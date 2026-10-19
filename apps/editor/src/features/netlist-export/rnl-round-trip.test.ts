@@ -36,7 +36,7 @@ import {
   createProjectSymbolResolver,
   externalSubcircuitSymbolId,
 } from "@icm/symbols";
-import { startCore } from "@rich-netlist/runtime";
+import { createRnlTestCore } from "./rnl-core.test-support";
 
 import { labelCensus, labelDifferences } from "../../../e2e/label-census";
 import { bipolarProject } from "../../../e2e/bipolar-project";
@@ -57,7 +57,7 @@ type ArrowEnd =
   | "open-arrow";
 
 // The rnl runtime's own core, in a worker thread: the editor's write and read.
-const core = startCore();
+const core = await createRnlTestCore();
 afterAll(() => core.terminate());
 const runtime: RnlRuntime = {
   // As JSON, this editor's readonly points are the runtime's point arrays.
