@@ -174,16 +174,13 @@ async function expectViewerLabels(
 }
 
 describe("viewer labels match the scene positions written by the editor", () => {
-  // preview.12 still inherits an owner's orientation for dx+dy labels.
-  // Change it.fails to it when the runtime is upgraded to a preview with
-  // the rnl scene-text orientation fix; keep this executable until then.
-  it.fails.each(["spice", "spectre"] as const)(
+  it.each(["spice", "spectre"] as const)(
     "draws the mirrored bipolar fixture's labels as written (%s)",
     async (format) => {
       await expectViewerLabels(bipolarProject(), format);
     },
   );
-  it.fails.each(
+  it.each(
     [
       "common-source-amplifier",
       "two-stage-op-amp",
