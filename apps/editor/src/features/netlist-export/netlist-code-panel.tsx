@@ -19,11 +19,14 @@ import {
 } from "./netlist-code-edit";
 import type { NetlistDiagnostic, PrintedNetlistInstance } from "@icm/netlist";
 import type { CircuitProject, ObjectLocator } from "@icm/model";
+import { NetlistCodeSelect, NetlistCopyButton } from "./netlist-code-controls";
 import {
-  NetlistCodeSelect,
-  NetlistCopyButton,
-  netlistFormatOptions,
-} from "./netlist-code-controls";
+  netlistMode,
+  netlistModeOptions,
+  type NetlistMode,
+} from "./netlist-mode";
+import type { NativeExternalTarget } from "../../hosts/native-external-links";
+import { RnlNetlistView } from "./rnl-netlist-view";
 import {
   inferNetlistProcess,
   preparedNetlistDefaults,
@@ -93,11 +96,14 @@ export function NetlistCodePanel({
   rootDocumentId,
   onRootChange,
   format,
+  rnl = false,
   namingProfile,
-  onFormatChange,
+  onModeChange,
   onReset,
   onCopy,
   onSaveFile,
+  externalLinksEnabled,
+  onOpenExternalLink,
   configurationError,
   onApply,
   onFocusInstance,
@@ -113,12 +119,17 @@ export function NetlistCodePanel({
   rootDocumentId?: string | undefined;
   onRootChange?(documentId: string): void;
   format: NetlistFormat;
+  /** Show the drawing written into the netlist as RNL, read-only. */
+  rnl?: boolean;
   namingProfile: NetlistNamingProfile;
-  onFormatChange(format: NetlistFormat): void;
+  onModeChange(mode: NetlistMode): void;
   onReset(): void;
   /** Puts the current netlist on the clipboard, as the Netlist menu's Copy does. */
   onCopy(): void;
   onSaveFile?(): void;
+  /** Whether the build may link outside itself; the RNL view's About link. */
+  externalLinksEnabled?: boolean | undefined;
+  onOpenExternalLink?: ((target: NativeExternalTarget) => void) | undefined;
   configurationError: string | null;
   onApply(edits: ProjectStructureEdit[]): boolean;
   onFocusInstance(instance: PrintedNetlistInstance | null): void;
@@ -449,9 +460,9 @@ export function NetlistCodePanel({
           <NetlistCodeSelect
             label="Format"
             ariaLabel="Netlist format"
-            value={format}
-            options={netlistFormatOptions}
-            onChange={(value) => onFormatChange(value as NetlistFormat)}
+            value={netlistMode(format, rnl)}
+            options={netlistModeOptions}
+            onChange={(value) => onModeChange(value as NetlistMode)}
           />
           <NetlistCodeSelect
             label="Process"
@@ -542,48 +553,59 @@ export function NetlistCodePanel({
           ) : null}
         </div>
       </div>
-      <div
-        className="netlist-code-viewport"
-        data-line-count={lineCount}
-        style={
-          {
-            "--netlist-editor-height": `${lineCount * 19.2 + 22}px`,
-          } as CSSProperties
-        }
-      >
-        <Suspense
-          fallback={
-            <StaticCodeView
-              ariaLabel="Loading Netlist code editor"
-              value={shown}
-              invalid={invalid}
-            />
+      {rnl ? (
+        <RnlNetlistView
+          project={project}
+          format={format}
+          namingProfile={namingProfile}
+          rootDocumentId={rootDocumentId}
+          externalLinksEnabled={externalLinksEnabled}
+          onOpenExternalLink={onOpenExternalLink}
+        />
+      ) : (
+        <div
+          className="netlist-code-viewport"
+          data-line-count={lineCount}
+          style={
+            {
+              "--netlist-editor-height": `${lineCount * 19.2 + 22}px`,
+            } as CSSProperties
           }
         >
-          <ProjectTextEditor
-            ariaLabel="Netlist code"
-            language="netlist"
-            value={shown}
-            readOnly={!!draftPreview}
-            invalid={invalid}
-            onChange={(text) => {
-              draftRef.current = text;
-              setDraft(text);
-              setApplyError(null);
-            }}
-            onEnter={() => {
-              if (!hasModelSources) apply();
-            }}
-            onModEnter={apply}
-            onBlur={() => {
-              if (!hasModelSources) applyRef.current();
-            }}
-            onCursorChange={focus}
-            highlightedRanges={highlightedRanges}
-            revealHighlight={selectionKey}
-          />
-        </Suspense>
-      </div>
+          <Suspense
+            fallback={
+              <StaticCodeView
+                ariaLabel="Loading Netlist code editor"
+                value={shown}
+                invalid={invalid}
+              />
+            }
+          >
+            <ProjectTextEditor
+              ariaLabel="Netlist code"
+              language="netlist"
+              value={shown}
+              readOnly={!!draftPreview}
+              invalid={invalid}
+              onChange={(text) => {
+                draftRef.current = text;
+                setDraft(text);
+                setApplyError(null);
+              }}
+              onEnter={() => {
+                if (!hasModelSources) apply();
+              }}
+              onModEnter={apply}
+              onBlur={() => {
+                if (!hasModelSources) applyRef.current();
+              }}
+              onCursorChange={focus}
+              highlightedRanges={highlightedRanges}
+              revealHighlight={selectionKey}
+            />
+          </Suspense>
+        </div>
+      )}
       <div
         className="netlist-device-mapping"
         aria-label="Netlist output options"
@@ -676,7 +698,7 @@ export function NetlistCodePanel({
           </button>
         </div>
       </div>
-      {dirty ? (
+      {!rnl && dirty ? (
         <div className="project-code-actions">
           <button
             type="button"
@@ -691,15 +713,15 @@ export function NetlistCodePanel({
           </button>
         </div>
       ) : null}
-      {editError ? <p role="alert">{editError}</p> : null}
+      {!rnl && editError ? <p role="alert">{editError}</p> : null}
       {processError ? <p role="alert">{processError}</p> : null}
-      {draftPreview ? (
+      {!rnl && draftPreview ? (
         <p className="netlist-edit-hint">
           Draft · each ? is something the drawing does not say yet
         </p>
       ) : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {issues.length ? (
+      {!rnl && error ? <p role="alert">{error}</p> : null}
+      {!rnl && issues.length ? (
         <div
           className="netlist-issues"
           role="alert"

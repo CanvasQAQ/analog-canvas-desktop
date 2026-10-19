@@ -156,6 +156,7 @@ export function EditorMenuBar({
   placeCellInstance,
   editorCommands,
   importSpiceFiles,
+  importRnlFiles,
   exportSvg,
   exportRaster,
   exportDesignNetlist,
@@ -260,6 +261,7 @@ export function EditorMenuBar({
   placeCellInstance: () => void;
   editorCommands: ReturnType<typeof createEditorCommandRouter>;
   importSpiceFiles: FileCommands["importSpiceFiles"];
+  importRnlFiles: FileCommands["importRnlFiles"];
   exportSvg: FileCommands["exportSvg"];
   exportRaster: FileCommands["exportRaster"];
   exportDesignNetlist: FileCommands["exportDesignNetlist"];
@@ -440,13 +442,14 @@ export function EditorMenuBar({
         onImportProject: (file) => void openProjectFile(file),
         onImportSpice: (files, namingProfile) =>
           void importSpiceFiles(files, namingProfile),
+        onImportRnl: (files) => void importRnlFiles(files),
         onExportProject: () => void exportProjectFile(),
         onExportSvg: () => void exportSvg(),
         onExportRaster: (format) => void exportRaster(format),
         // The file the Netlist panel's Save writes, whichever format it shows.
         onExportNetlist: () =>
           void exportDesignNetlist(
-            netlistPreferences.format,
+            netlistPreferences.mode,
             netlistNamingProfile,
             "file",
           ),

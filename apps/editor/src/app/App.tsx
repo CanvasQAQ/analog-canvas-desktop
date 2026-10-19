@@ -585,6 +585,7 @@ function WorkspaceEditor({
     NativeProjectHome,
     exportDelivery,
     capabilities,
+    openExternalLink,
   } = useEditorServices();
   const publicAgentUiEnabled =
     !import.meta.env?.ICM_DESKTOP && capabilities.agent && requestedAgentUi;
@@ -4434,32 +4435,36 @@ function WorkspaceEditor({
     paintSnapGuides,
     visualClipboard,
   });
-  const { exportSvg, exportDesignNetlist, exportRaster, importSpiceFiles } =
-    createEditorFileCommands({
-      project,
-      document,
-      resolver,
-      exportDelivery,
-      defaultViewBox: DEFAULT_VIEWBOX,
-      // Asked at export time, which is one of the moments an
-      // electrical verdict belongs to.
-      electricalWarningsPresent: () =>
-        requestElectricalDiagnostics().length > 0,
-      netlistRootDocumentId,
-      netlistConfigurationError: netlistPreferences.error,
-      guardDirtyReplacement,
-      replaceActiveProject,
-      showNetlist: (format, namingProfile) => {
-        netlistPreferences.selectFormat(format);
-        setNetlistNamingProfile(namingProfile);
-        showProjectPanel("netlist");
-      },
-      setImportReport,
-      setImportReviewOpen,
-      setSelectionOpen,
-      setStatus,
-      onChunkLoadFailure: setChunkLoadFailure,
-    });
+  const {
+    exportSvg,
+    exportDesignNetlist,
+    exportRaster,
+    importSpiceFiles,
+    importRnlFiles,
+  } = createEditorFileCommands({
+    project,
+    document,
+    resolver,
+    exportDelivery,
+    defaultViewBox: DEFAULT_VIEWBOX,
+    // Asked at export time, which is one of the moments an
+    // electrical verdict belongs to.
+    electricalWarningsPresent: () => requestElectricalDiagnostics().length > 0,
+    netlistRootDocumentId,
+    netlistConfigurationError: netlistPreferences.error,
+    guardDirtyReplacement,
+    replaceActiveProject,
+    showNetlist: (mode, namingProfile) => {
+      netlistPreferences.selectMode(mode);
+      setNetlistNamingProfile(namingProfile);
+      showProjectPanel("netlist");
+    },
+    setImportReport,
+    setImportReviewOpen,
+    setSelectionOpen,
+    setStatus,
+    onChunkLoadFailure: setChunkLoadFailure,
+  });
 
   // Single entry point for selecting a drafting object. Editing is opened
   // separately (double-click/Enter) so selection and text caret ownership do
@@ -5086,6 +5091,7 @@ function WorkspaceEditor({
         placeCellInstance={placeCellInstance}
         editorCommands={editorCommands}
         importSpiceFiles={importSpiceFiles}
+        importRnlFiles={importRnlFiles}
         exportSvg={exportSvg}
         exportRaster={exportRaster}
         exportDesignNetlist={exportDesignNetlist}
@@ -5489,7 +5495,8 @@ function WorkspaceEditor({
                       )
                     }
                     namingProfile={netlistNamingProfile}
-                    onFormatChange={netlistPreferences.selectFormat}
+                    rnl={netlistPreferences.rnl}
+                    onModeChange={netlistPreferences.selectMode}
                     profiles={netlistPreferences.preferences.profiles}
                     selectedProcess={netlistPreferences.selected}
                     onProcessChange={netlistPreferences.selectProfile}
@@ -5497,7 +5504,7 @@ function WorkspaceEditor({
                     onReset={netlistPreferences.reset}
                     onCopy={() =>
                       void exportDesignNetlist(
-                        netlistPreferences.format,
+                        netlistPreferences.mode,
                         netlistNamingProfile,
                       )
                     }
@@ -5505,9 +5512,18 @@ function WorkspaceEditor({
                       ? {
                           onSaveFile: () =>
                             void exportDesignNetlist(
-                              netlistPreferences.format,
+                              netlistPreferences.mode,
                               netlistNamingProfile,
                               "file",
+                            ),
+                        }
+                      : {})}
+                    externalLinksEnabled={capabilities.externalLinks}
+                    {...(openExternalLink
+                      ? {
+                          onOpenExternalLink: (target) =>
+                            void openExternalLink(target).catch((error) =>
+                              setStatus(String(error)),
                             ),
                         }
                       : {})}

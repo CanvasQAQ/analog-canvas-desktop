@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { resolve } from "node:path";
 import { inflateSync } from "node:zlib";
 import { createEmptyProject } from "@icm/model";
 import { serializeProject } from "@icm/project-protocol";
@@ -117,12 +116,21 @@ test("keeps rejected SPICE import diagnostics in a historical report", async ({
 }) => {
   await page.goto("/editor");
   await openMenu(page, "File");
-  await page
-    .getByTestId("spice-files")
-    .setInputFiles([
-      resolve(process.cwd(), "netlists/mixed-device-acceptance/circuit.spi"),
-      resolve(process.cwd(), "netlists/mixed-device-acceptance/models.inc"),
-    ]);
+  // A JFET has no symbol in the approved catalog. (The mixed-device acceptance
+  // netlist used to be refused for its switch; that card imports now.)
+  await page.getByTestId("spice-files").setInputFiles({
+    name: "jfet.spi",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      [
+        ".subckt top d g s",
+        "J1 d g s jm",
+        ".ends top",
+        ".model jm njf",
+        "",
+      ].join("\n"),
+    ),
+  });
 
   await expectStatus(page, "approved Razavi catalog has no symbol");
   const telemetry = page.getByTestId("editor-test-telemetry");
@@ -417,14 +425,21 @@ test("File > Export > Netlist saves the netlist the Netlist panel shows, in the 
   for (const [format, extension] of [
     ["spice", ".spi"],
     ["spectre", ".scs"],
+    ["spice+rnl", ".spi"],
+    ["spectre+rnl", ".scs"],
   ] as const) {
     await panel.getByLabel("Netlist format").selectOption(format);
-    await expect(code).toContainText(
-      format === "spice" ? ".subckt dut" : "subckt dut",
+    const output = format.endsWith("+rnl")
+      ? panel.getByRole("textbox", { name: "RNL netlist code", exact: true })
+      : code;
+    await expect(output).toContainText(
+      format.startsWith("spice") ? ".subckt dut" : "subckt dut",
     );
     // The editor's lines one by one: its element text as a whole gains line
     // breaks of its own in Chromium.
-    const shown = (await code.locator(".cm-line").allTextContents()).join("\n");
+    const shown = (await output.locator(".cm-line").allTextContents()).join(
+      "\n",
+    );
     const item = await exportNetlistItem(page);
     await expect(item).toHaveText("Netlist…");
     const saved = await savedBy(page, item);

@@ -171,8 +171,16 @@ declares fixed `VDD`/`VSS` ports; logic ports follow Symbol pins.
 - A same-name model in the imported SPICE suppresses the card everywhere; one in
   a folder's files only for that folder's runs. VACASK prints `sp_diode`/`sp_bjt`
   (`type=±1`); cards are SPICE-only.
-- Generic `NMOS`/`PMOS` and `SW` get no card; SPICE reports information
-  `GENERIC_MODEL_UNDEFINED`, silenced likewise.
+- A netlist handed out (panel, copy, save, `SPICE+RNL`, `Spectre+RNL`) carries
+  BSIM4 stand-ins for generic `NMOS`/`PMOS` in each Cell naming them
+  (information `GENERIC_MOS_MODEL`), so it reads back with each part's channel
+  and runs: `.model NMOS nmos level=54` and `.model PMOS pmos level=54` in
+  SPICE, `model NMOS bsim4 type=n` and `model PMOS bsim4 type=p` in Spectre.
+  BSIM4 takes the `nf` every MOS carries, which a level-1 card refuses; only
+  ngspice and Spectre are promised to read them. A run's deck carries none
+  (#1420: VACASK has no mapping for a Cell's own MOS card) and, like `SW`
+  everywhere, SPICE reports information `GENERIC_MODEL_UNDEFINED`, silenced
+  likewise.
 
 ### Magnetics
 
@@ -228,7 +236,11 @@ Printers are pure functions of a validated IR.
   stimuli or `.end`.
 - Spectre: version comment, `simulator lang=spectre`, sorted `global`,
   dependency-first `subckt`/`ends`, parenthesized nodes, Cell-local `parameters`;
-  never includes, sections, options, analyses, stimuli or saves.
+  never includes, sections, options, analyses, stimuli or saves. An independent
+  source the SPICE import kept as written, its AC and PULSE, SIN or PWL in its
+  dc text (`0.9 AC 1 0 PULSE(…)`), prints in Spectre's terms
+  (`type=pulse val0=… dc=0.9 mag=1 phase=0`), read as the VACASK projection
+  reads it; SPICE prints the text unchanged.
 
 ## Diagnostics and failure behavior
 
@@ -375,6 +387,9 @@ never invents an identifier.
   SPICE keeps an empty first title line; SCS starts with its language line.
 - Blocked output clears the panel and leaves the clipboard unchanged;
   presentation-only edits never change IR or bytes.
+- The `SPICE+RNL` and `Spectre+RNL` formats add RNL records and reorder
+  generated bodies' ports; they follow [RNL interchange](rnl-interchange.md),
+  and the rules above stay those of `SPICE` and `SCS`.
 
 ## Persistence boundary
 

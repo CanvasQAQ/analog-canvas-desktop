@@ -155,6 +155,9 @@ importers:
       "@icm/render-svg":
         specifier: workspace:*
         version: link:../../packages/render-svg
+      "@icm/rnl":
+        specifier: workspace:*
+        version: link:../../packages/rnl
       "@icm/simulation-service":
         specifier: workspace:*
         version: link:../../packages/simulation-service
@@ -167,6 +170,9 @@ importers:
       "@lezer/json":
         specifier: 1.0.3
         version: 1.0.3
+      "@rich-netlist/runtime":
+        specifier: 0.1.0-preview.12
+        version: 0.1.0-preview.12
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -450,6 +456,28 @@ importers:
       "@icm/symbols":
         specifier: workspace:*
         version: link:../symbols
+
+  packages/rnl:
+    dependencies:
+      "@icm/derived":
+        specifier: workspace:*
+        version: link:../derived
+      "@icm/devices":
+        specifier: workspace:*
+        version: link:../devices
+      "@icm/model":
+        specifier: workspace:*
+        version: link:../model
+      "@icm/netlist":
+        specifier: workspace:*
+        version: link:../netlist
+      "@icm/symbols":
+        specifier: workspace:*
+        version: link:../symbols
+    devDependencies:
+      "@icm/project-protocol":
+        specifier: workspace:*
+        version: link:../project-protocol
 
   packages/simulation-service:
     dependencies:
@@ -1975,6 +2003,12 @@ packages:
         integrity: sha512-xBaJish5OeGmniDj9cW5PRa/PtmuVU3ziqrbr5xJj901ZDN4TosrVaNZpEiLZAxdfnhAe7uQ7QFWfjPe9d9K2Q==,
       }
     engines: { node: ">= 10" }
+
+  "@rich-netlist/runtime@0.1.0-preview.12":
+    resolution:
+      {
+        integrity: sha512-WEJzEhJKBxZcbwXJR2fR6MUYeW5J+b7R0J7G2la5hNfCq23goBl+w21kkKg7NEHxNGouPGTeRq6xsmdyuLEebA==,
+      }
 
   "@rolldown/binding-android-arm64@1.2.3":
     resolution:
@@ -4254,6 +4288,8 @@ snapshots:
       "@resvg/resvg-js-win32-arm64-msvc": 2.6.2
       "@resvg/resvg-js-win32-ia32-msvc": 2.6.2
       "@resvg/resvg-js-win32-x64-msvc": 2.6.2
+
+  "@rich-netlist/runtime@0.1.0-preview.12": {}
 
   "@rolldown/binding-android-arm64@1.2.3":
     optional: true

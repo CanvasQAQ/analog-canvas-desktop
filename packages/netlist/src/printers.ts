@@ -49,13 +49,21 @@ function spiceInstance(instance: DesignNetlistInstance): string[] {
 }
 
 /** A Cell's own model cards, each `.model NAME TYPE(PARAM=VALUE …)`. */
+/** A model a Cell carries, as the SPICE card its body holds. */
+export function spiceModelCard(
+  model: NonNullable<DesignNetlistCell["models"]>[number],
+): string {
+  const values = model.parameters
+    .map((parameter) => `${parameter.name}=${parameter.rawValue}`)
+    .join(" ");
+  // A MOS stand-in reads as decks write one, `.model NMOS nmos level=54`.
+  if (model.type === "nmos" || model.type === "pmos")
+    return `.model ${model.name} ${model.type} ${values}`;
+  return `.model ${model.name} ${model.type}(${values})`;
+}
+
 function spiceModels(cell: DesignNetlistCell): string[] {
-  return (cell.models ?? []).map(
-    (model) =>
-      `.model ${model.name} ${model.type}(${model.parameters
-        .map((parameter) => `${parameter.name}=${parameter.rawValue}`)
-        .join(" ")})`,
-  );
+  return (cell.models ?? []).map(spiceModelCard);
 }
 
 /**
@@ -201,7 +209,7 @@ function renderSpice(
     append(
       ...(definition.kind === "magnetic"
         ? spiceMagneticSubcircuit(definition)
-        : generatedBehavioralModel(definition.name)),
+        : generatedBehavioralModel(definition.name, definition.ports)),
     );
   }
   for (const cell of ir.cells) {
@@ -297,6 +305,11 @@ function spectreCell(
       lines.push(
         ...printSpectreBehavioralModel(switchBehavioralDefinition(model)),
       );
+    // A MOS stand-in is Spectre's own BSIM4, as SPICE's is level 54.
+    if (model.type === "nmos" || model.type === "pmos")
+      lines.push(
+        `model ${model.name} bsim4 type=${model.type === "nmos" ? "n" : "p"}`,
+      );
   }
   let offset = lines.join("\n").length + 1;
   for (const instance of cell.instances) {
@@ -310,6 +323,14 @@ function spectreCell(
   lines.push(...couplingCards(cell, "spectre"));
   lines.push(`ends ${cell.name}`);
   return lines;
+}
+
+/** A Cell the netlist generates, an ideal block's body, as a file holds it. */
+export function printGeneratedCell(
+  cell: DesignNetlistCell,
+  format: NetlistFormat,
+): string[] {
+  return format === "spice" ? spiceCell(cell) : spectreCell(cell);
 }
 
 function renderSpectre(
@@ -335,7 +356,7 @@ function renderSpectre(
       ...(definition.kind === "magnetic"
         ? spectreMagneticSubcircuit(definition)
         : printSpectreBehavioralModel(
-            generatedBehavioralDefinition(definition.name),
+            generatedBehavioralDefinition(definition.name, definition.ports),
           )),
     );
   let length = lines.join("\n").length;

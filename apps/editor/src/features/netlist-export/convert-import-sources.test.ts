@@ -1,12 +1,111 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDesignNetlistExport } from "@icm/netlist";
+import { parseProject } from "@icm/project-protocol";
 import { importSpiceSources } from "@icm/spice";
-import { convertImportSources } from "./convert-import-sources.js";
+import { prepareImportSources } from "./convert-import-sources.js";
 const file = (path: string, text: string) => ({
   path,
   bytes: new TextEncoder().encode(text),
 });
 describe("Spectre import conversion", () => {
+  it.each(["unreferenced file", "inactive branch"])(
+    "keeps an author's Cell when an %s defines a built-in of the same name",
+    async (location) => {
+      const example = parseProject(
+        readFileSync(
+          resolve(
+            import.meta.dirname,
+            "../../examples/two-stage-op-amp.icproj.json",
+          ),
+          "utf8",
+        ),
+      );
+      const exported = createDesignNetlistExport(example, { format: "spice" });
+      if (exported.status !== "ready") throw new Error("export blocked");
+      const entry = [
+        ".subckt opamp VDD VSS VIP VIN VOUT",
+        "R1 VIP VOUT 10k",
+        "R2 VIN VSS 100k",
+        ".ends opamp",
+        ".subckt main vdd vss vip vin vout",
+        "X1 vdd vss vip vin vout opamp",
+        ".ends main",
+      ].join("\n");
+      const prepared = prepareImportSources(
+        location === "unreferenced file"
+          ? [file("entry.sp", entry), file("unused.sp", exported.file.text)]
+          : [
+              file(
+                "entry.sp",
+                `${entry}\n.if 0\n${exported.file.text}\n.endif\n`,
+              ),
+            ],
+      );
+      const result = await importSpiceSources(
+        prepared.inputs,
+        "entry.sp",
+        {},
+        {
+          builtInBodies: prepared.builtInBodies,
+        },
+      );
+      expect(result.successful, JSON.stringify(result.diagnostics)).toBe(true);
+      const custom = result.project?.documents.find(
+        (cell) => cell.netlist?.name === "opamp",
+      );
+      expect(
+        custom?.instances
+          .filter((part) => part.symbolId === "resistor")
+          .map((part) => part.reference),
+      ).toEqual(["R1", "R2"]);
+      const call = result.project?.documents
+        .find((cell) => cell.netlist?.name === "main")
+        ?.instances.find((part) => part.reference === "X1");
+      expect(call?.netlist?.binding).toEqual({
+        kind: "subcircuit",
+        childDocumentId: custom?.id,
+      });
+    },
+  );
+  it("keeps model bindings when a different Cell defines a same-name ideal switch", async () => {
+    const prepared = prepareImportSources([
+      file(
+        "switches.sp",
+        [
+          ".subckt custom a b c",
+          ".model ideal_switch SW(RON=2 ROFF=1e12 VT=0.5 VH=0)",
+          "S1 a b c 0 ideal_switch",
+          ".ends custom",
+          ".subckt standard a b c",
+          ".model ideal_switch SW(RON=1 ROFF=1e12 VT=0.5 VH=0)",
+          "S2 a b c 0 ideal_switch",
+          ".ends standard",
+        ].join("\n"),
+      ),
+    ]);
+    const result = await importSpiceSources(
+      prepared.inputs,
+      "switches.sp",
+      {},
+      {
+        builtInBodies: prepared.builtInBodies,
+      },
+    );
+    expect(result.successful, JSON.stringify(result.diagnostics)).toBe(true);
+    for (const cell of result.project!.documents) {
+      const part = cell.instances.find((instance) =>
+        instance.reference?.startsWith("S"),
+      );
+      expect(part?.symbolId).toBe("voltage-controlled-switch");
+      expect(part?.netlist?.binding).toEqual({
+        kind: "model",
+        deviceClass: "switch",
+        name: "ideal_switch",
+      });
+    }
+  });
   it("converts the entry and local includes while retaining their paths", async () => {
     const inputs = [
       file(
@@ -19,7 +118,7 @@ describe("Spectre import conversion", () => {
       ),
     ];
     const before = structuredClone(inputs);
-    const converted = convertImportSources(inputs);
+    const converted = prepareImportSources(inputs).inputs;
     expect(inputs).toEqual(before);
     expect(converted.map((f) => f.path)).toEqual(["circuit.scs", "leaf.inc"]);
     const result = await importSpiceSources(converted, "circuit.scs");
@@ -37,7 +136,7 @@ R3 (a\.b x\/y) resistor r=3k
 R4 (p\:q gnd) resistor r=4k
 ends top`;
     const result = await importSpiceSources(
-      convertImportSources([file("circuit.scs", text)]),
+      prepareImportSources([file("circuit.scs", text)]).inputs,
       "circuit.scs",
     );
     expect(result.successful, JSON.stringify(result.diagnostics)).toBe(true);
@@ -59,11 +158,53 @@ ends top`;
   });
   it("leaves ordinary SPICE unchanged and rejects lossy SCS with a file/line", () => {
     const spice = file("circuit.spi", "R1 a 0 1k");
-    expect(convertImportSources([spice])[0]).toBe(spice);
+    expect(prepareImportSources([spice]).inputs[0]).toBe(spice);
     expect(() =>
-      convertImportSources([
+      prepareImportSources([
         file("circuit.scs", "// heading\nR1 (a 0) resistor r=1k tc1=1"),
       ]),
     ).toThrow("circuit.scs:2: Unsupported parameters: tc1");
   });
+  it.each(["spice", "spectre"] as const)(
+    "brings the blocks of a %s export back as the blocks that wrote them",
+    async (format) => {
+      const project = parseProject(
+        readFileSync(
+          resolve(
+            import.meta.dirname,
+            "../../examples/two-stage-op-amp.icproj.json",
+          ),
+          "utf8",
+        ),
+      );
+      const exported = createDesignNetlistExport(project, { format });
+      if (exported.status !== "ready") throw new Error("export blocked");
+      const path = format === "spice" ? "circuit.sp" : "circuit.scs";
+      const prepared = prepareImportSources([file(path, exported.file.text)]);
+      expect(prepared.builtInBodies.map((body) => body.name)).toEqual([
+        "opamp",
+        "voltage_amplifier",
+      ]);
+      const result = await importSpiceSources(
+        prepared.inputs,
+        path,
+        {},
+        {
+          builtInBodies: prepared.builtInBodies,
+        },
+      );
+      expect(result.successful, JSON.stringify(result.diagnostics)).toBe(true);
+      expect(
+        result.project?.documents.flatMap((document) =>
+          document.instances.map((instance) => instance.symbolId),
+        ),
+      ).toEqual(expect.arrayContaining(["opamp", "voltage-amplifier"]));
+      const again = createDesignNetlistExport(result.project!, { format });
+      // Conversion from Spectre spells a value as its number (1p as 1e-12).
+      const values = (text: string) => text.replace(/\bc=1e-12\b/gu, "c=1p");
+      expect(again.status === "ready" && values(again.file.text)).toBe(
+        exported.file.text,
+      );
+    },
+  );
 });

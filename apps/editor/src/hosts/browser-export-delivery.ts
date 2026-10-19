@@ -1,3 +1,4 @@
+import { writeClipboardText } from "./clipboard-text";
 import { downloadBlob } from "./download-link";
 import type { EditorExportDelivery } from "./export-delivery";
 
@@ -10,7 +11,5 @@ export const browserExportDelivery: EditorExportDelivery = {
     );
     return { status: "download-requested" };
   },
-  async copyText(text) {
-    await navigator.clipboard.writeText(text);
-  },
+  copyText: writeClipboardText,
 };

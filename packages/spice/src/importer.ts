@@ -40,11 +40,159 @@ export interface SpiceImportResult extends SpiceCompileResult {
   project: CircuitProject | null;
 }
 
+/**
+ * A body Analog Canvas writes itself that the sources define, such as an
+ * op-amp's subcircuit or the ideal switch's model card: each card naming it
+ * imports as the part that wrote it, and a subcircuit body as no Cell. The
+ * netlist package tells such a body from an author's own of the same name
+ * (`findBuiltInBodies`); the importer only reads what it found.
+ */
+export interface SpiceBuiltInBody {
+  /** The verified declaration in the prepared source, not just its name. */
+  readonly source: { readonly path: string; readonly line: number };
+  /** The body's name, as the sources spell it. */
+  readonly name: string;
+  /**
+   * What the name is: a subcircuit, which `X` calls name, or a model card,
+   * which device cards such as `S` name.
+   */
+  readonly kind: "subcircuit" | "model";
+  /** The part's Symbol. */
+  readonly symbolId: string;
+  /** The subcircuit the part is bound to, as a placed one is; a part that takes no binding, such as a switch, has none. */
+  readonly target?: string;
+  /**
+   * The letters the part's reference starts with, where they are not X: a
+   * card that writes an X before them, as SPICE writes a call and the
+   * conversion from Spectre names one, keeps the reference without it.
+   */
+  readonly referencePrefix?: string;
+  /** Parameters the body's name stands for, such as an adder's signs. */
+  readonly parameters?: Readonly<Record<string, string>>;
+  /**
+   * The body's ports in the order it lists them: a Symbol pin; a supply the
+   * part takes as a property; the Cell's ground, which a switch reads its
+   * control against; or the clock its label names, as a chopper's. A supply
+   * the body does not read is left unbound where a card passes ground,
+   * which is what an unbound one exports as; bound, it could export as
+   * another card.
+   */
+  readonly ports: readonly (
+    | { readonly pinName: string }
+    | { readonly supply: "VDD" | "VSS"; readonly unboundAtGround: boolean }
+    | { readonly ground: true }
+    | { readonly phase: true }
+  )[];
+}
+
 export interface SpiceImportOptions {
   /** Input before frontend conversion; never used as mutable connectivity. */
   originalSources?: readonly SpiceSourceInput[];
   symbolMappings?: readonly PdkSymbolMappingOverride[];
   namingProfile?: "native" | "cadence-bang";
+  /** Bodies Analog Canvas writes itself among the sources' subcircuits. */
+  builtInBodies?: readonly SpiceBuiltInBody[];
+}
+
+/** The key a built-in body is found by: its kind and its name, any case. */
+const builtInBodyKey = (kind: SpiceBuiltInBody["kind"], name: string) =>
+  `${kind}:${name.toLowerCase()}`;
+
+/** The built-in body a card names, if the sources define one. */
+function calledBuiltInBody(
+  instance: CircuitInstanceIR,
+  bodies: ReadonlyMap<string, SpiceBuiltInBody>,
+): SpiceBuiltInBody | undefined {
+  if (instance.target.kind === "subcircuit")
+    return bodies.get(builtInBodyKey("subcircuit", instance.target.cellName));
+  if (instance.target.kind === "model")
+    return bodies.get(builtInBodyKey("model", instance.target.modelName));
+  return undefined;
+}
+
+/**
+ * The pin a card's node meets on the part a built-in body imports as: a
+ * Symbol pin, a supply, or null where the part takes the node otherwise (a
+ * supply left unbound, the ground a switch reads, the clock its label names).
+ */
+function builtInBodyPin(
+  body: SpiceBuiltInBody,
+  position: number,
+  atGround: boolean,
+): string | null {
+  const port = body.ports[position];
+  if (!port) return null;
+  if ("pinName" in port) return port.pinName;
+  if ("supply" in port)
+    return atGround && port.unboundAtGround ? null : port.supply;
+  return null;
+}
+
+/** The part's reference: the card's name, without an X SPICE put before it. */
+function builtInReference(name: string, prefix: string | undefined): string {
+  return prefix &&
+    /^x/iu.test(name) &&
+    name.slice(1).toUpperCase().startsWith(prefix.toUpperCase())
+    ? name.slice(1)
+    : name;
+}
+
+/** A card naming a built-in body, as the part that wrote it. */
+function importBuiltInBlock(
+  instance: CircuitInstanceIR,
+  body: SpiceBuiltInBody,
+  diagnostics: SpiceDiagnostic[],
+): Instance | null {
+  if (instance.terminals.length !== body.ports.length) {
+    diagnostics.push(
+      diagnostic(
+        "SPICE_IMPORT_UNSUPPORTED_SYMBOL",
+        "error",
+        "import",
+        `${instance.name} calls ${body.name} with ${instance.terminals.length} nodes for its ${body.ports.length} ports`,
+        instance.sourceRef,
+      ),
+    );
+    return null;
+  }
+  return {
+    id: instance.id,
+    symbolId: body.symbolId,
+    sourceRef: instance.sourceRef,
+    importProvenance: {
+      kind: "opaque",
+      sourceMasterName: body.name,
+      sourceTarget: `${body.kind}:${body.name}`,
+      status: "resolved",
+      terminalMapping: instance.terminals.flatMap((terminal) => {
+        const port = body.ports[terminal.position];
+        return port && "pinName" in port
+          ? [{ sourcePosition: terminal.position, pinName: port.pinName }]
+          : [];
+      }),
+    },
+    placement: null,
+    reference: builtInReference(instance.name, body.referencePrefix),
+    netlist: {
+      ...(body.target
+        ? {
+            binding: {
+              kind: "unresolved-subcircuit" as const,
+              name: body.target,
+            },
+          }
+        : {}),
+      parameters: {
+        ...Object.fromEntries(
+          Object.entries(instance.parameters).map(([name, parameter]) => [
+            name,
+            parameter.rawText,
+          ]),
+        ),
+        ...body.parameters,
+      },
+    },
+  };
 }
 
 function importedNetName(
@@ -109,6 +257,7 @@ function netlistDeviceClass(symbolId: string): NetlistDeviceClass | null {
     pnp: "bjt",
     "voltage-source": "voltage-source",
     "current-source": "current-source",
+    "voltage-controlled-switch": "switch",
     ground: "net-marker",
     vdd: "net-marker",
   };
@@ -191,6 +340,14 @@ function symbolFor(
         ...(pdkMapping.registryId ? { registryId: pdkMapping.registryId } : {}),
       };
     }
+    // An S card naming a model of the author's own: a switch the voltage
+    // across its two control nodes closes. Analog Canvas's own ideal switch
+    // is a built-in body, read before this.
+    if (/^s/iu.test(instance.name) && instance.terminals.length === 4)
+      return {
+        symbolId: "voltage-controlled-switch",
+        pinNames: ["P", "N", "CP", "CN"],
+      };
     const modelType = modelTypeByName.get(
       instance.target.modelName.toLowerCase(),
     );
@@ -389,7 +546,10 @@ function importInstance(
   diagnostics: SpiceDiagnostic[],
   modelTypeByName: ReadonlyMap<string, string>,
   symbolMappings: readonly PdkSymbolMappingOverride[],
+  builtInBodies: ReadonlyMap<string, SpiceBuiltInBody>,
 ): Instance | null {
+  const body = calledBuiltInBody(instance, builtInBodies);
+  if (body) return importBuiltInBlock(instance, body, diagnostics);
   const mapping = symbolFor(instance, modelTypeByName, symbolMappings);
   if (!mapping) {
     diagnostics.push(
@@ -756,6 +916,7 @@ function importDocument(
   diagnostics: SpiceDiagnostic[],
   modelTypeByName: ReadonlyMap<string, string>,
   options: SpiceImportOptions,
+  builtInBodies: ReadonlyMap<string, SpiceBuiltInBody>,
 ): SchematicDocument {
   const symbolMappings = options.symbolMappings ?? [];
   const namingProfile = options.namingProfile ?? "native";
@@ -777,7 +938,13 @@ function importDocument(
   });
   const instances = visibleInstances
     .map((instance) =>
-      importInstance(instance, diagnostics, modelTypeByName, symbolMappings),
+      importInstance(
+        instance,
+        diagnostics,
+        modelTypeByName,
+        symbolMappings,
+        builtInBodies,
+      ),
     )
     .filter((instance): instance is Instance => instance !== null);
   const importedInstanceById = new Map(
@@ -811,32 +978,93 @@ function importDocument(
       };
     }
   }
-  const nets: Net[] = cell.nets.map((net) => ({
-    id: net.id,
-    terminals: visibleInstances
-      .filter((instance) => importedInstanceById.has(instance.id))
-      .flatMap((instance) =>
-        instance.terminals
-          .filter(
-            (terminal) =>
-              terminal.netId === net.id &&
-              (!["vcvs", "vccs", "cccs", "ccvs"].includes(
-                importedInstanceById.get(instance.id)?.symbolId ?? "",
-              ) ||
-                terminal.position < 2),
-          )
-          .map((terminal) => ({
-            instanceId: instance.id,
-            pinName: String(
-              importedInstanceById
-                .get(instance.id)
-                ?.importProvenance?.terminalMapping?.find(
-                  (candidate) => candidate.sourcePosition === terminal.position,
-                )?.pinName ?? `P${terminal.position + 1}`,
-            ),
-          })),
+  const groundNetIds = new Set(
+    cell.nets.filter((net) => net.name === "0").map((net) => net.id),
+  );
+  /** The pin a call's node meets, or null where it meets none. */
+  const pinAt = (
+    instance: CircuitInstanceIR,
+    terminal: CircuitInstanceIR["terminals"][number],
+  ): string | null => {
+    const imported = importedInstanceById.get(instance.id);
+    if (!imported) return null;
+    const body = calledBuiltInBody(instance, builtInBodies);
+    if (body)
+      return builtInBodyPin(
+        body,
+        terminal.position,
+        groundNetIds.has(terminal.netId),
+      );
+    if (
+      ["vcvs", "vccs", "cccs", "ccvs"].includes(imported.symbolId) &&
+      terminal.position >= 2
+    )
+      return null;
+    return String(
+      imported.importProvenance?.terminalMapping?.find(
+        (candidate) => candidate.sourcePosition === terminal.position,
+      )?.pinName ?? `P${terminal.position + 1}`,
+    );
+  };
+  const controlNetIds = new Set(
+    instances.flatMap((instance) =>
+      instance.netlist?.control?.kind === "voltage"
+        ? [
+            instance.netlist.control.positiveNetId,
+            instance.netlist.control.negativeNetId,
+          ]
+        : [],
+    ),
+  );
+  const nets: Net[] = cell.nets
+    .map((net) => ({
+      id: net.id,
+      terminals: visibleInstances.flatMap((instance) =>
+        instance.terminals.flatMap((terminal) => {
+          const pinName =
+            terminal.netId === net.id ? pinAt(instance, terminal) : null;
+          return pinName === null ? [] : [{ instanceId: instance.id, pinName }];
+        }),
       ),
-  }));
+    }))
+    // A ground that only supplies left unbound reached would still make
+    // the Cell reach ground, and its export add a ground pin; it goes too.
+    .filter(
+      (net) =>
+        net.terminals.length > 0 ||
+        !groundNetIds.has(net.id) ||
+        controlNetIds.has(net.id) ||
+        cell.ports.some((port) => port.netId === net.id) ||
+        !visibleInstances.some(
+          (instance) =>
+            calledBuiltInBody(instance, builtInBodies) &&
+            instance.terminals.some((terminal) => terminal.netId === net.id),
+        ),
+    );
+  const keptNetIds = new Set(nets.map((net) => net.id));
+  // A switch reads its control against the Cell's ground, which a Cell
+  // printed as a subcircuit takes as a pin (VSS): the node its card passes
+  // there is claimed as ground, as a ground drawn on it would be, so the
+  // switch reads the same node again.
+  const blockGroundNetIds = new Set<string>();
+  const phaseLabels: { instanceId: string; name: string }[] = [];
+  for (const instance of visibleInstances) {
+    const body = calledBuiltInBody(instance, builtInBodies);
+    if (!body || !importedInstanceById.has(instance.id)) continue;
+    for (const terminal of instance.terminals) {
+      const port = body.ports[terminal.position];
+      if (!port) continue;
+      if ("ground" in port && !groundNetIds.has(terminal.netId))
+        blockGroundNetIds.add(terminal.netId);
+      // A part clocked by its label, as a chopper is, names the node.
+      const net = cell.nets.find((item) => item.id === terminal.netId);
+      if ("phase" in port && net)
+        phaseLabels.push({
+          instanceId: instance.id,
+          name: importedNetName(net.name, net.scope, namingProfile).name,
+        });
+    }
+  }
   const formalTerminals = cell.ports.map((port, index) => {
     const importedPortName = importedNetName(
       port.name,
@@ -876,6 +1104,24 @@ function importDocument(
     importedInstanceById,
     diagnostics,
   );
+  const placed = withShelfPlacements(
+    instances,
+    DOCUMENT_GRID,
+    new Map(
+      formalTerminals.flatMap((terminal) => {
+        const [pin] = terminal.interfaceInstanceIds;
+        return pin
+          ? [
+              [
+                pin,
+                cellPinSide(terminal.name, terminal.netId, nets, instances),
+              ] as const,
+            ]
+          : [];
+      }),
+    ),
+  );
+  const labelOffset = { x: 0, y: -4 * DOCUMENT_GRID };
   return {
     id: documentId,
     name: cell.name,
@@ -884,8 +1130,10 @@ function importDocument(
     sourceStatus: "in-sync",
     importReference: {
       files: [],
-      nets: nets.map((net, index) => {
-        const source = cell.nets[index]!;
+      // Every net kept is one of the Cell's.
+      nets: nets.flatMap((net) => {
+        const source = cell.nets.find((candidate) => candidate.id === net.id);
+        if (!source) return [];
         const name = importedNetName(source.name, source.scope, namingProfile);
         return {
           id: source.id,
@@ -915,20 +1163,12 @@ function importDocument(
         defaultValue: parameter.rawText,
       })),
     },
-    instances: withShelfPlacements(
-      instances,
-      DOCUMENT_GRID,
-      new Map(
-        formalTerminals.map((terminal) => [
-          terminal.interfaceInstanceIds[0]!,
-          cellPinSide(terminal.name, terminal.netId, nets, instances),
-        ]),
-      ),
-    ),
+    instances: placed,
     nets,
     ...(mosBulkDefaults ? { mosBulkDefaults } : {}),
     ...(inductorCouplings.length ? { inductorCouplings } : {}),
     connectivityEvidence: cell.nets.flatMap((net) => {
+      if (!keptNetIds.has(net.id)) return [];
       const importedName = importedNetName(net.name, net.scope, namingProfile);
       return [
         ...(importedName.name
@@ -999,11 +1239,52 @@ function importDocument(
           netId: net.id,
           sourceNetId,
         })),
+        ...(blockGroundNetIds.has(net.id)
+          ? [
+              {
+                id: deriveStableId(
+                  "connectivity-evidence",
+                  documentId,
+                  "block-ground",
+                  net.id,
+                ),
+                kind: "name-claim" as const,
+                netId: net.id,
+                name: "0",
+                owner: {
+                  kind: "global-declaration" as const,
+                  sourceNetId: net.id,
+                },
+                scope: "global" as const,
+                powerDomain: "ground" as const,
+              },
+            ]
+          : []),
       ];
     }),
     routes: [],
     junctions: [],
-    annotations: [],
+    annotations: phaseLabels.map(({ instanceId, name }) => {
+      const position = placed.find((item) => item.id === instanceId)?.placement
+        ?.position ?? { x: 0, y: 0 };
+      return {
+        id: deriveStableId("annotation", documentId, "phase", instanceId),
+        kind: "instance-label" as const,
+        content: { runs: [{ kind: "text" as const, value: name }] },
+        anchor: {
+          kind: "object" as const,
+          objectId: instanceId,
+          localOffset: labelOffset,
+          fallbackPosition: {
+            x: position.x + labelOffset.x,
+            y: position.y + labelOffset.y,
+          },
+        },
+        alignment: "middle" as const,
+        rotation: 0 as const,
+        locked: false,
+      };
+    }),
     presentation: {
       styleProfileId: "razavi-textbook-v1",
       grid: DOCUMENT_GRID,
@@ -1153,8 +1434,47 @@ function importCircuitIR(
       model.modelType.toLowerCase(),
     ]),
   );
-  const importedDocuments = ir.cells.map((cell) =>
-    importDocument(cell, diagnostics, modelTypeByName, options),
+  const builtInBodies = new Map(
+    (options.builtInBodies ?? [])
+      .filter((body) => {
+        const definitions = (
+          body.kind === "subcircuit" ? ir.cells : ir.models
+        ).filter(
+          (definition) =>
+            definition.name.toLowerCase() === body.name.toLowerCase(),
+        );
+        const matches = (
+          candidate: SpiceBuiltInBody,
+          definition: (typeof definitions)[number],
+        ) =>
+          bundle.files.some(
+            (file) =>
+              file.id === definition.sourceRef.fileId &&
+              file.path === normalizeSourcePath(candidate.source.path),
+          ) && definition.sourceRef.start.line === candidate.source.line;
+        // Only the active definition may authorize a built-in. Model names can
+        // occur in several Cells: keep ordinary bindings if any definition is
+        // custom, rather than applying one Cell's model to another.
+        return (
+          definitions.some((definition) => matches(body, definition)) &&
+          definitions.every((definition) =>
+            (options.builtInBodies ?? []).some(
+              (candidate) =>
+                candidate.kind === body.kind &&
+                candidate.name.toLowerCase() === body.name.toLowerCase() &&
+                matches(candidate, definition),
+            ),
+          )
+        );
+      })
+      .map((body) => [builtInBodyKey(body.kind, body.name), body]),
+  );
+  // A built-in body imports as the part each call of it is, not as a Cell.
+  const isBody = (name: string) =>
+    builtInBodies.has(builtInBodyKey("subcircuit", name));
+  const cells = ir.cells.filter((cell) => !isBody(cell.name));
+  const importedDocuments = cells.map((cell) =>
+    importDocument(cell, diagnostics, modelTypeByName, options, builtInBodies),
   );
   const { documents, externalSubcircuitDefinitions } =
     bindImportedChildDocuments(importedDocuments);
@@ -1163,7 +1483,7 @@ function importCircuitIR(
       fileId: file.id,
     }));
   }
-  const topCell = ir.topCells[0] ?? ir.cells[0]?.name;
+  const topCell = ir.topCells.find((name) => !isBody(name)) ?? cells[0]?.name;
   const topDocument = documents.find(
     (document) =>
       document.sourceBinding?.cellName.toLowerCase() === topCell?.toLowerCase(),

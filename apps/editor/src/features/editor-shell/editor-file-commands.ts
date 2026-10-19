@@ -1,5 +1,5 @@
-import { convertImportSources } from "../netlist-export/convert-import-sources";
-import type { NetlistFormat, NetlistNamingProfile } from "@icm/netlist";
+import { prepareImportSources } from "../netlist-export/convert-import-sources";
+import type { NetlistNamingProfile } from "@icm/netlist";
 import type { CircuitProject, GridRect, SchematicDocument } from "@icm/model";
 import { importSpiceSources } from "@icm/spice";
 import type { SymbolResolver } from "@icm/symbols";
@@ -7,14 +7,25 @@ import { safeExportBaseName } from "@icm/exporters";
 import type { EditorExportDelivery } from "../../hosts/export-delivery";
 
 import { withImportedInstanceDisplays } from "../instance-display/imported-instance-displays";
+import {
+  netlistModeParts,
+  type NetlistMode,
+} from "../netlist-export/netlist-mode";
+import { planRnlImport } from "../netlist-export/rnl-import";
+import { loadRnlRuntime } from "../netlist-export/rnl-runtime";
 
 import {
   createVisualExportArtifact,
   createSvgExportArtifact,
   describeExportFailure,
   planDesignNetlistExport,
+  planRnlNetlistExport,
+  type DesignNetlistExportPlan,
   type EditorExportArtifact,
 } from "./editor-export-commands";
+
+const CLIPBOARD_FALLBACK =
+  "Clipboard unavailable; select the netlist in the sidebar and copy it";
 
 type SpiceImportResult = Awaited<ReturnType<typeof importSpiceSources>>;
 export interface SpiceImportReport {
@@ -40,10 +51,7 @@ export interface EditorFileCommandDependencies {
     viewBox: GridRect,
     options: { source: "spice-import" },
   ) => void;
-  showNetlist: (
-    format: NetlistFormat,
-    namingProfile: NetlistNamingProfile,
-  ) => void;
+  showNetlist: (mode: NetlistMode, namingProfile: NetlistNamingProfile) => void;
   setImportReport: (report: SpiceImportReport | null) => void;
   setImportReviewOpen: (open: boolean) => void;
   setSelectionOpen: (open: boolean) => void;
@@ -96,17 +104,54 @@ export function createEditorFileCommands({
     }
   };
 
+  /** The status when the rnl runtime fails to load or to write. */
+  const rnlFailure = (error: unknown) =>
+    error instanceof Error
+      ? `RNL: ${error.message}`
+      : "The rnl runtime could not write this netlist";
+
+  /**
+   * Copies an RNL netlist. The copy starts now and takes the text once the
+   * runtime's Worker has written it: Safari refuses a clipboard write that
+   * starts after that wait.
+   */
+  const copyRnlNetlist = async (
+    options: Omit<Parameters<typeof planRnlNetlistExport>[0], "runtime">,
+  ): Promise<void> => {
+    const planned: Promise<DesignNetlistExportPlan> = loadRnlRuntime()
+      .then((runtime) => planRnlNetlistExport({ ...options, runtime }))
+      .catch((error: unknown) => ({
+        status: "blocked",
+        message: rnlFailure(error),
+      }));
+    const text = planned.then((plan) =>
+      plan.status === "ready"
+        ? String(plan.artifact.bytes)
+        : Promise.reject(new Error(plan.message)),
+    );
+    // A blocked plan fails the copy too; the plan says why, below.
+    text.catch(() => {});
+    const copied = exportDelivery.copyText(text).then(
+      () => true,
+      () => false,
+    );
+    const plan = await planned;
+    if (plan.status === "blocked") setStatus(plan.message);
+    else setStatus((await copied) ? plan.artifact.report : CLIPBOARD_FALLBACK);
+  };
+
   const exportDesignNetlist = async (
-    format: NetlistFormat,
+    mode: NetlistMode,
     namingProfile: NetlistNamingProfile = "native",
     destination: "clipboard" | "file" = "clipboard",
   ): Promise<void> => {
-    showNetlist(format, namingProfile);
+    showNetlist(mode, namingProfile);
     if (netlistConfigurationError) {
       setStatus(`Fix Netlist configuration: ${netlistConfigurationError}`);
       return;
     }
-    const plan = planDesignNetlistExport({
+    const { format, rnl } = netlistModeParts(mode);
+    const options = {
       format,
       project,
       namingProfile,
@@ -114,7 +159,23 @@ export function createEditorFileCommands({
         ? { rootDocumentId: netlistRootDocumentId }
         : {}),
       electricalWarningsPresent: electricalWarningsPresent(),
-    });
+    };
+    if (rnl && destination === "clipboard") {
+      await copyRnlNetlist(options);
+      return;
+    }
+    let plan;
+    try {
+      plan = rnl
+        ? await planRnlNetlistExport({
+            ...options,
+            runtime: await loadRnlRuntime(),
+          })
+        : planDesignNetlistExport(options);
+    } catch (error) {
+      setStatus(rnlFailure(error));
+      return;
+    }
     if (plan.status === "blocked") {
       setStatus(plan.message);
       return;
@@ -144,7 +205,7 @@ export function createEditorFileCommands({
           ? error instanceof Error
             ? error.message
             : "Netlist file export failed"
-          : "Clipboard unavailable; select the netlist in the sidebar and copy it",
+          : CLIPBOARD_FALLBACK,
       );
     }
   };
@@ -166,11 +227,9 @@ export function createEditorFileCommands({
     }
   };
 
-  const importSpiceFiles = async (
-    files: FileList | null,
-    namingProfile: "native" | "cadence-bang" = "native",
-  ): Promise<void> => {
-    if (!files || files.length === 0) return;
+  /** The chosen files and the one entry among them, or null after saying why. */
+  const readSources = async (files: FileList | null) => {
+    if (!files || files.length === 0) return null;
     const sourceInputs = await Promise.all(
       [...files].map(async (file) => ({
         path: file.webkitRelativePath || file.name,
@@ -191,47 +250,107 @@ export function createEditorFileCommands({
       setStatus(
         `Select one unambiguous .cir, .sp, .spi, or .scs entry and its local include files; found ${entryCandidates.length}`,
       );
-      return;
+      return null;
     }
+    return { sourceInputs, entryCandidates };
+  };
+
+  /** Replace the open Project with an imported one, and open its report. */
+  const installImport = async (
+    label: string,
+    importedProject: CircuitProject,
+    report: SpiceImportReport,
+  ) => {
+    const instanceCount = importedProject.documents.reduce(
+      (count, candidate) => count + candidate.instances.length,
+      0,
+    );
+    await guardDirtyReplacement(label, () => {
+      replaceActiveProject(importedProject, defaultViewBox, {
+        source: "spice-import",
+      });
+      setImportReport(report);
+      setImportReviewOpen(true);
+      setSelectionOpen(true);
+      const documents = importedProject.documents.length;
+      setStatus(
+        `Imported ${documents} ${documents === 1 ? "Document" : "Documents"} and ${instanceCount} structural ${instanceCount === 1 ? "instance" : "instances"}`,
+      );
+    });
+  };
+
+  /** Show an import that failed, with its findings. */
+  const reportFailedImport = (report: SpiceImportReport, message: string) => {
+    setImportReport(report);
+    setImportReviewOpen(true);
+    setSelectionOpen(true);
+    setStatus(message);
+  };
+
+  const importRnlFiles = async (files: FileList | null): Promise<void> => {
+    const sources = await readSources(files);
+    if (!sources) return;
+    // readSources returns only with exactly one entry.
+    const [entry] = sources.entryCandidates;
+    if (!entry) return;
+    const entryPath = entry.path;
+    setStatus("Importing RNL sources");
+    try {
+      const plan = await planRnlImport({
+        inputs: sources.sourceInputs,
+        entryPath,
+        runtime: await loadRnlRuntime(),
+      });
+      const report = { entryPath, diagnostics: plan.diagnostics };
+      if (plan.status === "failed") {
+        reportFailedImport(report, plan.message);
+        return;
+      }
+      await installImport("Import RNL sources", plan.project, report);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "RNL import failed");
+    }
+  };
+
+  const importSpiceFiles = async (
+    files: FileList | null,
+    namingProfile: "native" | "cadence-bang" = "native",
+  ): Promise<void> => {
+    const sources = await readSources(files);
+    if (!sources) return;
+    const { sourceInputs, entryCandidates } = sources;
     setStatus("Importing SPICE sources");
     try {
+      const prepared = prepareImportSources(sourceInputs);
       const result = await importSpiceSources(
-        convertImportSources(sourceInputs),
+        prepared.inputs,
         entryCandidates[0]!.path,
         {},
-        { namingProfile, originalSources: sourceInputs },
+        {
+          namingProfile,
+          originalSources: sourceInputs,
+          builtInBodies: prepared.builtInBodies,
+        },
       );
       const nextImportReport: SpiceImportReport = {
         entryPath: entryCandidates[0]!.path,
         diagnostics: result.diagnostics,
       };
       if (!result.project || !result.successful) {
-        setImportReport(nextImportReport);
-        setImportReviewOpen(true);
-        setSelectionOpen(true);
         const firstError = result.diagnostics.find(
           (item) => item.severity === "error",
         );
-        setStatus(firstError?.message ?? "SPICE import failed");
+        reportFailedImport(
+          nextImportReport,
+          firstError?.message ?? "SPICE import failed",
+        );
         return;
       }
-      const importedProject = withImportedInstanceDisplays(result.project);
-      const instanceCount = importedProject.documents.reduce(
-        (count, candidate) => count + candidate.instances.length,
-        0,
+      await installImport(
+        "Import SPICE sources",
+        withImportedInstanceDisplays(result.project),
+        nextImportReport,
       );
-      await guardDirtyReplacement("Import SPICE sources", () => {
-        replaceActiveProject(importedProject, defaultViewBox, {
-          source: "spice-import",
-        });
-        setImportReport(nextImportReport);
-        setImportReviewOpen(true);
-        setSelectionOpen(true);
-        const documents = importedProject.documents.length;
-        setStatus(
-          `Imported ${documents} ${documents === 1 ? "Document" : "Documents"} and ${instanceCount} structural ${instanceCount === 1 ? "instance" : "instances"}`,
-        );
-      });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "SPICE import failed");
     }
@@ -242,5 +361,6 @@ export function createEditorFileCommands({
     exportDesignNetlist,
     exportRaster,
     importSpiceFiles,
+    importRnlFiles,
   };
 }

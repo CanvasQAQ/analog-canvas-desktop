@@ -59,6 +59,12 @@ function versionStaticServiceWorker(): Plugin {
 export default defineConfig({
   // The Worker serves the editor from a domain root, so assets are absolute.
   base: "/",
+  // The rnl runtime's Worker awaits at its top level, so Workers bundle as
+  // ES modules; every Worker here is a module Worker already.
+  worker: { format: "es" },
+  // Pre-bundling would rewrite the runtime's import.meta.url for its Worker
+  // and WebAssembly; serve it as the package ships it.
+  optimizeDeps: { exclude: ["@rich-netlist/runtime"] },
   plugins: [
     isolateDevDependencyCache(),
     react(),

@@ -5,6 +5,7 @@ export {
   GENERIC_PNP_MODEL,
 } from "./extract-generic-models.js";
 export * from "./export.js";
+export type { BodyPortOrder } from "./body-port-order.js";
 export * from "./project-model-source.js";
 export * from "./model-source-variant.js";
 export * from "./model-source-transform.js";
@@ -14,6 +15,7 @@ export * from "./equivalence.js";
 export * from "./topology-correspondence.js";
 export * from "./net-name-codec.js";
 export * from "./net-export-name.js";
+export { withNetlistPowerMarkerClaims } from "./extract-nets.js";
 export * from "./printers.js";
 export * from "./printed-netlist.js";
 export * from "./parameter-projection.js";
@@ -52,3 +54,4 @@ export * from "./vacask-model-symbols.js";
 export * from "./simulation-native-migration.js";
 export { isVacaskStatement } from "./vacask-statement.js";
 export * from "./instance-source.js";
+export * from "./built-in-bodies.js";
