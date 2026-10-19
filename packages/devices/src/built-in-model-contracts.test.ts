@@ -20,7 +20,11 @@ describe("built-in model registration", () => {
       expect(
         model!.ports.map((port) => port.name),
         descriptor.symbolId,
-      ).toEqual(descriptor.ports.map((port) => port.name));
+      ).toEqual(
+        descriptor.ports
+          .filter((port) => model!.family !== "comparator" || !port.supply)
+          .map((port) => port.name),
+      );
     }
     expect(
       new Set(builtInModelContracts.map((model) => model.target)).size,

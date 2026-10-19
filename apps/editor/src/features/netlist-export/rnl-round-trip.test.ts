@@ -76,7 +76,7 @@ async function roundTrip(
   format: "spice" | "spectre" = "spice",
 ) {
   const exported = createRnlExport(project, { format });
-  if (exported.status !== "ready") throw new Error("export blocked");
+  if (exported.status !== "ready") throw new Error(JSON.stringify(exported));
   const written = await runtime.write({ write: exported.request, svg: false });
   return importRnl(written.text, format);
 }
@@ -807,11 +807,16 @@ function comparator(
     reference: "X1",
     placement: { position: { x: 100, y: 0 }, rotation: 0, mirror: "none" },
     netlist: {
-      binding: { kind: "unresolved-subcircuit", name: IDEAL_COMPARATOR_TARGET },
+      binding: {
+        kind: "unresolved-subcircuit",
+        name: symbolId.startsWith("comparator-differential")
+          ? "icm_ideal_comparator_differential"
+          : IDEAL_COMPARATOR_TARGET,
+      },
       parameters,
     },
   });
-  for (const port of subcircuitDescriptor("comparator")!.ports) {
+  for (const port of subcircuitDescriptor(symbolId)!.ports) {
     const pinName = port.pinName ?? port.supply;
     if (port.supply && !(powered && port.supply === "VDD")) continue;
     const id = `pin-${port.name}`;
@@ -835,8 +840,101 @@ function comparator(
 }
 
 describe("RNL round trip of built-in blocks", () => {
+  it("refuses an inline comparator stencil on a different custom master interface", () => {
+    const project = comparator("comparator-differential", {}, true);
+    const ports = ["VDD", "VSS", "VIP", "VIN", "VOP", "VON"];
+    project.documents[0]!.instances[0]!.netlist!.binding = {
+      kind: "unresolved-subcircuit",
+      name: "custom_cmp",
+    };
+    project.modelSources = [
+      {
+        id: "source",
+        language: "spice",
+        revision: 1,
+        entry: "cmp.sp",
+        dependencies: [],
+        files: [
+          {
+            path: "cmp.sp",
+            text: `.subckt custom_cmp ${ports.join(" ")}\nRLOAD VOP VON 1k\n.ends custom_cmp\n`,
+          },
+        ],
+      },
+    ];
+    project.externalSubcircuitDefinitions = [
+      {
+        id: "custom-cmp",
+        name: "custom_cmp",
+        interfaceStatus: "declared",
+        terminals: ports.map((name) => ({
+          id: name,
+          name,
+          direction: "inout" as const,
+        })),
+        formalParameters: [],
+        implementation: {
+          kind: "source",
+          sourceId: "source",
+          entry: "custom_cmp",
+        },
+      },
+    ];
+    const result = createRnlExport(project, { format: "spice" });
+    expect(result.status).toBe("blocked");
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "RNL_INLINE_INTERFACE_MISMATCH" }),
+    );
+  });
+  it.each(["missing primitive", "linewidth", "linestyle", "fill"])(
+    "does not recognize a local comparator stencil with edited %s",
+    async (edit) => {
+      const project = comparator(
+        "comparator-differential-inputs-swapped",
+        { vhigh: "1" },
+        false,
+      );
+      const exported = createRnlExport(project, { format: "spice" });
+      if (exported.status !== "ready") throw Error(JSON.stringify(exported));
+      const stencil = exported.request.ops.find(
+        (op) => op.op === "define-symbol",
+      );
+      if (!stencil || stencil.op !== "define-symbol")
+        throw Error("No inline stencil");
+      if (edit === "missing primitive") stencil.prims.pop();
+      else if (edit === "fill") {
+        const triangle = stencil.prims.find(
+          (primitive) => primitive.points.length === 4,
+        )!;
+        triangle.params = { ...triangle.params, fill: "linecolor" };
+      } else {
+        const lead = stencil.prims[0]!;
+        lead.style = {
+          ...lead.style,
+          ...(edit === "linewidth" ? { linewidth: 12 } : { linestyle: "none" }),
+        };
+      }
+      const written = await runtime.write({
+        write: exported.request,
+        svg: false,
+      });
+      const plan = await importRnl(written.text, "spice");
+      expect(plan.diagnostics).toContainEqual(
+        expect.objectContaining({ code: "RNL_IMPORT_UNMAPPED_SYMBOL" }),
+      );
+    },
+  );
   it.each(
-    (["comparator", "comparator-unmarked"] as const).flatMap((symbolId) =>
+    (
+      [
+        "comparator",
+        "comparator-unmarked",
+        "comparator-differential",
+        "comparator-differential-inputs-swapped",
+        "comparator-differential-unmarked",
+        "comparator-differential-unmarked-inputs-swapped",
+      ] as const
+    ).flatMap((symbolId) =>
       (
         [
           ["icm_ideal_comparator", { vhigh: "1" }, false],
@@ -844,7 +942,17 @@ describe("RNL round trip of built-in blocks", () => {
         ] as const
       ).map(
         ([body, parameters, powered]) =>
-          [symbolId, body, parameters, powered] as const,
+          [
+            symbolId,
+            symbolId.startsWith("comparator-differential")
+              ? body.replace(
+                  "icm_ideal_comparator",
+                  "icm_ideal_comparator_differential",
+                )
+              : body,
+            parameters,
+            powered,
+          ] as const,
       ),
     ),
   )(

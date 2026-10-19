@@ -78,14 +78,17 @@ the deterministic standalone Symbol projection, not unrelated electrical edits.
 ## Razavi visual authority and product boundary
 
 `fixtures/visual-reference/razavi-reference-v1/manifest.json` is the only
-visual authority. A catalog entry may appear in the Razavi palette only when
-it is both `reviewed` and has:
+visual authority for reference-derived entries. A catalog entry may appear in
+the Razavi palette only when it is `reviewed` and either has:
 
 ```json
 "visualAuthority": { "kind": "razavi-reference-v1", "...": "..." }
 ```
 
-The product set is exactly the reviewed, Reference-calibrated entries:
+or declares explicit `house` provenance and its reason, with no claimed visual
+authority. House entries follow the [visual contract](../../docs/specs/razavi-visual-contract.md#provenance).
+
+The product set is exactly the reviewed reference entries and explicit house derivatives:
 
 - `nmos`, `pmos`, and `ground`;
 - `voltage-source`, `pulse-voltage-source`, `current-source`; the two-terminal
@@ -192,6 +195,11 @@ The product set is exactly the reviewed, Reference-calibrated entries:
   past the apex. The shared construction lives in `scripts/lib/analog-triangle.mjs`,
   and the op-amp
   generator also projects the comparator bodies;
+- `comparator-differential` is a house-derived complementary-output comparator,
+  sharing that triangle and the existing comparator's step glyph. Its hidden
+  input-swapped/unmarked siblings preserve named electrical pins; its ideal
+  model follows the [netlist contract](../../docs/specs/netlist-export.md#ideal-blocks).
+  No exact PDF witness is claimed;
 - `opamp-wide` and `opamp-differential-wide` sit beside their compact versions
   in Analog Blocks. The 40-unit entries display **Op Amp** and **FD Amp**;
   the existing 20-unit entries display **Op Amp S** and **FD Amp S**. Tooltips

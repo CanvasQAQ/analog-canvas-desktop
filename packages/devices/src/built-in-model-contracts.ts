@@ -6,8 +6,10 @@ import type {
 import { IDEAL_COMPARATOR_TARGET } from "./contract.js";
 import {
   HIGH_LEVEL_PARAMETER,
-  IDEAL_COMPARATOR_SUPPLY_TARGET,
+  DIFFERENTIAL_COMPARATOR_TARGET,
   idealComparatorBodyPorts,
+  idealComparatorModelTarget,
+  idealComparatorReadsSupply,
   SUPPLY_HIGH_LEVEL,
   type IdealComparatorBody,
 } from "./ideal-comparator.js";
@@ -244,6 +246,10 @@ const recipes: Readonly<Record<string, BuiltInModelRecipe>> = {
     family: "comparator",
     implementation: "comparator",
   },
+  [DIFFERENTIAL_COMPARATOR_TARGET]: {
+    family: "comparator",
+    implementation: "comparator",
+  },
 };
 
 function contract(target: string): BuiltInModelContract | undefined {
@@ -263,8 +269,11 @@ function contract(target: string): BuiltInModelContract | undefined {
     // its VDD high level chooses adds VDD (ideal-comparator.ts). Its
     // historical five-port external master is not a generated model.
     ports:
-      target === IDEAL_COMPARATOR_TARGET
-        ? idealComparatorBodyPorts(IDEAL_COMPARATOR_TARGET, descriptor.ports)
+      family === "comparator"
+        ? idealComparatorBodyPorts(
+            target as IdealComparatorBody,
+            descriptor.ports,
+          )
         : descriptor.ports,
     parameters:
       family === "logic"
@@ -344,8 +353,8 @@ const NUMERIC_BODY_HIGH_LEVEL = "1";
 export function idealComparatorBodyContract(
   body: IdealComparatorBody,
 ): IdealComparatorBodyContract {
-  const model = builtInModelContract(IDEAL_COMPARATOR_TARGET)!;
-  const readsSupply = body === IDEAL_COMPARATOR_SUPPLY_TARGET;
+  const model = builtInModelContract(idealComparatorModelTarget(body))!;
+  const readsSupply = idealComparatorReadsSupply(body);
   const descriptor = builtInSubcircuitDescriptors.find(
     (candidate) => candidate.symbolId === model.symbolId,
   )!;
