@@ -138,6 +138,13 @@ declares fixed `VDD`/`VSS` ports; logic ports follow Symbol pins.
   (stored `vhigh=1` is not migrated). Errors:
   `INVALID_IDEAL_COMPARATOR_PARAMETER` (also ERC and immediate Agent refusal),
   `IDEAL_COMPARATOR_NAME_COLLISION`.
+- Fully differential comparator (`comparator-differential`) shares those
+  parameters and checks. `OUT+` uses the comparator transfer above; `OUT-`
+  uses its complement, so their sum is high + vlow and equal inputs put both
+  at the midpoint. Bodies `icm_ideal_comparator_differential` (`VIP VIN VOP
+  VON`) and `icm_ideal_comparator_differential_vdd` (`VDD VIP VIN VOP VON`)
+  read neither VSS nor an implicit clock. The model is ideal, unlatched and
+  memoryless; the Symbol's step mark adds no hysteresis or propagation delay.
 - SPICE and VACASK include all bodies; Spectre includes comparator and
   combinational gates (`bsource` with RC delay); DFF, multiplier and converters
   stay call-only with `SPECTRE_MODEL_NOT_INCLUDED`. Other Analog Blocks are

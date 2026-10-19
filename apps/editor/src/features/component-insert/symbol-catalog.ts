@@ -88,6 +88,8 @@ export function symbolCategory(symbolId: string): string {
       "voltage-amplifier",
       "comparator",
       "comparator-unmarked",
+      "comparator-differential",
+      "comparator-differential-unmarked",
     ].includes(symbolId)
   ) {
     return "Analog Blocks";
@@ -163,6 +165,7 @@ const LIBRARY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   "opamp-wide": "Op Amp",
   "opamp-differential-crossed": "FD Amp S",
   "opamp-differential-wide-crossed": "FD Amp",
+  "comparator-differential": "FD Comp",
   "depletion-nmos": "D-NMOS",
   "depletion-pmos": "D-PMOS",
   "externally-controlled-switch": "Ctrl SW",
@@ -177,6 +180,8 @@ const LIBRARY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
 
 /** One line saying what an entry does, where the name alone leaves a doubt. */
 const LIBRARY_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  "comparator-differential":
+    "Fully differential comparator — complementary OUT+ / OUT−; input/output pin spacing: 20",
   tcoil:
     "Bridged T-coil: two coupled windings with a bridge capacitor across the ends",
   "center-tap-inductor":
@@ -309,6 +314,7 @@ const SYMBOL_ORDER: readonly string[] = [
   "transconductance",
   "differential-transconductance",
   "comparator",
+  "comparator-differential",
   "adc",
   "dac",
   "annotation-arrow",

@@ -53,6 +53,15 @@ the RNL language and its runtime belong to rnl.
   `$VCVS`, `$VCCS`, `$CCVS` and `$CCCS` symbols. Default circle appearances
   export as `$CANVAS_*_CIRCLE` from `analog-canvas-extensions`. Both preserve
   their appearance, pin positions and control connections through import.
+- Fully differential comparators define their exact house artwork in the file
+  using the runtime's `define-symbol` operation. Signals precede supplies;
+  numeric-high bodies omit VDD and every body omits VSS. Marked, unmarked and
+  input-swapped states round-trip without an external symbol-package update.
+  Import recognizes the local Symbol only when its name, artwork and positional
+  pins match; an edited stencil keeps the electrically imported part and reports
+  `RNL_IMPORT_UNMAPPED_SYMBOL`. A retargeted custom interface with different
+  positional terminals refuses with `RNL_INLINE_INTERFACE_MISMATCH`, rather
+  than drawing a wire on the wrong signal; plain SPICE/SCS remains available.
 - RNL's op-amp kinds (op-amps, comparators, differential transconductors) put
   - on top, at the inputs and at a differential op-amp's outputs. An Analog
     Canvas variant with − on top is that symbol flipped top to bottom: it is

@@ -5,7 +5,7 @@ import type { Instance, SchematicDocument } from "@icm/model";
 import {
   ADDER_SIGNED_INPUTS,
   ADDER_TARGET,
-  IDEAL_COMPARATOR_SUPPLY_TARGET,
+  idealComparatorReadsSupply,
   OPAMP_HIGH_LIMIT,
   OPAMP_LIMIT_SUPPLIES,
   OPAMP_LOW_LIMIT,
@@ -315,7 +315,7 @@ export function extractBuiltInSubcircuitInstance(
     parameters: (idealComparator
       ? parameters.filter(
           ([name]) =>
-            target !== IDEAL_COMPARATOR_SUPPLY_TARGET ||
+            !idealComparatorReadsSupply(target) ||
             name.toLowerCase() !== HIGH_LEVEL_PARAMETER,
         )
       : parameters
