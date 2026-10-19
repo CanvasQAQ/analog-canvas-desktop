@@ -184,6 +184,19 @@ it("says which .model card a device of unknown type needs", async () => {
   );
 });
 
+it("suggests native Spectre model statements for an undeclared model in SCS", async () => {
+  const result = await importSpiceSources(
+    [input("bipolar.scs", "* converted SCS\nQ1 c b e mystery\n.end\n")],
+    "bipolar.scs",
+  );
+  expect(
+    result.diagnostics.find((d) => d.code === "SPICE_IMPORT_UNSUPPORTED_SYMBOL")
+      ?.message,
+  ).toBe(
+    'Q1 uses model mystery, which no model statement declares, so its device type is unknown. Add "model mystery bjt type=npn" or "model mystery bjt type=pnp".',
+  );
+});
+
 it("imports a standard-cell call as the external block it declares, not a Library gate (#1450)", async () => {
   // A cell is reviewed only behind a gate someone bound it to: its four rails
   // have no place on the gate's symbol.

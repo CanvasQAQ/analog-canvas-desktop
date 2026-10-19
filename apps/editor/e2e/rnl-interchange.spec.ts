@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { compareElectricalGraphs, projectElectricalGraph } from "@icm/netlist";
 
 import {
   exampleProject,
@@ -10,6 +11,41 @@ import {
   showNetlistPanel,
 } from "./editor-fixtures.js";
 import { labelCensus, labelDifferences } from "./label-census.js";
+import { bipolarProject } from "./bipolar-project.js";
+
+for (const mode of ["spice+rnl", "spectre+rnl"] as const)
+  test(`imports bipolar devices, a diode and mirrored labels from ${mode}`, async ({
+    page,
+  }) => {
+    const project = bipolarProject();
+    await openProject(page, project);
+    const drawn = await exportedProject(page);
+    const text = await copiedNetlist(page, mode);
+    await page.getByTestId("rnl-files").setInputFiles({
+      name: `bipolar.${mode === "spice+rnl" ? "sp" : "scs"}`,
+      mimeType: "text/plain",
+      buffer: Buffer.from(text),
+    });
+    const unsaved = page.getByRole("dialog", { name: "Unsaved changes" });
+    const imported = page
+      .getByTestId("status")
+      .filter({ hasText: /^Imported \d+ Documents?/u });
+    await expect(unsaved.or(imported)).toBeVisible();
+    if (await unsaved.isVisible())
+      await unsaved
+        .getByRole("button", { name: "Continue without saving" })
+        .click();
+    await expectStatus(page, /^Imported \d+ Documents?/u);
+    const read = await exportedProject(page);
+    expect(drawingCensus(read)).toEqual(drawingCensus(drawn));
+    const before = projectElectricalGraph(drawn);
+    const after = projectElectricalGraph(read);
+    expect(before.status).toBe("ready");
+    expect(after.status).toBe("ready");
+    if (before.status === "ready" && after.status === "ready")
+      expect(compareElectricalGraphs(before.graph, after.graph)).toBe("equal");
+    expect(labelDifferences(labelCensus(drawn), labelCensus(read))).toEqual([]);
+  });
 
 /**
  * A netlist as the Netlist panel's Copy hands it out, in one of its formats,
