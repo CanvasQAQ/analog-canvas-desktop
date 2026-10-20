@@ -265,7 +265,7 @@ export function DrawingToolbar({
         onClick={() => onActivateTool("no-connect")}
       >
         <ToolIcon name="no-connect" />
-        <span>No Connect</span>
+        <span>NoConn</span>
       </button>
       <button
         type="button"

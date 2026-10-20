@@ -154,7 +154,8 @@ One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
 
 ### No Connect
 
-- Toolbar **No Connect**, its Library tile and `I` search (`NC`, `noconn`,
+- Compact tool labels show **NoConn**; explanatory tooltips retain **No Connect**.
+  The toolbar, Library tile and `I` search (`NC`, `noconn`,
   `No Connect`) activate the same marking tool, never create an Instance.
 - Hover and click choose the nearest visible device terminal within 12 screen
   pixels. Ambiguous overlapping terminals are not guessed. The preview names

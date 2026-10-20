@@ -162,6 +162,7 @@ export function symbolCategory(symbolId: string): string {
  * Both remain independently authored interface objects in the current model.
  */
 const LIBRARY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+  "no-connect": "NoConn",
   opamp: "Op Amp S",
   "opamp-wide": "Op Amp",
   "opamp-differential-crossed": "FD Amp S",
@@ -182,7 +183,7 @@ const LIBRARY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
 /** One line saying what an entry does, where the name alone leaves a doubt. */
 const LIBRARY_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "no-connect":
-    "Mark intentionally unused pins; activates a tool, not a device",
+    "No Connect: mark intentionally unused pins; activates a tool, not a device",
   "comparator-differential":
     "Fully differential comparator — complementary OUT+ / OUT−; input/output pin spacing: 20",
   tcoil:

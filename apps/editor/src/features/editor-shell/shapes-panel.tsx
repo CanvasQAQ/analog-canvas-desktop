@@ -61,7 +61,7 @@ const COMPACT_LIBRARY_LABELS: Readonly<Record<string, string>> = {
   "variable-inductor": "Var Ind",
   "variable-resistor": "Var Res",
   vdd: "VDD Rail",
-  "no-connect": "NC",
+  "no-connect": "NoConn",
   "vdd-port": "VDD",
   "voltage-amplifier": "V Amp",
   "voltage-source": "V Src",
