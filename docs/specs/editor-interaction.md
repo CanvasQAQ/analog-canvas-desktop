@@ -12,8 +12,8 @@ rendering and recovery.
 
 - Library, `I` and **Place Cell** are views over one editor-local insert
   controller (`all` picker, `cells` picker, or a chosen Symbol) delegating to the
-  component, Cell, Cell-Pin, external-master or VDD-rail planner. It adds no
-  Project type, Edit Engine operation or Agent endpoint.
+  component, Cell, Cell-Pin, external-master or VDD-rail planner, or activating
+  an editor tool. It adds no Project type, Edit Engine operation or Agent endpoint.
 - A Cell placement shares cursor preview, snap, rotation, mirror and cancel with
   Symbols and creates one typed subcircuit Instance through a Project structural
   transaction. `Xn` is its sole Netlist Reference; an internal Cell shows its
@@ -114,7 +114,7 @@ rendering and recovery.
 
 One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
 `VddRailPlacement`, `CopyPlacement`, `SelectionMove` (`M`/`Shift+M`), `Wire`,
-`Drawing`.
+`NoConnect`, `Drawing`.
 
 - Box selection, drag-move, pan and text editing are bounded gesture owners
   cancelled at every reset boundary; no transient state lives in parallel React
@@ -151,6 +151,19 @@ One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
   screen pixels, ranked by closest conductor point before quantization. A
   captured target completes in one click; Alt suppresses capture; ambiguous
   coincident Nets need a clearer target; a Junction and its arms are one target.
+
+### No Connect
+
+- Toolbar **No Connect**, its Library tile and `I` search (`NC`, `noconn`,
+  `No Connect`) activate the same marking tool, never create an Instance.
+- Hover and click choose the nearest visible device terminal within 12 screen
+  pixels. Ambiguous overlapping terminals are not guessed. The preview names
+  the target and distinguishes connected and already-marked pins.
+- Each click on an unused terminal adds the existing NoConnect declaration in
+  one undoable transaction; the tool stays active until Escape or another tool.
+  Repeated marks do nothing; connected pins require explicit disconnection.
+- Tool exit, Document change, leaving the canvas and camera changes clear the
+  hover preview. Endpoint Properties retains its existing mark/clear actions.
 
 ## Selection alignment
 

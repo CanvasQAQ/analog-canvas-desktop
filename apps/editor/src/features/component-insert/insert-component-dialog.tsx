@@ -237,6 +237,10 @@ export function InsertComponentDialog({
   const applyChoice = (choice: InsertChoice | null): void => {
     if (!choice) return;
     const symbolId = choice.symbol.id;
+    if (choice.kind === "symbol" && symbolId === "no-connect") {
+      onApply({ kind: "no-connect", symbolId, symbolName: "No Connect" });
+      return;
+    }
     if (choice.kind === "symbol" && symbolId === "vdd") {
       onApply({
         kind: "vdd-rail",
