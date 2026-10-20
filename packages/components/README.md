@@ -149,8 +149,9 @@ The product set is exactly the reviewed reference entries and explicit house der
   Figures 16.2, 16.24, and 16.25. Buffer and the generic D/CK/Q/Q-bar flip-flop
   use direct evidence from Figures 16.53(a) and 16.23(a). `delay-cell` uses the
   rectangular `Delta-T` stage from _Analysis and Design of Data Converters_,
-  printed page 331, Figure 16.2(c); its timing and netlist implementation remain
-  deliberately unmapped. OR is the reviewed NOR body without its output
+  printed page 331, Figure 16.2(c); its noninverting propagation model and
+  project Cell binding follow the [netlist contract](../../docs/specs/netlist-export.md#ideal-blocks),
+  independently of that visual evidence. OR is the reviewed NOR body without its output
   bubble; XNOR is the direct XOR body with the reviewed two-input NOR negation
   bubble. The eight combinational gates use the product normalization
   `bodyNormalization: "left-grid-anchor"`: translate the reviewed artwork

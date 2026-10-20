@@ -46,6 +46,7 @@ import { createDefaultNetlistExportPreferences } from "./netlist-export-preferen
 import { prepareNetlistExample } from "./netlist-process";
 import { planRnlImport } from "./rnl-import";
 import type { RnlRuntime } from "./rnl-runtime";
+import { delayCellFixture } from "../../../../../packages/netlist/src/delay-cell-fixture.test-support.js";
 
 /** An arrow end's style, as a drawing object keeps it. */
 type ArrowEnd =
@@ -74,6 +75,26 @@ const example = (name: string): CircuitProject =>
       "utf8",
     ),
   );
+
+it.each(["spice", "spectre"] as const)(
+  "round-trips an electrical Delay Cell's body, supply connections and unchanged artwork through %s+RNL",
+  async (format) => {
+    const project = delayCellFixture();
+    const result = await roundTrip(project, format);
+    expect(failures(result)).toEqual([]);
+    const parts = result.project.documents
+      .flatMap((d) => d.instances)
+      .filter((i) => i.symbolId === "delay-cell");
+    expect(parts).toHaveLength(3);
+    expect(parts.every((i) => i.netlist?.parameters.tpd === "100p")).toBe(true);
+    expect(drawingCensus(result.project)).toEqual(drawingCensus(project));
+    const before = projectElectricalGraph(project);
+    const after = projectElectricalGraph(result.project);
+    if (before.status !== "ready" || after.status !== "ready")
+      throw Error("Delay Cell graph was not ready");
+    expect(compareElectricalGraphs(before.graph, after.graph)).toBe("equal");
+  },
+);
 
 describe("RNL round trip of bipolar devices and mirrored labels", () => {
   it.each(["spice", "spectre"] as const)(

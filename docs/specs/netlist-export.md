@@ -118,6 +118,19 @@ declares fixed `VDD`/`VSS` ports; logic ports follow Symbol pins.
   Cells; inputs are high above V(VDD,VSS)/2 via a `tanh` step `vt` (10 mV);
   outputs swing VSS→VDD through a one-pole delay `td` (10 ps); flip-flops sample D
   on CK rising, RST active high.
+- Delay Cell (`delay_cell`: `VDD VSS A Y`) is noninverting logic propagation,
+  not pure transport or a sampled `z^-1` delay. Relative to VSS, with
+  `Vs=V(VDD,VSS)` and `L(v)=(1+tanh((v-Vs/2)/vt))/2`, its state obeys
+  `tau*dx/dt+x=Vs*L(A)` and `Y=Vs*L(x)`, `tau=tpd/ln(2)`.
+  Positive numeric `tpd` (10 ps) is the nominal settled full-swing 50% delay;
+  positive numeric `vt` (10 mV) sets threshold width. Input slew/history can
+  change delay and narrow pulses can be suppressed. Input is high impedance,
+  output is an ideal voltage drive; no physical loading or power is modeled.
+  Invalid parameters block export with `INVALID_DELAY_CELL_PARAMETER`.
+  SPICE, VACASK and Spectre project the same recipe; Spectre execution is not
+  qualified. Like gates and DFFs, a project Cell with A/Y and optional VDD/VSS
+  Pins can replace the body without changing artwork. That Cell owns its
+  parameters and supplies; clearing its selection restores formula defaults.
 - Adder: V(Y) = ±V(A) ± V(B). `signA`/`signB` are `+` (default) or `-` (`−` read
   and stored as `-`); signs pick the body (`adder`, `adder_minus_a`,
   `adder_minus_b`, `adder_minus_ab`), never a call parameter; `+ +` is
