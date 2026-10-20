@@ -14,6 +14,9 @@ import { labelCensus, labelDifferences } from "./label-census.js";
 import { bipolarProject } from "./bipolar-project.js";
 
 test("loads the Canvas package once for both RNL formats", async ({ page }) => {
+  await page.route("https://rich-netlist.github.io/rnl-packages/**", (route) =>
+    route.abort(),
+  );
   const requested: string[] = [];
   page.on("request", (request) => {
     if (/analog-canvas-extensions[^/]*\.rnl/u.test(request.url()))
@@ -86,6 +89,7 @@ test("loads the Canvas package once for both RNL formats", async ({ page }) => {
   if (before.status === "ready" && after.status === "ready")
     expect(compareElectricalGraphs(before.graph, after.graph)).toBe("equal");
   expect(requested).toHaveLength(1);
+  expect(new URL(requested[0]!).origin).toBe(new URL(page.url()).origin);
 });
 
 test("reports a failed Canvas package fetch and retries on the next request", async ({
@@ -100,6 +104,30 @@ test("reports a failed Canvas package fetch and retries on the next request", as
   await panel.getByLabel("Netlist format").selectOption("spice+rnl");
   await expect(
     panel.getByText(/RNL Canvas package could not load.*HTTP 503/u),
+  ).toBeVisible();
+  await page.unroute(pattern);
+  await panel.getByLabel("Netlist format").selectOption("spice");
+  expect(await copiedNetlist(page, "spice+rnl")).toContain(
+    '@RNL(type="header")',
+  );
+});
+
+test("rejects changed Canvas package bytes and retries with the locked asset", async ({
+  page,
+}) => {
+  const pattern = "**/*analog-canvas-extensions*.rnl*";
+  await page.route(pattern, async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      body: Buffer.concat([await response.body(), Buffer.from("\n")]),
+    });
+  });
+  await openProject(page, bipolarProject());
+  const panel = await showNetlistPanel(page);
+  await panel.getByLabel("Netlist format").selectOption("spice+rnl");
+  await expect(
+    panel.getByText(/Canvas package SHA-256 mismatch/u),
   ).toBeVisible();
   await page.unroute(pattern);
   await panel.getByLabel("Netlist format").selectOption("spice");

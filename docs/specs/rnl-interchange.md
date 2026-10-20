@@ -27,8 +27,14 @@ the RNL language and its runtime belong to rnl.
   also receive its `package_dirs`. The adapter preserves the caller's files,
   includes and search order. One package fetch serves the shared Worker;
   fetch failures identify the package and can be retried.
-- The build takes the optional Canvas package from the runtime's public npm
-  export and serves it as a Vite asset in the Web and desktop compositions.
+- Canvas 0.1 is locked by name, version, URL and raw-byte SHA-256 against the
+  public [package catalog](https://rich-netlist.github.io/rnl-packages/catalog.json).
+  Refreshing the vendored asset rejects changed catalog records or byte hashes.
+  Web and desktop builds verify and ship those bytes as a local Vite asset;
+  runtime loading verifies them before decoding, without contacting the catalog.
+  The static shell caches the same-origin hashed package, Worker and WebAssembly
+  after use; package reloads refresh cached bytes with an offline fallback.
+  Imported package files remain outside that cache.
 
 ### Export formats
 
