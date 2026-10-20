@@ -177,7 +177,10 @@ declares fixed `VDD`/`VSS` ports; logic ports follow Symbol pins.
   `.model PNP PNP(IS=1e-16 BF=50 VAF=50)` (information `GENERIC_BJT_MODEL`).
 - A same-name model in the imported SPICE suppresses the card everywhere; one in
   a folder's files only for that folder's runs. VACASK prints `sp_diode`/`sp_bjt`
-  (`type=±1`); cards are SPICE-only.
+  (`type=±1`). Spectre export carries native stand-ins with the same parameters:
+  `model DIODE diode is=1e-14 n=1`, `model NPN bjt type=npn is=1e-16 bf=100 vaf=100`
+  and `model PNP bjt type=pnp is=1e-16 bf=50 vaf=50`. Spectre run decks carry none
+  of these stand-ins; their model libraries remain the authority.
 - A netlist handed out (panel, copy, save, `SPICE+RNL`, `Spectre+RNL`) carries
   BSIM4 stand-ins for generic `NMOS`/`PMOS` in each Cell naming them
   (information `GENERIC_MOS_MODEL`), so it reads back with each part's channel

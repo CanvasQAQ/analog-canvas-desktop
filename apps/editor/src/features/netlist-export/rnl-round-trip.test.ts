@@ -15,7 +15,11 @@ import {
   type CircuitProject,
   type Instance,
 } from "@icm/model";
-import { createDesignNetlistExport } from "@icm/netlist";
+import {
+  compareElectricalGraphs,
+  createDesignNetlistExport,
+  projectElectricalGraph,
+} from "@icm/netlist";
 import { parseProject } from "@icm/project-protocol";
 import {
   composeOrient,
@@ -32,9 +36,10 @@ import {
   createProjectSymbolResolver,
   externalSubcircuitSymbolId,
 } from "@icm/symbols";
-import { startCore } from "@rich-netlist/runtime";
+import { createRnlTestCore } from "./rnl-core.test-support";
 
 import { labelCensus, labelDifferences } from "../../../e2e/label-census";
+import { bipolarProject } from "../../../e2e/bipolar-project";
 import { withImportedInstanceDisplays } from "../instance-display/imported-instance-displays";
 import { materializeRazaviProjectBulkConnections } from "../../presentation/razavi-presentation";
 import { createDefaultNetlistExportPreferences } from "./netlist-export-preferences";
@@ -52,7 +57,7 @@ type ArrowEnd =
   | "open-arrow";
 
 // The rnl runtime's own core, in a worker thread: the editor's write and read.
-const core = startCore();
+const core = await createRnlTestCore();
 afterAll(() => core.terminate());
 const runtime: RnlRuntime = {
   // As JSON, this editor's readonly points are the runtime's point arrays.
@@ -69,6 +74,132 @@ const example = (name: string): CircuitProject =>
       "utf8",
     ),
   );
+
+describe("RNL round trip of bipolar devices and mirrored labels", () => {
+  it.each(["spice", "spectre"] as const)(
+    "reads every device and label back from %s",
+    async (format) => {
+      const project = bipolarProject();
+      const plan = await roundTrip(project, format);
+      expect(failures(plan)).toEqual([]);
+      expect(drawingCensus(plan.project)).toEqual(drawingCensus(project));
+      const before = projectElectricalGraph(project);
+      const after = projectElectricalGraph(plan.project);
+      expect(before.status).toBe("ready");
+      expect(after.status).toBe("ready");
+      if (before.status === "ready" && after.status === "ready")
+        expect(compareElectricalGraphs(before.graph, after.graph)).toBe(
+          "equal",
+        );
+      expect(
+        labelDifferences(labelCensus(project), labelCensus(plan.project)),
+      ).toEqual([]);
+    },
+  );
+});
+
+async function expectViewerLabels(
+  project: CircuitProject,
+  format: "spice" | "spectre",
+) {
+  const exported = createRnlExport(project, { format });
+  if (exported.status !== "ready") throw new Error("export blocked");
+  const written = await core.write({
+    write: exported.request as unknown as Parameters<
+      typeof core.write
+    >[0]["write"],
+    svg: false,
+    primitives: true,
+  });
+  const path = `circuit.${format === "spice" ? "sp" : "scs"}`;
+  const snapshot = await runtime.snapshot({
+    entry: path,
+    files: { [path]: written.text },
+    dialect: format,
+    parts: { drawing: false, host: true, model: true },
+  });
+  let compared = 0;
+  for (const level of snapshot.levels) {
+    const drawing = written.document.levels.find(
+      (item) => item.title === level.name,
+    );
+    for (const text of level.model?.texts ?? []) {
+      if (!text.written || !text.attach || !text.key) continue;
+      const owner = `${text.attach}::${text.key}`;
+      const primitive = drawing?.primitives?.find(
+        (item) => item.kind === "text" && item.owner === owner,
+      );
+      expect(primitive, owner).toBeDefined();
+      if (primitive?.kind !== "text") throw new Error(`missing text ${owner}`);
+      expect(primitive.anchor, owner).toEqual(text.anchor);
+      expect(primitive.halign, owner).toBe(text.halign);
+      expect(primitive.valign, owner).toBe(text.valign);
+      // Ink can overhang its alignment anchor (italics and scripts). Compare
+      // its box with the same text drawn at the scene point independently of
+      // the owner, rather than assuming an ink edge equals the anchor.
+      const reference = await core.write({
+        write: {
+          ...exported.request,
+          ops: [
+            {
+              op: "add-text",
+              level: level.id,
+              lines: text.lines,
+              at: text.anchor,
+              halign: text.halign,
+              valign: text.valign,
+              rotate: text.rotate,
+              style: { ...text.style, size: primitive.size },
+            },
+          ],
+        } as unknown as Parameters<typeof core.write>[0]["write"],
+        svg: false,
+        primitives: true,
+      });
+      const expected = reference.document.levels
+        .flatMap((item) => item.primitives ?? [])
+        .filter((item) => item.kind === "text");
+      expect(
+        reference.document.diagnostics.filter(
+          (item) => item.severity === "error",
+        ),
+        owner,
+      ).toEqual([]);
+      expect(expected, owner).toHaveLength(1);
+      expect(primitive.bbox, owner).toEqual(expected[0]?.bbox);
+      compared++;
+    }
+  }
+  expect(compared).toBeGreaterThan(0);
+}
+
+describe("viewer labels match the scene positions written by the editor", () => {
+  it.each(["spice", "spectre"] as const)(
+    "draws the mirrored bipolar fixture's labels as written (%s)",
+    async (format) => {
+      await expectViewerLabels(bipolarProject(), format);
+    },
+  );
+  it.each(
+    [
+      "common-source-amplifier",
+      "two-stage-op-amp",
+      "current-mirror-loaded-differential-pair",
+      "fully-differential-two-stage-op-amp",
+      "five-transistor-ota-sky130",
+    ].flatMap((name) =>
+      (["spice", "spectre"] as const).map((format) => [name, format] as const),
+    ),
+  )("draws %s labels as written (%s)", async (name, format) => {
+    await expectViewerLabels(
+      prepareNetlistExample(
+        example(name),
+        createDefaultNetlistExportPreferences().profiles.abstract,
+      ),
+      format,
+    );
+  });
+});
 
 /** Export as SPICE+RNL, write with the runtime, and import the file it wrote. */
 async function roundTrip(

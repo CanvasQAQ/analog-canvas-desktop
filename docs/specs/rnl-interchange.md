@@ -22,6 +22,13 @@ the RNL language and its runtime belong to rnl.
   (`@icm/netlist`, `@icm/symbols`, `@icm/derived`); only the editor loads it.
 - Without the runtime, the RNL formats say so and copy nothing; the other
   formats are unaffected.
+- Canvas extensions are supplied explicitly at a private virtual path in
+  `files` and `pool` for every build, snapshot and rebuild; write and catalog
+  also receive its `package_dirs`. The adapter preserves the caller's files,
+  includes and search order. One package fetch serves the shared Worker;
+  fetch failures identify the package and can be retried.
+- The build takes the optional Canvas package from the runtime's public npm
+  export and serves it as a Vite asset in the Web and desktop compositions.
 
 ### Export formats
 

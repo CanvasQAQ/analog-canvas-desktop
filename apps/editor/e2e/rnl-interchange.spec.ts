@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { compareElectricalGraphs, projectElectricalGraph } from "@icm/netlist";
 
 import {
   exampleProject,
@@ -10,6 +11,136 @@ import {
   showNetlistPanel,
 } from "./editor-fixtures.js";
 import { labelCensus, labelDifferences } from "./label-census.js";
+import { bipolarProject } from "./bipolar-project.js";
+
+test("loads the Canvas package once for both RNL formats", async ({ page }) => {
+  const requested: string[] = [];
+  page.on("request", (request) => {
+    if (/analog-canvas-extensions[^/]*\.rnl/u.test(request.url()))
+      requested.push(request.url());
+  });
+  const project = bipolarProject();
+  const document = project.documents[0]!;
+  document.instances.push({
+    id: "E1",
+    reference: "E1",
+    symbolId: "vcvs",
+    placement: { position: { x: 800, y: 100 }, rotation: 0, mirror: "none" },
+    netlist: {
+      binding: { kind: "primitive", deviceClass: "vcvs" },
+      parameters: { gain: "2" },
+      control: {
+        kind: "voltage",
+        positiveNetId: "bias",
+        negativeNetId: "tail",
+      },
+    },
+  });
+  document.nets
+    .find((net) => net.id === "out")!
+    .terminals.push({ instanceId: "E1", pinName: "+" });
+  document.nets
+    .find((net) => net.id === "tail")!
+    .terminals.push({ instanceId: "E1", pinName: "-" });
+  await openProject(page, project);
+  let rich = "";
+  for (const mode of ["spice+rnl", "spectre+rnl"] as const) {
+    const text = await copiedNetlist(page, mode);
+    rich = text;
+    expect(text).toContain(
+      '@USE-PACKAGE(name="analog-canvas-extensions", version="0.1")',
+    );
+    expect(text).toContain("$CANVAS_VCVS_CIRCLE");
+    await expect(
+      page.getByTestId("rnl-findings").locator(".rnl-finding-error"),
+    ).toHaveCount(0);
+  }
+  const before = projectElectricalGraph(await exportedProject(page));
+  await page.getByTestId("rnl-files").setInputFiles({
+    name: "canvas.scs",
+    mimeType: "text/plain",
+    buffer: Buffer.from(rich),
+  });
+  const unsaved = page.getByRole("dialog", { name: "Unsaved changes" });
+  const ready = page
+    .getByTestId("status")
+    .filter({ hasText: /^Imported \d+ Documents?/u });
+  await expect(unsaved.or(ready)).toBeVisible();
+  if (await unsaved.isVisible())
+    await unsaved
+      .getByRole("button", { name: "Continue without saving" })
+      .click();
+  await expectStatus(page, /^Imported \d+ Documents?/u);
+  const imported: typeof project = await exportedProject(page);
+  const vcvs = imported.documents
+    .flatMap((document) => document.instances)
+    .find((instance) => instance.reference === "E1");
+  expect(vcvs?.symbolId).toBe("vcvs");
+  expect(vcvs?.symbolVariantId).not.toBe("diamond");
+  expect(vcvs?.placement).toEqual(
+    document.instances.find((instance) => instance.id === "E1")!.placement,
+  );
+  const after = projectElectricalGraph(imported);
+  expect(before.status).toBe("ready");
+  expect(after.status).toBe("ready");
+  if (before.status === "ready" && after.status === "ready")
+    expect(compareElectricalGraphs(before.graph, after.graph)).toBe("equal");
+  expect(requested).toHaveLength(1);
+});
+
+test("reports a failed Canvas package fetch and retries on the next request", async ({
+  page,
+}) => {
+  const pattern = "**/*analog-canvas-extensions*.rnl*";
+  await page.route(pattern, (route) =>
+    route.fulfill({ status: 503, body: "package unavailable" }),
+  );
+  await openProject(page, exampleProject("two-stage-op-amp.icproj.json"));
+  const panel = await showNetlistPanel(page);
+  await panel.getByLabel("Netlist format").selectOption("spice+rnl");
+  await expect(
+    panel.getByText(/RNL Canvas package could not load.*HTTP 503/u),
+  ).toBeVisible();
+  await page.unroute(pattern);
+  await panel.getByLabel("Netlist format").selectOption("spice");
+  expect(await copiedNetlist(page, "spice+rnl")).toContain(
+    '@RNL(type="header")',
+  );
+});
+
+for (const mode of ["spice+rnl", "spectre+rnl"] as const)
+  test(`imports bipolar devices, a diode and mirrored labels from ${mode}`, async ({
+    page,
+  }) => {
+    const project = bipolarProject();
+    await openProject(page, project);
+    const drawn = await exportedProject(page);
+    const text = await copiedNetlist(page, mode);
+    await page.getByTestId("rnl-files").setInputFiles({
+      name: `bipolar.${mode === "spice+rnl" ? "sp" : "scs"}`,
+      mimeType: "text/plain",
+      buffer: Buffer.from(text),
+    });
+    const unsaved = page.getByRole("dialog", { name: "Unsaved changes" });
+    const imported = page
+      .getByTestId("status")
+      .filter({ hasText: /^Imported \d+ Documents?/u });
+    await expect(unsaved.or(imported)).toBeVisible();
+    if (await unsaved.isVisible())
+      await unsaved
+        .getByRole("button", { name: "Continue without saving" })
+        .click();
+    await expectStatus(page, /^Imported \d+ Documents?/u);
+    const read = await exportedProject(page);
+    expect(drawingCensus(read)).toEqual(drawingCensus(drawn));
+    const before = projectElectricalGraph(drawn);
+    const after = projectElectricalGraph(read);
+    expect(before.status).toBe("ready");
+    expect(after.status).toBe("ready");
+    if (before.status === "ready" && after.status === "ready")
+      expect(compareElectricalGraphs(before.graph, after.graph)).toBe("equal");
+    expect(labelDifferences(labelCensus(drawn), labelCensus(read))).toEqual([]);
+  });
 
 /**
  * A netlist as the Netlist panel's Copy hands it out, in one of its formats,
@@ -287,6 +418,7 @@ for (const example of [
         page,
       }) => {
         await openEditor(page, `/editor?example=${example}`);
+        await expectStatus(page, /^Opened example:/u);
         const panel = await showNetlistPanel(page);
         await panel.getByLabel("Netlist process").selectOption(process);
         const drawn = await exportedProject(page);

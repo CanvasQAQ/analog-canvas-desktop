@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
 
 import { RNL_SYMBOLS } from "@icm/rnl";
-import { startCore } from "@rich-netlist/runtime";
+import { createRnlTestCore } from "./rnl-core.test-support";
 
-const core = startCore();
+const core = await createRnlTestCore();
 afterAll(() => core.terminate());
 
 /** An exit direction in degrees, as the mapping table has it, as the catalog says it. */
