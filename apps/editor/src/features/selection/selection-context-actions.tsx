@@ -53,8 +53,7 @@ export function MosBulkConnectionSection({
 }) {
   if (connection === null) return null;
   const { terminal, netName, status } = connection;
-  const label =
-    netName ?? (status === "no-connect" ? "No Connect" : "Unconnected");
+  const label = netName ?? (status === "no-connect" ? "NoConn" : "Unconnected");
   const origin = {
     explicit: "Explicit connection",
     "cell-default": "Cell default",
@@ -63,7 +62,7 @@ export function MosBulkConnectionSection({
     "no-connect": "Intentionally left unconnected",
     unresolved: "Choose a net for the bulk terminal",
   }[status];
-  const description = `${terminal} → ${label} · ${origin}${
+  const description = `${terminal} → ${status === "no-connect" ? "No Connect" : label} · ${origin}${
     explicitRouteVisible ? " · Dashed bulk route shown" : ""
   }`;
   return (
@@ -319,8 +318,9 @@ export function EndpointActionsSection({
         type="button"
         onClick={onToggleNoConnect}
         disabled={!noConnect && endpointNetId !== null}
+        title={noConnect ? "Clear No Connect" : "Mark No Connect"}
       >
-        {noConnect ? "Clear No Connect" : "Mark No Connect"}
+        {noConnect ? "Clear NoConn" : "Mark NoConn"}
       </button>
       {!noConnect && endpointNetId ? (
         <small>Disconnect this endpoint before marking No Connect.</small>

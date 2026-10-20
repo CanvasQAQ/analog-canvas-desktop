@@ -472,7 +472,7 @@ export function InsertComponentDialog({
                 title={
                   choice.kind === "cell"
                     ? `${label} · Cell`
-                    : `${label} · ${choice.symbol.id}`
+                    : `${choice.symbol.id === "no-connect" ? choice.symbol.name : label} · ${choice.symbol.id}`
                 }
                 data-testid={
                   choice.kind === "cell"

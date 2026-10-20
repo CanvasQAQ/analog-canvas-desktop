@@ -149,8 +149,8 @@ export function NoConnectPlacementPreview({
         {state === "connected"
           ? "Connected"
           : state === "marked"
-            ? "Already No Connect"
-            : "No Connect"}
+            ? "Already NoConn"
+            : "NoConn"}
       </text>
     </g>
   );

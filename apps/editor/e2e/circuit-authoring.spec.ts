@@ -30,7 +30,17 @@ test("No Connect tool snaps near pins, places repeatedly and exits without chang
 }) => {
   await openEditor(page);
   await placeComponentAt(page, "resistor", { x: 340, y: 220 });
+  await expect(page.getByTestId("draw-tool-no-connect")).toHaveText("NoConn");
+  await expect(page.getByTestId("draw-tool-no-connect")).toHaveAttribute(
+    "title",
+    "No Connect: mark intentionally unused pins",
+  );
   await clickDrawTool(page, "no-connect");
+  await expect(page.getByTestId("statusbar-tool")).toHaveText("NoConn");
+  await expect(page.getByTestId("statusbar-tool")).toHaveAttribute(
+    "title",
+    "Active tool: No Connect",
+  );
   const preview = page.getByTestId("no-connect-target");
   for (const pinName of ["1", "2"]) {
     const pin = await page.getByTestId(`terminal-R1-${pinName}`).boundingBox();
@@ -42,6 +52,7 @@ test("No Connect tool snaps near pins, places repeatedly and exits without chang
     };
     await page.mouse.move(point.x, point.y);
     await expect(preview).toHaveAttribute("data-terminal", `R1.${pinName}`);
+    await expect(preview).toContainText("NoConn");
     await expect(page.getByTestId("status")).toContainText(`R1.${pinName}`);
     await page.mouse.click(point.x, point.y);
     await expect(page.locator('[data-role="no-connect"]')).toHaveCount(
@@ -63,12 +74,13 @@ test("No Connect can be found by NC or noconn and activates a tool, not an Insta
   page,
 }) => {
   await openEditor(page);
-  for (const query of ["NC", "noconn", "No Connect"]) {
+  for (const query of ["NC", "noconn", "NoConn", "No Connect"]) {
     await page.keyboard.press("i");
     const dialog = page.getByRole("dialog", { name: "Insert Component" });
     await dialog.getByLabel("Component search").fill(query);
-    const choice = dialog.getByRole("option", { name: /No Connect/ });
+    const choice = dialog.getByRole("option", { name: "NoConn", exact: true });
     await expect(choice).toBeVisible();
+    await expect(choice).toHaveAttribute("title", /No Connect/);
     await choice.click();
     await expect(page.getByTestId("draw-tool-no-connect")).toHaveAttribute(
       "aria-pressed",
@@ -399,11 +411,11 @@ test("authors components, connectivity and No Connect manually from an empty can
 
   // An unconnected endpoint is marked and cleared as No Connect.
   await page.getByTestId("terminal-R1-1").click({ button: "right" });
-  await page.getByRole("button", { name: "Mark No Connect" }).click();
+  await page.getByRole("button", { name: "Mark NoConn", exact: true }).click();
   await expectStatus(page, "Marked terminal-R1-1 No Connect");
   await expect(page.locator('[data-role="no-connect"]')).toHaveCount(1);
   await page.getByTestId("terminal-R1-1").click({ button: "right" });
-  await page.getByRole("button", { name: "Clear No Connect" }).click();
+  await page.getByRole("button", { name: "Clear NoConn", exact: true }).click();
   await expectStatus(page, "Cleared No Connect on terminal-R1-1");
   await expect(page.locator('[data-role="no-connect"]')).toHaveCount(0);
 });
