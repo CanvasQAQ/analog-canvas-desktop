@@ -41,6 +41,17 @@ the RNL language and its runtime belong to rnl.
   a browser, the system browser in the desktop app, which opens only its fixed
   list of links (`rnl` among them). The link is left out where the build links
   nowhere outside itself. The editor has one language, so there is one page.
+- In the Web and local-host compositions, **Open RNL Viewer** follows About
+  RNL. It is enabled only for the current completed RNL export. A synchronous
+  click opens the full online Viewer, reusing its connected tab without
+  navigating away from Viewer edits, and sends the `.sp` or `.scs` text with
+  `analog-canvas-extensions` 0.1 through the Viewer `rnl: 1` API. Both sides
+  check origin, window identity, launch token and request ID. Netlist text
+  stays out of URLs and upload services. Popup blocking, missing capabilities,
+  import errors and timeouts are reported with retry available. The desktop
+  composition omits this action. Local-host uses `same-origin-allow-popups`
+  and allows capability discovery at the Viewer host; cross-origin isolation
+  is not required by this composition.
 - Bodies the netlist writes itself (ideal blocks, magnetics) print their ports
   in the terminal order of their RNL symbol: SPICE primitives in SPICE order,
   op-amps as their macromodels do (in+ in− V+ V− out), other blocks signals

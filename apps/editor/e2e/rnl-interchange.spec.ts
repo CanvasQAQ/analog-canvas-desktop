@@ -296,9 +296,11 @@ test("links the RNL formats to the introduction to RNL, and only them", async ({
   await openEditor(page, "/editor?example=two-stage-op-amp");
   const panel = await showNetlistPanel(page);
   const about = panel.getByRole("link", { name: /^About RNL/u });
+  const viewer = panel.getByRole("link", { name: /^Open RNL Viewer/u });
   for (const plain of ["spice", "spectre"] as const) {
     await panel.getByLabel("Netlist format").selectOption(plain);
     await expect(about).toHaveCount(0);
+    await expect(viewer).toHaveCount(0);
   }
   for (const mode of ["spice+rnl", "spectre+rnl"] as const) {
     await panel.getByLabel("Netlist format").selectOption(mode);
@@ -306,6 +308,9 @@ test("links the RNL formats to the introduction to RNL, and only them", async ({
     await expect(about).toHaveAttribute("href", introduction);
     await expect(about).toHaveAttribute("target", "_blank");
     await expect(about).toHaveAttribute("rel", /noopener/u);
+    await expect(viewer).toBeVisible();
+    await expect(viewer).toBeEnabled();
+    await expect(about.locator("..")).toHaveText(/About RNL.*Open RNL Viewer/u);
   }
   const opened = page.context().waitForEvent("page");
   await about.click();
@@ -313,6 +318,107 @@ test("links the RNL formats to the introduction to RNL, and only them", async ({
   await tab.waitForLoadState("domcontentloaded");
   expect(tab.url()).toBe(introduction);
   // The drawing stays open here.
+  await expect(page.getByTestId("schematic-canvas")).toBeVisible();
+});
+
+test("opens both current RNL exports and the Canvas package in one reusable Viewer tab", async ({
+  page,
+  browserName,
+}) => {
+  const viewerUrl = "https://rich-netlist.github.io/rnl/viewer/";
+  const candidate = process.env.RNL_VIEWER_TEST_URL;
+  await page.context().route(`${viewerUrl}**`, async (route) => {
+    const requested = route.request().url();
+    if (candidate) {
+      const suffix = requested.slice(viewerUrl.length);
+      if (suffix.startsWith("fonts/")) {
+        await route.continue();
+        return;
+      }
+      const response = await route.fetch({
+        url: `${candidate.replace(/\/$/u, "")}/${suffix}`,
+      });
+      await route.fulfill({ response });
+    } else if (requested.endsWith("viewer-api.json")) {
+      await route.fulfill({
+        json: { rnl: 1, features: ["requestId", "packages", "opener"] },
+        headers: { "access-control-allow-origin": "*" },
+      });
+    } else {
+      // The external Viewer is isolated at its public postMessage boundary in AC's suite.
+      await route.fulfill({
+        contentType: "text/html",
+        body: `<title>RNL Viewer</title><script>
+        const params=new URLSearchParams(location.search), token=params.get('token'), origin=params.get('origin');
+        window.imports=[];
+        addEventListener('message', event=>{
+          if(event.source!==opener || event.origin!==origin || event.data?.token!==token || event.data?.rnl!==1) return;
+          imports.push(event.data);
+          opener.postMessage({rnl:1,token,type:'loaded',requestId:event.data.requestId},origin);
+        });
+        opener.postMessage({rnl:1,token,type:'ready',features:['requestId','packages','opener']},origin);
+      </script>`,
+      });
+    }
+  });
+  await openEditor(page, "/editor?example=two-stage-op-amp");
+  let viewer: Page | undefined;
+  for (const mode of ["spice+rnl", "spectre+rnl"] as const) {
+    const expected = await copiedNetlist(page, mode);
+    const link = page.getByRole("link", { name: /^Open RNL Viewer/u });
+    await expect(link).toBeEnabled();
+    const opened = viewer ? null : page.waitForEvent("popup");
+    await link.click();
+    viewer ??= await opened!;
+    await expect(link).toBeEnabled();
+    if (candidate) {
+      await expect
+        .poll(() =>
+          viewer!.evaluate(() => {
+            const state = (
+              window as unknown as {
+                viewer: { doc: { files: { text: string }[] } | null };
+              }
+            ).viewer;
+            return state.doc?.files[0]?.text;
+          }),
+        )
+        .toBe(expected);
+      await expect(viewer.locator("#canvas > svg")).toBeVisible();
+      await viewer.locator("#tab-files").click();
+      await expect(
+        viewer.getByRole("button", {
+          name: "Open analog-canvas-extensions 0.1",
+          exact: true,
+        }),
+      ).toBeVisible();
+      await viewer.locator("#tab-netlist").click();
+    } else {
+      const imported = await viewer.evaluate(() =>
+        (
+          window as unknown as { imports: Record<string, unknown>[] }
+        ).imports.at(-1),
+      );
+      expect(imported).toMatchObject({
+        type: "open",
+        name: mode === "spice+rnl" ? "circuit.sp" : "circuit.scs",
+        text: expected,
+        packages: [{ name: "analog-canvas-extensions", version: "0.1" }],
+      });
+    }
+    expect(page.context().pages()).toHaveLength(2);
+    expect(viewer.url()).not.toContain(encodeURIComponent(expected));
+  }
+  if (browserName === "chromium") {
+    await page.bringToFront();
+    await page.screenshot({ path: "test-results/rnl-viewer-link.png" });
+    if (candidate) {
+      await viewer!.bringToFront();
+      await viewer!.screenshot({
+        path: "test-results/rnl-viewer-imported.png",
+      });
+    }
+  }
   await expect(page.getByTestId("schematic-canvas")).toBeVisible();
 });
 
