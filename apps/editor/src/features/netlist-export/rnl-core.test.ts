@@ -1,14 +1,10 @@
-import { readFile } from "node:fs/promises";
 import { afterAll, describe, expect, it } from "vitest";
 import { startCore, type WriteRequest } from "@rich-netlist/runtime";
 import { withCanvasPackage } from "./rnl-core";
+import { canvasPackageText } from "./rnl-core.test-support";
 
 const bare = startCore();
-const packageFile = new URL(
-  import.meta
-    .resolve("@rich-netlist/runtime/packages/analog-canvas-extensions.rnl"),
-);
-const packageText = await readFile(packageFile, "utf8");
+const packageText = await canvasPackageText;
 const core = withCanvasPackage(bare, packageText);
 afterAll(() => core.terminate());
 

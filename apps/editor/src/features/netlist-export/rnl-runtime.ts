@@ -2,6 +2,7 @@ import type { RnlSnapshot, RnlWriteRequest } from "@icm/rnl";
 
 import { importChunk } from "../../components/chunk-import";
 import { withCanvasPackage, type RnlWorkspace } from "./rnl-core";
+import { decodeCanvasPackage } from "./rnl-canvas-package";
 
 /** A finding of the rnl runtime about the file it wrote (rnl standard, ch. 7). */
 export interface RnlRuntimeDiagnostic {
@@ -57,20 +58,17 @@ export function loadRnlRuntime(): Promise<RnlRuntime | null> {
       () =>
         Promise.all([
           import("@rich-netlist/runtime"),
-          import("@rich-netlist/runtime/packages/analog-canvas-extensions.rnl?url"),
+          import("./analog-canvas-extensions.rnl?url"),
         ]),
     );
     let text: string;
     try {
-      const response = await fetch(packageUrl);
+      // A retry must replace bad cached bytes; the shell keeps an offline fallback.
+      const response = await fetch(packageUrl, { cache: "reload" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      text = await response.text();
-      if (
-        !/@PACKAGE\s*\(\s*name\s*=\s*"analog-canvas-extensions"\s*,\s*version\s*=\s*"0\.1"/u.test(
-          text,
-        )
-      )
-        throw new Error("invalid package declaration");
+      text = await decodeCanvasPackage(
+        new Uint8Array(await response.arrayBuffer()),
+      );
     } catch (cause) {
       throw new Error(
         `RNL Canvas package could not load from ${packageUrl}: ${cause instanceof Error ? cause.message : String(cause)}`,
