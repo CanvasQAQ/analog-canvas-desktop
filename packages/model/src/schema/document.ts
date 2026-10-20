@@ -764,6 +764,24 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
     }
 
     for (const [junctionIndex, junction] of document.junctions.entries()) {
+      if (
+        junction.contactAnchor &&
+        !document.nets.some(
+          (net) =>
+            net.id === junction.netId &&
+            net.terminals.some(
+              (terminal) =>
+                terminal.instanceId === junction.contactAnchor!.instanceId &&
+                terminal.pinName === junction.contactAnchor!.pinName,
+            ),
+        )
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "A junction contact anchor must name a terminal on its Net",
+          path: ["junctions", junctionIndex, "contactAnchor"],
+        });
+      }
       if (!netIds.has(junction.netId)) {
         context.addIssue({
           code: "custom",

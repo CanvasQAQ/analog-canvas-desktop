@@ -46,6 +46,9 @@ import {
   annotationOwningInstanceId,
   deriveProjectNetNameProjection,
   deriveRoutingAffectedClosure,
+  contactRequiresJunctionDot,
+  endpointKey,
+  junctionForContact,
   diagnosticPresentationGroup,
   runErcChecks,
   resolveDraftingObjectGeometry,
@@ -1452,6 +1455,15 @@ function WorkspaceEditor({
     document.id,
   );
   const documentContactEvidence = documentConnectivity?.contactEvidence;
+  const junctionDotEndpointKeys = useMemo(
+    () =>
+      new Set(
+        documentContactEvidence?.contacts
+          .filter(contactRequiresJunctionDot)
+          .flatMap((contact) => contact.endpoints.map(endpointKey)) ?? [],
+      ),
+    [documentContactEvidence],
+  );
   const [interfaceConfirmation, setInterfaceConfirmation] = useState<{
     request: CellInterfaceConfirmation;
     snapshot: typeof project;
@@ -1851,6 +1863,17 @@ function WorkspaceEditor({
     )
       setControlPickState(null);
   }, [selectedInstance?.id]);
+  const selectedContact = selectedEndpoint
+    ? documentContactEvidence?.byEndpointKey.get(
+        endpointKey(selectedEndpoint.endpoint),
+      )
+    : undefined;
+  const selectedContactJunction = selectedContact
+    ? junctionForContact(
+        selectedContact,
+        new Map(document.junctions.map((j) => [j.id, j])),
+      )
+    : undefined;
   const selectedAnnotationOwnerInstanceId = selectedAnnotation
     ? annotationOwningInstanceId(selectedAnnotation)
     : undefined;
@@ -2598,13 +2621,17 @@ function WorkspaceEditor({
   );
   const internalSelection = useMemo(
     () =>
-      deriveRoutingAffectedClosure(document, {
-        instanceIds: selectedIds,
-        routeIds: visualSelection.routeIds,
-        junctionIds: visualSelection.junctionIds,
-        annotationIds: visualSelection.annotationIds,
-      }),
-    [document, selectedIds, visualSelection],
+      deriveRoutingAffectedClosure(
+        document,
+        {
+          instanceIds: selectedIds,
+          routeIds: visualSelection.routeIds,
+          junctionIds: visualSelection.junctionIds,
+          annotationIds: visualSelection.annotationIds,
+        },
+        { resolver },
+      ),
+    [document, selectedIds, visualSelection, resolver],
   );
   const wouldMoveIds = useMemo(() => {
     const ids = new Set(
@@ -6585,6 +6612,30 @@ function WorkspaceEditor({
                 onDeleteConnection: () => disconnectSelectedEndpoint(true),
                 onToggleNoConnect: toggleSelectedNoConnectFromSelection,
                 onDeleteJunction: deleteSelectedJunctionFromSelection,
+                ...(selectedEndpoint &&
+                (selectedEndpoint.endpoint.kind === "junction" ||
+                  (selectedContact &&
+                    contactRequiresJunctionDot(selectedContact)))
+                  ? {
+                      junctionColor: {
+                        color:
+                          selectedContactJunction?.styleOverride?.color ??
+                          "auto",
+                        onApply: (color: string) => {
+                          const result = transact([
+                            {
+                              kind: "set_junction_style_override",
+                              target: selectedEndpoint.endpoint,
+                              styleOverride:
+                                color === "auto" ? null : { color },
+                            },
+                          ]);
+                          if (result.ok) setStatus("Updated junction color");
+                          return { ok: result.ok };
+                        },
+                      },
+                    }
+                  : {}),
               }}
               annotationActions={{
                 kind:
@@ -7037,6 +7088,7 @@ function WorkspaceEditor({
               selectedRouteSegmentIndex,
               selectedEndpoint,
               supplementalJunctionIds: supplementalSelection.junctionIds,
+              junctionDotEndpointKeys,
               selectionPolicy:
                 simulationPickActive || controlPickState
                   ? unfilteredSelectionPolicy

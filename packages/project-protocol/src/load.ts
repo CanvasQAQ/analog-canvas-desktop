@@ -217,6 +217,29 @@ export function tryParseProjectWithMetadata(
   let current: Record<string, unknown>;
   try {
     if (
+      sourceSchemaVersion < 73 &&
+      Array.isArray(parsed.documents) &&
+      parsed.documents.some(
+        (document: unknown) =>
+          isRecord(document) &&
+          Array.isArray(document.junctions) &&
+          document.junctions.some(
+            (junction: unknown) =>
+              isRecord(junction) &&
+              (Object.hasOwn(junction, "styleOverride") ||
+                Object.hasOwn(junction, "contactAnchor") ||
+                junction.role === "style-anchor"),
+          ),
+      )
+    )
+      throw new ProjectFormatError([
+        {
+          code: "INVALID_PROJECT",
+          path: ["documents"],
+          message: "Junction colors require Project schema 73",
+        },
+      ]);
+    if (
       sourceSchemaVersion < 72 &&
       Array.isArray(parsed.documents) &&
       parsed.documents.some(

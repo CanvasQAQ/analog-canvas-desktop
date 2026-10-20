@@ -25,6 +25,11 @@ const LazyItemPropertySummary = lazy(() =>
     default: module.ItemPropertySummary,
   })),
 );
+const JunctionColorProperties = lazy(() =>
+  import("../properties/property-editors").then((module) => ({
+    default: module.JunctionColorProperties,
+  })),
+);
 function ItemPropertySummary(props: {
   item: ItemPropertyIdentity;
   color: string;
@@ -252,6 +257,7 @@ export function EndpointActionsSection({
   onDeleteConnection,
   onToggleNoConnect,
   onDeleteJunction,
+  junctionColor,
 }: {
   item?: WireSource | null;
   color?: string;
@@ -262,27 +268,53 @@ export function EndpointActionsSection({
   onDeleteConnection: () => void;
   onToggleNoConnect: () => void;
   onDeleteJunction: () => void;
+  junctionColor?: {
+    color: string;
+    onApply(color: string): { ok: boolean; message?: string };
+  };
 }) {
+  const junctionProperties =
+    item && junctionColor ? (
+      <Suspense fallback={<p role="status">Loading properties…</p>}>
+        <JunctionColorProperties
+          item={{
+            type: "junction",
+            name:
+              item.endpoint.kind === "junction"
+                ? item.endpoint.junctionId
+                : `${item.endpoint.instanceId}.${item.endpoint.pinName}`,
+            coordinate: [
+              item.connection.contactPoint.x,
+              item.connection.contactPoint.y,
+            ],
+          }}
+          color={junctionColor.color}
+          inheritedColor={color}
+          onApply={junctionColor.onApply}
+        />
+      </Suspense>
+    ) : null;
   if (kind === "junction")
     return (
       <section className="context-actions" aria-label="Junction actions">
         <h2>Junction</h2>
-        {item && (
-          <ItemPropertySummary
-            item={{
-              type: "junction",
-              name:
-                item.endpoint.kind === "junction"
-                  ? item.endpoint.junctionId
-                  : "",
-              coordinate: [
-                item.connection.contactPoint.x,
-                item.connection.contactPoint.y,
-              ],
-            }}
-            color={color}
-          />
-        )}
+        {junctionProperties ??
+          (item && (
+            <ItemPropertySummary
+              item={{
+                type: "junction",
+                name:
+                  item.endpoint.kind === "junction"
+                    ? item.endpoint.junctionId
+                    : "",
+                coordinate: [
+                  item.connection.contactPoint.x,
+                  item.connection.contactPoint.y,
+                ],
+              }}
+              color={color}
+            />
+          ))}
         <button type="button" onClick={onDeleteJunction}>
           Delete junction and attached wires
         </button>
@@ -292,22 +324,23 @@ export function EndpointActionsSection({
   return (
     <section className="context-actions" aria-label="Endpoint actions">
       <h2>Endpoint</h2>
-      {item && (
-        <ItemPropertySummary
-          item={{
-            type: "terminal",
-            name:
-              item.endpoint.kind === "terminal"
-                ? `${item.endpoint.instanceId}.${item.endpoint.pinName}`
-                : "",
-            coordinate: [
-              item.connection.contactPoint.x,
-              item.connection.contactPoint.y,
-            ],
-          }}
-          color={color}
-        />
-      )}
+      {junctionProperties ??
+        (item && (
+          <ItemPropertySummary
+            item={{
+              type: "terminal",
+              name:
+                item.endpoint.kind === "terminal"
+                  ? `${item.endpoint.instanceId}.${item.endpoint.pinName}`
+                  : "",
+              coordinate: [
+                item.connection.contactPoint.x,
+                item.connection.contactPoint.y,
+              ],
+            }}
+            color={color}
+          />
+        ))}
       <button type="button" onClick={onDisconnect}>
         Disconnect endpoint
       </button>

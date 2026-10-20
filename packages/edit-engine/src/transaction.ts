@@ -54,6 +54,11 @@ import { applyMosBulkEdit } from "./transaction-mos-bulk.js";
 import { applyNetPowerEdit } from "./transaction-net-power.js";
 import { applyRouteGeometryEdit } from "./transaction-route-geometry.js";
 import { applyRouteStyleOverrideEdit } from "./transaction-route-style.js";
+import {
+  applyJunctionStyleOverrideEdit,
+  followStyledContactJunctions,
+  reconcileJunctionContactAnchors,
+} from "./transaction-junction-style.js";
 import { applyObjectDocumentStyleEdit } from "./transaction-object-document-style.js";
 import { applyRouteTopologyEdit } from "./transaction-route-topology.js";
 import { applyPresentationLayoutEdit } from "./transaction-presentation-layout.js";
@@ -377,6 +382,16 @@ export function executeTransaction(
         if (!outcome.ok) return outcome.rejection;
         break;
       }
+      case "set_junction_style_override": {
+        const outcome = applyJunctionStyleOverrideEdit(edit, {
+          draft,
+          resolver,
+          changedObjectIds,
+          reject: rejectAt,
+        });
+        if (!outcome.ok) return outcome.rejection;
+        break;
+      }
       case "set_object_document_style": {
         const outcome = applyObjectDocumentStyleEdit(edit, {
           draft,
@@ -573,6 +588,16 @@ export function executeTransaction(
     geometryChanged = true;
   }
 
+  if (resolver) {
+    followStyledContactJunctions(
+      document,
+      draft,
+      resolver,
+      transformedInstanceIds,
+      movedJunctionIds,
+      changedObjectIds,
+    );
+  }
   if (resolver && transformedInstanceIds.size > 0) {
     // One user-visible transform may require several persisted orientation
     // edits (for example a top-bottom screen reflection is mirror + rotate).
@@ -1057,6 +1082,9 @@ export function executeTransaction(
   connectivityChanged ||=
     draft.nets.length !== netCountBeforeDeferredPrune ||
     draft.connectivityEvidence.length !== evidenceCountBeforeDeferredPrune;
+
+  if (resolver)
+    reconcileJunctionContactAnchors(draft, resolver, changedObjectIds);
 
   const originalNetContractIssueKeys = connectivityChanged
     ? new Set(

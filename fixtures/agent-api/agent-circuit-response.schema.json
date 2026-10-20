@@ -1571,8 +1571,35 @@
                         "enum": [
                           "branch",
                           "label-anchor",
-                          "route-anchor"
+                          "route-anchor",
+                          "style-anchor"
                         ]
+                      },
+                      "styleOverride": {
+                        "type": "object",
+                        "properties": {
+                          "color": {
+                            "$ref": "#/$defs/__schema66"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "contactAnchor": {
+                        "type": "object",
+                        "properties": {
+                          "instanceId": {
+                            "$ref": "#/$defs/__schema1"
+                          },
+                          "pinName": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "instanceId",
+                          "pinName"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
