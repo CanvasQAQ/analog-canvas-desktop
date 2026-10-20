@@ -118,6 +118,7 @@ export interface EditorCanvasSurfaceProps {
   textDraft?: ComponentProps<typeof TextDraftEditorOverlay>;
   /** A card in the middle of the canvas, above the drawing. */
   notice?: ReactNode;
+  noConnectPreview?: ReactNode;
 }
 
 function CanvasShortcutChord({ keys }: { keys: readonly string[] }) {
@@ -162,6 +163,7 @@ export function EditorCanvasSurface({
   interactionPreviews,
   textDraft,
   notice,
+  noConnectPreview,
 }: EditorCanvasSurfaceProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   useLayoutEffect(() => {
@@ -398,6 +400,7 @@ export function EditorCanvasSurface({
                 : null
             }
           />
+          {noConnectPreview}
           {cellSymbolLayout ? (
             <EditorCellSymbolLayoutOverlay {...cellSymbolLayout} />
           ) : null}

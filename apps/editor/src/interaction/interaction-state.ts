@@ -58,6 +58,7 @@ export function freeWireDraftTarget(point: Point): WireDraftTarget {
 export type EditorTool =
   | "pointer"
   | "wire"
+  | "no-connect"
   | "construction-line"
   | "arrow"
   | "polyline"
@@ -161,6 +162,7 @@ export interface CopyPlacement<TClipboard> {
 
 export type InteractionState<TClipboard = never> =
   | { kind: "idle" }
+  | { kind: "no-connect" }
   | {
       kind: "placing-component";
       placement: PendingComponentPlacement;
@@ -259,6 +261,8 @@ export function activateInteractionTool<TClipboard>(
   switch (tool) {
     case "pointer":
       return IDLE_INTERACTION_STATE;
+    case "no-connect":
+      return { kind: "no-connect" };
     case "wire":
       return {
         kind: "wire",
@@ -320,6 +324,8 @@ export function interactionReducer<TClipboard>(
   switch (action.type) {
     case "activate-tool":
       if (action.tool === "wire" && state.kind === "wire") return state;
+      if (action.tool === "no-connect" && state.kind === "no-connect")
+        return state;
       if (state.kind === "drawing" && state.tool === action.tool) return state;
       return activateInteractionTool<TClipboard>(action.tool);
     case "place-component":
@@ -524,6 +530,8 @@ export function interactionTool<TClipboard>(
       return "pointer";
     case "wire":
       return "wire";
+    case "no-connect":
+      return "no-connect";
     case "drawing":
       return state.tool;
   }

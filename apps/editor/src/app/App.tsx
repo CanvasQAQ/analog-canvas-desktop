@@ -130,6 +130,10 @@ import {
 } from "../canvas/canvas-gesture-controller";
 import { createEditorCanvasEventHandlers } from "../canvas/editor-canvas-event-handlers";
 import {
+  NoConnectPlacementPreview,
+  useNoConnectPlacement,
+} from "../features/no-connect/no-connect-placement";
+import {
   canvasPointFromClient,
   logicalRadiusForCanvasPixels,
   replaceCanvasSnapGuides,
@@ -2819,6 +2823,7 @@ function WorkspaceEditor({
     paintSnapGuides,
     beginVddRailInteraction,
     activateDrawingTool: setTool,
+    activateNoConnectTool: () => activateTool("no-connect"),
     beginComponentPlacement: (request) => {
       beginComponentPlacement(request);
       seedComponentPreviewFromPointer(request.kind);
@@ -2996,6 +3001,7 @@ function WorkspaceEditor({
     rotateCommandMove: rotateCommandMoveFromSelection,
     selectInstance: selectInstanceFromSelection,
     toggleSelectedNoConnect: toggleSelectedNoConnectFromSelection,
+    markEndpointNoConnect,
     updateCommandMovePreview: updateCommandMovePreviewFromSelection,
   } = useSelectionInteraction({
     project,
@@ -4042,6 +4048,7 @@ function WorkspaceEditor({
     const currentInteraction = getCurrentInteractionState();
     const alreadyActive =
       (nextTool === "wire" && currentInteraction.kind === "wire") ||
+      (nextTool === "no-connect" && currentInteraction.kind === "no-connect") ||
       (currentInteraction.kind === "drawing" &&
         currentInteraction.tool === nextTool) ||
       (nextTool === "pointer" && currentInteraction.kind === "idle");
@@ -4063,19 +4070,21 @@ function WorkspaceEditor({
     setStatus(
       nextTool === "wire"
         ? "Wire: choose a pin, junction, route segment, or blank grid point"
-        : nextTool === "rectangle"
-          ? "Rectangle: click the first corner"
-          : nextTool === "circle"
-            ? "Circle: click the center"
-            : nextTool === "arrow"
-              ? arrowPreset.family === "outline"
-                ? "Outline arrow: click to place, or drag to size (Esc cancels)"
-                : "Arrow: click the start point"
-              : nextTool === "polyline"
-                ? "Polyline: click vertices; double-click or Enter to finish"
-                : nextTool === "construction-line"
-                  ? "Construction line: click the start point"
-                  : "Pointer ready",
+        : nextTool === "no-connect"
+          ? "No Connect: move near a pin and click to mark · Esc exits"
+          : nextTool === "rectangle"
+            ? "Rectangle: click the first corner"
+            : nextTool === "circle"
+              ? "Circle: click the center"
+              : nextTool === "arrow"
+                ? arrowPreset.family === "outline"
+                  ? "Outline arrow: click to place, or drag to size (Esc cancels)"
+                  : "Arrow: click the start point"
+                : nextTool === "polyline"
+                  ? "Polyline: click vertices; double-click or Enter to finish"
+                  : nextTool === "construction-line"
+                    ? "Construction line: click the start point"
+                    : "Pointer ready",
     );
   }
 
@@ -4567,7 +4576,16 @@ function WorkspaceEditor({
     }),
   });
 
+  const noConnectPlacement = useNoConnectPlacement({
+    active: tool === "no-connect",
+    document,
+    viewBox,
+    endpoints: visibleEndpoints,
+    mark: markEndpointNoConnect,
+    report: setStatus,
+  });
   const canvasEventHandlers = createEditorCanvasEventHandlers({
+    noConnectPlacement,
     model: { tool, document, resolver, selectionPolicy },
     session: {
       interactionKind: () => getCurrentInteractionState().kind,
@@ -6694,6 +6712,7 @@ function WorkspaceEditor({
           onPinch={zoomAtClientPoint}
           className={[
             "schematic-canvas",
+            tool === "no-connect" ? "no-connect-mode" : "",
             tool === "wire" ? "wire-mode" : "",
             pendingSymbolId || vddRailMode || copyPlacement
               ? "component-mode"
@@ -6719,6 +6738,9 @@ function WorkspaceEditor({
             .join(" ")}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
           eventHandlers={canvasEventHandlers}
+          noConnectPreview={
+            <NoConnectPlacementPreview target={noConnectPlacement.preview} />
+          }
           grid={{ visible: gridDotsVisible, viewBox }}
           sceneInnerHtml={sceneInnerHtml}
           selectionHalo={{

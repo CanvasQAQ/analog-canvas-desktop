@@ -13,6 +13,7 @@ import {
   isAnnotationPaletteSymbol,
 } from "./annotation-preview-symbols";
 import { vddRailPreviewSymbol } from "./vdd-rail-preview-symbol";
+import { noConnectPreviewSymbol } from "./no-connect-preview-symbol";
 
 /**
  * Reach order rather than taxonomy order: the devices placed most often in a
@@ -180,6 +181,8 @@ const LIBRARY_DISPLAY_NAMES: Readonly<Record<string, string>> = {
 
 /** One line saying what an entry does, where the name alone leaves a doubt. */
 const LIBRARY_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  "no-connect":
+    "Mark intentionally unused pins; activates a tool, not a device",
   "comparator-differential":
     "Fully differential comparator — complementary OUT+ / OUT−; input/output pin spacing: 20",
   tcoil:
@@ -229,6 +232,7 @@ const LIBRARY_LEAVES_OUT = new Set([
 export function paletteSymbols(_styleProfileId: string): SymbolDefinition[] {
   const symbols = [
     vddRailPreviewSymbol,
+    noConnectPreviewSymbol,
     ...razaviProductSymbols,
     ...annotationPreviewSymbols,
     ...expandedDeviceSymbols,
@@ -292,6 +296,7 @@ const SYMBOL_ORDER: readonly string[] = [
   "vdd-port",
   "vdd",
   "ground",
+  "no-connect",
   // Signal-flow blocks in signal-chain order, not alphabetical.
   "adder",
   "multiplier",
@@ -336,7 +341,7 @@ function symbolRank(symbolId: string): number {
 function searchableText(symbol: SymbolDefinition): string {
   const formula = symbol.formulaPresentation?.defaultFormula ?? "";
   return normalizeSignalFlowFormula(
-    `${libraryDisplayName(symbol.id, symbol.name)} ${symbol.name} ${symbol.id} ${formula}`,
+    `${libraryDisplayName(symbol.id, symbol.name)} ${symbol.name} ${symbol.id} ${formula} ${symbol.id === "no-connect" ? "nc noconn" : ""}`,
   ).toLowerCase();
 }
 
