@@ -33,12 +33,12 @@ holding one (`drafting-cover`).
 
 `place-component` takes an optional `id` of your choosing (refused if taken).
 Give one to a ground, each VDD marker and any part you will wire: later actions
-of the list may name it by that ID or its Reference. In MCP wiring
-`instance:{kind:"instance",id}` avoids full-Snapshot name resolution (use it
-for imported Cell Pins). A bare-string pin `instance`
-(`{kind:"pin",instance:"M4",pin:"G"}`) is a Reference, never an ID. A name
-several parts share (every VDD marker's `VDD`) is refused with their IDs, never
-resolved to the first.
+of the list may name it by that ID or its Reference. A bare string
+(`instance:"M4"`) matches a Reference or Cell Pin name first and an ID only
+when none matches; `instance:{kind:"instance",id}` names the ID alone and, in
+MCP wiring, avoids full-Snapshot name resolution (use it for imported Cell
+Pins). A name several parts share (every VDD marker's `VDD`) is refused with
+their IDs, never resolved to the first.
 
 ## Place and name
 
@@ -251,10 +251,10 @@ information). Hidden bulk needs no decorative wire.
   Net. `reference` names a Port (required); `vdd-port` defaults to `VDD`;
   `ground` takes none. Optional `direction` (default passive) applies to these
   markers only (native `terminalDirections` keys must be new markers). The
-  first explicit supply in a batch initializes an absent bulk default. A
-  `vdd-port`'s name stands beside its bar; `arrange-labels` `side:"top"`
-  centres it (house style). A `vdd-port` is a supply that can become the PMOS
-  body default; a rail on a signal Net (an input `VIN`) is a `port` of that name.
+  first explicit supply in a batch initializes an absent bulk default, so a
+  signal input (`VIN`) is a `port`, not a `vdd-port`. A `vdd-port`'s name
+  stands beside its bar; `arrange-labels` `side:"top"` centres it (house
+  style).
 - `set-port-direction` sets one terminal or a whole Port; `set-vdd-mode`
   switches VDD between Cell Pin and Global. Remove a Pin with
   `remove-cell-terminal` or selection deletion, never by disconnecting `P`.

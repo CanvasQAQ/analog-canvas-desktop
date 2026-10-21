@@ -23,17 +23,16 @@ A drawing that only matches its netlist is not done.
 - The figure decides placement, orientation, signal flow, names and printed text. The
   netlist decides connectivity. When they disagree, follow the netlist: keep the figure's
   arrangement and draw the extra parts beside it.
-- Measure the figure in device heights. Keep its proportions at 1 device height = 60 grid
-  units. Never stretch it to make room for wires.
+- Measure the figure in device pitches and keep its proportions at one device pitch = 60
+  grid units. Never stretch it to make room for wires.
 - A block the figure draws as a symbol (op-amp, comparator) but the netlist gives as
   transistors is drawn either way:
   - as a Cell placed where the symbol is;
   - flat, beside the main drawing, joined by Net labels.
+- With no figure (netlist only): main signal path left to right, positive rail above, ground
+  or the negative rail below, repeated sequences in tap order, and a visible supply name.
 
 ## Compact layout
-
-Human-drawn Gallery circuits use about 8,400 grid² per part, and each part's nearest
-neighbour is about 41 away. Drawings twice that loose read as empty and careless.
 
 - **Pitch** (a MOS or BJT symbol is 40 tall):
 
@@ -52,9 +51,10 @@ neighbour is about 41 away. Drawings twice that loose read as empty and careless
   around an empty frame.
 - **Unshown circuitry:** parts the source does not show (bias, a block's transistors) sit
   80–120 from the drawing, packed the same way.
-- **Self-check:** area per part ≤ 10,000 grid² and nearest neighbour ≤ 55. Area per part is
-  the bounding box of the part origins, plus 80 on each axis, divided by the parts; Cells
-  count separately. Also avoid a strip longer than 3.5 times its width.
+- **Self-check** (targets from human-drawn Gallery circuits): area per part ≤ 10,000 grid²
+  and nearest neighbour ≤ 55. Area per part is the bounding box of the part origins, plus 80
+  on each axis, divided by the parts; Cells count separately. Also avoid a strip longer than
+  3.5 times its width.
 - **Compacting a loose drawing:** move whole areas with one selection `transform` so their
   internal wires come along. Redraw the few wires between areas instead of leaving
   stretched loops. If it is badly spread, redrawing is usually faster.
@@ -82,26 +82,26 @@ electrical evidence. Apply only the matching topology, and never rewire to fit a
 | Separate return | Feedback/compensation corridor apart from the forward path |
 | Body tie | Dashed body wire by `via`: a stub out of the channel, then the shortest path to the target Net or a Junction on it |
 
-Plan branched Nets whole: spine, taps, exits. Branches get Junctions; bends and unconnected
-crossings stay dot-free. Bound Net labels may replace distant wires; free text may not.
+Plan branched Nets whole: spine, taps, exits; branches get Junctions. Bound Net labels may
+replace distant wires.
 
 ## Names and text
 
 The editor typesets names itself: `M1` → M₁, `VB1` → V_B1, `vin` → v_in, `φ1` → φ₁.
 
-- **Device references:** the source's names (M1, C2, Q3). Parts it does not name continue the
+- **Device references:** the source's names (M1, C2, Q3), within the
+  [Reference rules](shared/authoring.md#place-and-name). Parts it does not name continue the
   numbering. Never use generated or netlist names such as `MM3_2`, `RRF` or `net1005`; they
   typeset wrongly.
-- **A name with another prefix** (a MOS the figure calls S1) keeps its device prefix and
-  shows the figure's name with `set-display-alias`.
 - **Ports and Net labels:**
-  - the source's text, as plain text;
-  - Greek as the Unicode letter (`φ1`);
+  - the source's text, as plain text ([labels](shared/authoring.md#labels-and-text));
   - drop function arguments such as `(t)`;
   - a Net the source leaves unnamed but that needs a label gets a short name (`VB1`, `VX`).
 - **Equations and notes** printed beside the circuit: annotations with a math run, near the
   same spot.
-- **Values and W/L:** show them only when the source does.
+- **Values and W/L:** in a new drawing, show them only when the source does. In a user's own
+  drawing, keep default attached labels, manual positions, formatting and values unless
+  asked; never erase values.
 
 ## Review the render
 
@@ -112,5 +112,4 @@ Render and look at it before reporting:
 - the source's arrangement is recognisable at a glance;
 - nothing is parked far away.
 
-Fix what you see, at most a few rounds. Report what is left rather than polish unrelated
-areas.
+Fix what you see, at most two rounds.

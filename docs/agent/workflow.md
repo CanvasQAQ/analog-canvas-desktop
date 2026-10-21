@@ -36,9 +36,8 @@ is recovered with the original request identity. Interpret results with
 | Drawing from a reference (figure, paper, netlist) | Done as [Drawing a schematic](circuit-style-knowledge.md) defines it: connected, compact, reads like the source |
 | Simulation | Completed run, captured input identity and retrieved requested results |
 
-Draw from a reference, or make other visual changes, with
-[Drawing a schematic](circuit-style-knowledge.md) and
-[diagnostic policy](shared/diagnostics.md); do not clear observations
+For other visual changes use [Drawing a schematic](circuit-style-knowledge.md)
+and [diagnostic policy](shared/diagnostics.md); do not clear observations
 mechanically or polish unrelated areas. A render does not prove electrical
 performance.
 
