@@ -1,7 +1,7 @@
 {
   "format": "analog-canvas-agent-distribution-v1",
   "version": 1,
-  "registrySha256": "8ce51f004914620d154cb54df36b2c6e73dc2ee7850eda8b1c33dbf3d430c08a",
+  "registrySha256": "7a1c63b8c1af55e3f573c952a4ecbfb75562baf4cc94ebae341301c5f0e8b724",
   "sources": [
     {
       "source": "docs/agent/simulation-specs.md",
@@ -21,11 +21,11 @@
     },
     {
       "source": "docs/agent/shared/authoring.md",
-      "sha256": "d1e5ea4d50731ba42a4e80df204ded0c25e9cfade9cb72b63d5a69d8b242999d"
+      "sha256": "3ca387887a0d32ab9126f6734dec436223beb0ef5cf98a471d34ee6093e00370"
     },
     {
       "source": "docs/agent/workflow.md",
-      "sha256": "f9627abd68a7262386277e097d66d3fc4ff1af538a2c5edde323e6ef141b2e09"
+      "sha256": "b63788b375b95396c7500a0631a4b2a1ca9eea1c9799914333285d1d2ba658a8"
     },
     {
       "source": "docs/agent/tool-behavior.md",
@@ -37,7 +37,7 @@
     },
     {
       "source": "docs/agent/circuit-style-knowledge.md",
-      "sha256": "f44806049658dd57b750daf16c18a55c04ea5c1b3b356d5ad5d945fb619a781e"
+      "sha256": "d20c15d3b94ac77bd6fcf3acbddaa7e9fa2d7b62ab2267097f355064b194bcd4"
     },
     {
       "source": "docs/agent/shared/diagnostics.md",
@@ -256,7 +256,7 @@
         "http-cli",
         "http-kit"
       ],
-      "task": "Look up schematic layout rules",
+      "task": "Draw or redraw a schematic from a figure, paper or netlist",
       "load": "on-demand",
       "requires": [],
       "uri": "analog-canvas://reference/razavi-style",
@@ -284,7 +284,7 @@
         "http-cli",
         "http-kit"
       ],
-      "task": "Layout lookup alias; do not reread",
+      "task": "Drawing guide alias; do not reread",
       "load": "on-demand",
       "requires": [],
       "uri": "analog-canvas://reference/routing",
@@ -521,7 +521,7 @@
         "http-cli",
         "http-kit"
       ],
-      "task": "Layout lookup alias; do not reread",
+      "task": "Drawing guide alias; do not reread",
       "load": "on-demand",
       "requires": [],
       "uri": "analog-canvas://reference/knowledge/patterns",
@@ -606,7 +606,7 @@
         "docs/agent/shared/simulation.md",
         "docs/agent/circuit-style-knowledge.md"
       ],
-      "sha256": "1f3c9cd038dd3e6a0fa1af6648184d6a6d9de4cb96fcaaf9a714d0fe57fa7902"
+      "sha256": "f450a743219d3a34deca5b04fc7b07637660b67d6bf4e47743205ddd43460b41"
     },
     {
       "file": "packages/agent-adapter/src/agent-docs.generated.ts",
@@ -636,7 +636,7 @@
         "docs/agent/shared/simulation.md",
         "docs/agent/circuit-style-knowledge.md"
       ],
-      "sha256": "8d3d70bf04b50e59d27aa4113d76d0aff7b4d7e12e5140b75cb578f183f34723"
+      "sha256": "e92d2e6a404de0aa3b9bc472e5084a72538d6af536bc5e02122e4773fb4177a9"
     },
     {
       "file": "packages/agent-adapter/src/agent-api-help.generated.ts",
