@@ -10,11 +10,16 @@ import { rnlLength, symbolShapes } from "./shapes.js";
 import type { RnlSymbol } from "./symbol-map.js";
 import type { RnlSymbolDefinitionView } from "./rnl-import.js";
 
-/** New house artwork is defined in the file, not attributed to a package. */
+/** Artwork with new electrical interfaces is defined in the file itself. */
 export const inlineRnlSymbols: readonly RnlSymbol[] = builtInSymbols.flatMap(
   (symbol): RnlSymbol[] => {
     const descriptor = subcircuitDescriptor(symbol.id);
-    if (descriptor?.target !== DIFFERENTIAL_COMPARATOR_TARGET) return [];
+    if (
+      !descriptor ||
+      (descriptor.target !== DIFFERENTIAL_COMPARATOR_TARGET &&
+        descriptor.target !== "delay_cell")
+    )
+      return [];
     const ports = [
       ...descriptor.ports.filter((port) => !port.supply),
       ...descriptor.ports.filter((port) => port.supply),

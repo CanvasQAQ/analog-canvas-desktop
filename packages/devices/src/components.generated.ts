@@ -2047,6 +2047,17 @@ export const componentSubcircuitDescriptors: readonly BuiltInSubcircuitDescripto
       ],
     },
     {
+      id: "delay-cell",
+      symbolId: "delay-cell",
+      target: "delay_cell",
+      ports: [
+        { name: "VDD", direction: "inout", supply: "VDD" },
+        { name: "VSS", direction: "inout", supply: "VSS" },
+        { name: "A", direction: "input", pinName: "A" },
+        { name: "Y", direction: "output", pinName: "Y" },
+      ],
+    },
+    {
       id: "adder",
       symbolId: "adder",
       target: "adder",

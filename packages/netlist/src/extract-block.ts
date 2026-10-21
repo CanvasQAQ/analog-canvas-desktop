@@ -99,6 +99,31 @@ export function extractBuiltInSubcircuitInstance(
     binding?.kind === "unresolved-subcircuit" &&
     binding.name.toLowerCase() !== definition.target;
   const ownDefinition = projectNames.has(target.toLowerCase());
+  if (target.toLowerCase() === "delay_cell" && !ownDefinition) {
+    const seen = new Set<string>();
+    for (const [name, value] of Object.entries(netlist?.parameters ?? {})) {
+      const folded = name.toLowerCase();
+      const parsed = parseSpiceNumber(value.trim());
+      if (
+        seen.has(folded) ||
+        !["tpd", "vt"].includes(folded) ||
+        !parsed ||
+        !Number.isFinite(parsed.value) ||
+        parsed.value <= 0
+      ) {
+        diagnostic(
+          diagnostics,
+          document.id,
+          "INVALID_DELAY_CELL_PARAMETER",
+          `Delay Cell ${reference} accepts unique numeric tpd and vt > 0; received ${name}=${value}`,
+          [instance.id],
+          "error",
+          name,
+        );
+      }
+      seen.add(folded);
+    }
+  }
   if (
     adderSigns.some((input) => input.sign === "-") &&
     (retargeted || ownDefinition)

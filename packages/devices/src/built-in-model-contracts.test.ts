@@ -47,12 +47,7 @@ describe("built-in model registration", () => {
   });
 
   it("does not fabricate an implementation for custom or drawing-only targets", () => {
-    for (const target of [
-      "custom_amplifier",
-      "delay_cell",
-      "constructor",
-      "__proto__",
-    ])
+    for (const target of ["custom_amplifier", "constructor", "__proto__"])
       expect(builtInModelContract(target), target).toBeUndefined();
   });
 

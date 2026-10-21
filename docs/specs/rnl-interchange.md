@@ -77,9 +77,11 @@ the RNL language and its runtime belong to rnl.
   `$VCVS`, `$VCCS`, `$CCVS` and `$CCCS` symbols. Default circle appearances
   export as `$CANVAS_*_CIRCLE` from `analog-canvas-extensions`. Both preserve
   their appearance, pin positions and control connections through import.
-- Fully differential comparators define their exact house artwork in the file
+- Fully differential comparators and Delay Cell define their exact artwork in the file
   using the runtime's `define-symbol` operation. Signals precede supplies;
-  numeric-high bodies omit VDD and every body omits VSS. Marked, unmarked and
+  Delay Cell retains both VDD/VSS, while comparator numeric-high bodies omit
+  VDD and every comparator body omits VSS. The old two-terminal drawing-only
+  Delay Cell stencil is import-only. Marked, unmarked and
   input-swapped states round-trip without an external symbol-package update.
   Import recognizes the local Symbol only when its name, artwork and positional
   pins match; an edited stencil keeps the electrically imported part and reports

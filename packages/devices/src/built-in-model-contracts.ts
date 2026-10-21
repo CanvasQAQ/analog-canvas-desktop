@@ -47,6 +47,7 @@ export type BuiltInModelRecipe =
         | "nor"
         | "xor"
         | "xnor"
+        | "delay"
         | "flip-flop";
     }
   | {
@@ -156,6 +157,19 @@ const logic = [
     "One-pole output delay; not a digital event propagation delay.",
   ),
 ];
+const delay = [
+  logic[0]!,
+  {
+    ...parameter(
+      "tpd",
+      "Propagation delay",
+      "10p",
+      "s",
+      "Nominal 50% propagation delay for a settled full-swing step. RC state with logic regeneration; narrow pulses may be suppressed, not pure transport delay.",
+    ),
+    expressions: false,
+  },
+].map((definition) => ({ ...definition, expressions: false }));
 // The ideal comparator's export checks that each level is a number, so none
 // takes an expression in braces.
 const comparator: readonly DeviceParameterDefinition[] = [
@@ -230,6 +244,7 @@ const recipes: Readonly<Record<string, BuiltInModelRecipe>> = {
   dac: { family: "signal", implementation: "quantizer" },
   inverter: { family: "logic", implementation: "inverter" },
   buffer: { family: "logic", implementation: "buffer" },
+  delay_cell: { family: "logic", implementation: "delay" },
   ...Object.fromEntries(
     (["and", "nand", "or", "nor", "xor", "xnor"] as const).flatMap(
       (implementation) =>
@@ -277,7 +292,9 @@ function contract(target: string): BuiltInModelContract | undefined {
         : descriptor.ports,
     parameters:
       family === "logic"
-        ? logic
+        ? implementation === "delay"
+          ? delay
+          : logic
         : family === "comparator"
           ? comparator
           : family === "opamp"

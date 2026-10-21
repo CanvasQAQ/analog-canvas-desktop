@@ -610,7 +610,7 @@ export const razaviSymbolCatalogEntries: readonly RazaviSymbolCatalogEntry[] = [
     palette: true,
     automaticMappings: [],
     manualOnlyReason:
-      "Visual delay-stage block; timing and structural netlist semantics require an explicit implementation mapping.",
+      "Manual placement; noninverting formula propagation delay or an explicit project Cell implementation, not pure transport delay.",
     assetPath: "delay-cell.json",
     assetHash:
       "384d3be7c07eef3a8237cc2d21928b9c9df329b05b6101a1fe4184378a8a42fc",
