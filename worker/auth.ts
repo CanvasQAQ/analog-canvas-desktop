@@ -1,5 +1,10 @@
 export * from "./auth-do";
-import { AUTH_SESSION_COOKIE, type AuthEnv, type SessionUser } from "./auth-do";
+import {
+  AUTH_SESSION_COOKIE,
+  OWNER_TOKEN_PREFIX,
+  type AuthEnv,
+  type SessionUser,
+} from "./auth-do";
 
 function hasSessionCookie(request: Request): boolean {
   const prefix = `${AUTH_SESSION_COOKIE}=`;
@@ -51,12 +56,15 @@ export async function ownerTokenUserOf(
   request: Request,
   env: Partial<AuthEnv>,
 ): Promise<SessionUser | null> {
-  if (!env.AUTH || !hasBearer(request)) return null;
+  // Only an Owner token's prefix is worth waking the AuthDO for.
+  const authorization = request.headers.get("Authorization") ?? "";
+  if (!env.AUTH || !authorization.startsWith(`Bearer ${OWNER_TOKEN_PREFIX}`))
+    return null;
   try {
     const response = await env.AUTH.getByName("auth").fetch(
       "https://auth/internal/owner-token-user",
       {
-        headers: { authorization: request.headers.get("Authorization") ?? "" },
+        headers: { authorization },
       },
     );
     if (!response.ok) return null;

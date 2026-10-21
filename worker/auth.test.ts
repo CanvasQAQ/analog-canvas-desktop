@@ -1269,13 +1269,16 @@ describe("Owner tokens (#1769)", () => {
   it("ownerTokenUserOf reads the bearer through the binding", async () => {
     const { auth, owner, mint } = await ownerHarness();
     const { token } = await mint("ci");
+    let bindingFetches = 0;
     const env = {
       AUTH: {
         getByName: () => ({
-          fetch: (input: Request | string, init?: RequestInit) =>
-            auth.durable.fetch(
+          fetch: (input: Request | string, init?: RequestInit) => {
+            bindingFetches += 1;
+            return auth.durable.fetch(
               typeof input === "string" ? new Request(input, init) : input,
-            ),
+            );
+          },
         }),
       },
     };
@@ -1285,8 +1288,34 @@ describe("Owner tokens (#1769)", () => {
       });
     const bearer = { Authorization: `Bearer ${token}` };
     expect((await ownerTokenUserOf(request(bearer), env))?.isOwner).toBe(true);
+    expect(bindingFetches).toBe(1);
+    // Anything but an Owner token's prefix never wakes the AuthDO.
     expect(await ownerTokenUserOf(request(), env)).toBeNull();
     expect(await ownerTokenUserOf(request({ Cookie: owner }), env)).toBeNull();
+    expect(
+      await ownerTokenUserOf(
+        request({ Authorization: "Bearer gallery-reader" }),
+        env,
+      ),
+    ).toBeNull();
+    expect(bindingFetches).toBe(1);
     expect(await ownerTokenUserOf(request(bearer), {})).toBeNull();
+  });
+
+  it("removes an account's tokens with the account", async () => {
+    const { auth, sql, owner, mint, lookup } = await ownerHarness();
+    const { token } = await mint("old laptop");
+    const deleted = await auth.call("/api/auth/account/delete", {
+      method: "POST",
+      cookie: owner,
+      body: JSON.stringify({ confirm: "delete-account" }),
+    });
+    expect(deleted.status).toBe(200);
+    expect(await lookup(token)).toBeNull();
+    expect(
+      sql
+        .exec<{ count: number }>("SELECT COUNT(*) AS count FROM owner_tokens")
+        .one().count,
+    ).toBe(0);
   });
 });

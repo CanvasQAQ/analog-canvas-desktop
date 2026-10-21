@@ -342,9 +342,12 @@ simulator, reason?, folders}` with per-Spec condition, value, unit and
   account): `{entries: [{id, name, description?, tags?, projectText,
 createdAt?}]}` (≤10), validated like submissions with the prefix
   (`invalid-id`); existing ids are replaced in place (version kept); per-entry
-  `{id, ok, created, previewRevision}` or `{id, ok: false, error}`.
-- Owner tokens (#1769) are per-machine passes for that import, and no other
-  route accepts one. The Owner's same-origin session (else 401/403) mints one
+  `{id, ok, created, previewRevision}` or `{id, ok: false, error}`. Imports
+  post from the CLI with `pnpm gallery:import-batches … --post`
+  ([Batch drawing](../agent/batch-drawing.md)).
+- Owner tokens (#1769): one labelled token per machine for that import; no
+  other route accepts one, and a token does not expire until it is revoked.
+  The Owner's same-origin session (else 401/403) mints one
   with `POST /api/auth/owner-tokens {label}` → `{id, label, token, createdAt}`
   (`acot_…`, shown once; AuthDO keeps its SHA-256), lists them with
   `GET /api/auth/owner-tokens` → `{tokens: [{id, label, createdAt,

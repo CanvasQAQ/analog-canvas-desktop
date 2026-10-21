@@ -155,7 +155,7 @@ describe("posting import batches with the Owner token (#1769)", () => {
       () => Response.json({ error: "x" }, { status: 503 }),
       null,
       null,
-      () => Response.json({ error: "unauthorized" }, { status: 401 }),
+      () => Response.json({ error: "invalid-fields" }, { status: 400 }),
     ];
     const fetchImpl = async (url, init) => {
       const { entries } = JSON.parse(init.body);
@@ -201,10 +201,13 @@ describe("posting import batches with the Owner token (#1769)", () => {
       authorization: "Bearer acot_t",
       "content-type": "application/json",
     });
-    expect(lines.slice(-3)).toEqual([
+    expect(lines.slice(-6)).toEqual([
+      "posted 3/7",
+      "posted 6/7",
+      "posted 7/7",
       "5 posted, 2 failed.",
       "failed ag-4: invalid-project",
-      "failed ag-7: http-401",
+      "failed ag-7: http-400",
     ]);
 
     // Batches already built post from their directory, to Production by
@@ -236,6 +239,54 @@ describe("posting import batches with the Owner token (#1769)", () => {
     expect(lines.slice(-2)).toEqual([
       "6 posted, 1 failed.",
       "failed ag-5: no-result",
+    ]);
+  });
+
+  it("sends the token over https, or plain http to this machine only", () => {
+    const origin = (value) =>
+      parseArguments(["--post-dir", "out", "--source", "ag", "--origin", value])
+        .origin;
+    expect(origin("https://staging.example.com/path")).toBe(
+      "https://staging.example.com",
+    );
+    expect(origin("http://localhost:8787")).toBe("http://localhost:8787");
+    expect(origin("http://127.0.0.1:5173/")).toBe("http://127.0.0.1:5173");
+    expect(origin("http://[::1]:8787")).toBe("http://[::1]:8787");
+    for (const refused of [
+      "http://analog-canvas.tokenzhang.com",
+      "http://localhost.example.com",
+      "http://192.168.1.2:8787",
+      "htps://analog-canvas.tokenzhang.com",
+      "ftp://localhost",
+      "analog-canvas.tokenzhang.com",
+    ])
+      expect(() => origin(refused)).toThrow(/--origin/u);
+  });
+
+  it("stops at the first refused token instead of sending the rest", async () => {
+    const run = scratch();
+    for (let index = 1; index <= 7; index += 1)
+      task(run, String(index), { accepted: "first", path: "first" });
+    let requests = 0;
+    const lines = [];
+    const code = await main(["--source", "analoggenie", run, "--post"], {
+      root,
+      env: { ANALOG_CANVAS_OWNER_TOKEN: "acot_revoked" },
+      fetchImpl: async () => {
+        requests += 1;
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      },
+      sleep: async () => {},
+      log: (line) => lines.push(line),
+    });
+    expect(code).toBe(1);
+    expect(requests).toBe(1);
+    expect(lines.slice(-5)).toEqual([
+      "0 posted, 3 failed.",
+      "failed ag-1: http-401",
+      "failed ag-2: http-401",
+      "failed ag-3: http-401",
+      "Stopped at http-401: the Owner token is missing, wrong or revoked, or its account is not the Owner's; 4 entries not sent.",
     ]);
   });
 });

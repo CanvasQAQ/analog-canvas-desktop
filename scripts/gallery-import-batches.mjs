@@ -31,8 +31,11 @@ it left out and why. --include-suspect also takes drawings accepted because
 two redraws agreed against the dataset's netlist.
 
 --post then posts them, ${POST_BATCH} entries a request, to --origin (default
-${DEFAULT_ORIGIN}); --post-dir posts the batch files already in DIR. The
-Owner token comes from ${TOKEN_ENV}, else ~/.config/analog-canvas/owner-token.`;
+${DEFAULT_ORIGIN}; https://, or http:// to localhost, 127.0.0.1 or [::1]);
+--post-dir posts the batch files already in DIR. The Owner token comes from
+${TOKEN_ENV}, else ~/.config/analog-canvas/owner-token. Dropped connections
+and 5xx are retried; a 401 or 403 stops the run. It prints posted and failed
+counts and failed ids, and exits non-zero if anything failed.`;
 
 export function parseArguments(argv) {
   const options = { includeSuspect: false, post: false };
@@ -56,8 +59,32 @@ export function parseArguments(argv) {
   }
   if (!options.source || rest.length !== (options.postDir ? 0 : 1))
     throw new Error(USAGE);
+  if (options.origin) options.origin = postOrigin(options.origin);
   if (options.postDir) return { ...options, post: true };
   return { ...options, run: rest[0] };
+}
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * The origin the token may go to: https, or plain http to this machine
+ * only, so the token never crosses the network in the clear.
+ */
+export function postOrigin(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`--origin ${value} is not a URL`);
+  }
+  if (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && LOCAL_HOSTS.has(url.hostname))
+  )
+    return url.origin;
+  throw new Error(
+    `--origin ${value} must be https:// (or http:// to localhost, 127.0.0.1 or [::1])`,
+  );
 }
 
 /** The Owner token: the environment's, else the per-machine file's. */
@@ -82,8 +109,10 @@ export function batchFiles(dir) {
 
 /**
  * Post every entry of the batch files, POST_BATCH a request. A dropped
- * connection or a 5xx is retried with backoff; anything else is that
- * request's answer. Returns how many went in and which did not, and why.
+ * connection or a 5xx is retried with backoff; a 401 or 403 (a missing,
+ * wrong or revoked token, or not the Owner's) stops the run; anything else
+ * is that request's answer. Returns how many went in, which did not and
+ * why, and, when stopped, the refusal and how many were never sent.
  */
 export async function postBatches({
   files,
@@ -104,6 +133,7 @@ export async function postBatches({
     const chunk = entries.slice(index, index + POST_BATCH);
     let answer = null;
     let error = "";
+    let status = 0;
     for (let attempt = 0; attempt <= POST_RETRIES; attempt += 1) {
       if (attempt > 0) await sleep(1000 * 2 ** (attempt - 1));
       try {
@@ -119,8 +149,9 @@ export async function postBatches({
           answer = await response.json();
           break;
         }
-        error = `http-${response.status}`;
-        if (response.status < 500) break;
+        status = response.status;
+        error = `http-${status}`;
+        if (status < 500) break;
       } catch (thrown) {
         error = thrown instanceof Error ? thrown.message : String(thrown);
       }
@@ -137,6 +168,12 @@ export async function postBatches({
           error: answer ? (result?.error ?? "no-result") : error,
         });
     }
+    if (status === 401 || status === 403)
+      return {
+        posted,
+        failed,
+        stopped: { error, unsent: entries.length - index - chunk.length },
+      };
     log(`${Math.min(index + POST_BATCH, entries.length)}/${entries.length}`);
   }
   return { posted, failed };
@@ -253,6 +290,10 @@ export async function main(
     log = console.log,
   } = {},
 ) {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    log(USAGE);
+    return 0;
+  }
   const options = parseArguments(argv);
   let files;
   if (options.postDir) {
@@ -269,17 +310,22 @@ export async function main(
     );
   }
   if (!options.post) return 0;
-  const { posted, failed } = await postBatches({
+  const { posted, failed, stopped } = await postBatches({
     files,
     source: options.source,
     origin: options.origin ?? DEFAULT_ORIGIN,
     token: ownerToken(env, home),
     fetchImpl,
     ...(sleep ? { sleep } : {}),
+    log: (progress) => log(`posted ${progress}`),
   });
   log(`${posted} posted, ${failed.length} failed.`);
   for (const { id, error } of failed) log(`failed ${id}: ${error}`);
-  return failed.length > 0 ? 1 : 0;
+  if (stopped)
+    log(
+      `Stopped at ${stopped.error}: the Owner token is missing, wrong or revoked, or its account is not the Owner's; ${stopped.unsent} entries not sent.`,
+    );
+  return failed.length > 0 || stopped ? 1 : 0;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

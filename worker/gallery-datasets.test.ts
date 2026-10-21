@@ -165,6 +165,25 @@ describe("reference datasets in stores of their own (#1510)", () => {
     expect((await importing(null)).status).toBe(401);
     expect((await importing("acot_wrong")).status).toBe(401);
     expect((await importing(`${token}x`)).status).toBe(401);
+    // A bad bearer is refused even beside the Owner's own session.
+    const withCookie = await route(
+      env,
+      new Request(`${ORIGIN}/api/gallery/sources/analoggenie/entries`, {
+        method: "POST",
+        headers: {
+          Origin: ORIGIN,
+          Cookie: owner,
+          Authorization: "Bearer acot_wrong",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          entries: [
+            { id: "ag-8", name: "AnalogGenie 8", projectText: projectText() },
+          ],
+        }),
+      }),
+    );
+    expect(withCookie.status).toBe(401);
 
     // No other route takes it: not a read, not a submission.
     expect((await bearerCall("/api/gallery/ag-7", token)).status).toBe(401);
