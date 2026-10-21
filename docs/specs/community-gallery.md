@@ -336,12 +336,19 @@ simulator, reason?, folders}` with per-Spec condition, value, unit and
   an opened copy publishes as a new community entry.
 - `GET /api/gallery/sources` → `{sources: [... , count]}`; readers see non-empty
   datasets, Owner accounts all.
-- `POST /api/gallery/sources/<key>/entries` (same-origin, Owner account, else 403
-  `owner-only`): `{entries: [{id, name, description?, tags?, projectText,
+- `POST /api/gallery/sources/<key>/entries` (the Owner's same-origin session,
+  or `Authorization: Bearer <Owner token>` without the same-origin check; 401
+  without either, 403 `owner-only` once the account is no longer an Owner
+  account): `{entries: [{id, name, description?, tags?, projectText,
 createdAt?}]}` (≤10), validated like submissions with the prefix
   (`invalid-id`); existing ids are replaced in place (version kept); per-entry
-  `{id, ok, created, previewRevision}` or `{id, ok: false, error}`. It runs from
-  the Owner's browser, so no new secret exists.
+  `{id, ok, created, previewRevision}` or `{id, ok: false, error}`.
+- Owner tokens (#1769) are per-machine passes for that import, and no other
+  route accepts one. The Owner's same-origin session (else 401/403) mints one
+  with `POST /api/auth/owner-tokens {label}` → `{id, label, token, createdAt}`
+  (`acot_…`, shown once; AuthDO keeps its SHA-256), lists them with
+  `GET /api/auth/owner-tokens` → `{tokens: [{id, label, createdAt,
+lastUsedAt}]}`, and revokes one with `DELETE /api/auth/owner-tokens/<id>`.
 
 ## Accounts and sessions
 
@@ -368,12 +375,13 @@ tokens and codes are stored.
   versions, likes, daily-open records and Cloud Projects;
   ComponentLibraryDO its components; AnalogArena unlinks its Voter
   ([Account deletion](analog-arena.md#account-deletion)); AuthDO last removes
-  sessions, codes, counters and the row. A failing step answers 503 leaving the
+  sessions, Owner tokens, codes, counters and the row. A failing step answers 503 leaving the
   account signed in; steps are idempotent. Reply
   `{deleted: {circuits, likes, projects, components}}`.
 - Super-admin is computed per request from `ADMIN_EMAILS` ∪ `ADMIN_EMAILS_EXTRA`
   (comma-separated, case-insensitive). The session cookie is the only write
-  credential.
+  credential, except an Owner token on the dataset import
+  ([Reference datasets](#reference-datasets)).
 
 ### AI seats
 
