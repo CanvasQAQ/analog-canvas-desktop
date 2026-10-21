@@ -35,8 +35,10 @@ holding one (`drafting-cover`).
 Give one to a ground, each VDD marker and any part you will wire: later actions
 of the list may name it by that ID or its Reference. In MCP wiring
 `instance:{kind:"instance",id}` avoids full-Snapshot name resolution (use it
-for imported Cell Pins). A name several parts share (every VDD marker's `VDD`)
-is refused with their IDs, never resolved to the first.
+for imported Cell Pins). A bare-string pin `instance`
+(`{kind:"pin",instance:"M4",pin:"G"}`) is a Reference, never an ID. A name
+several parts share (every VDD marker's `VDD`) is refused with their IDs, never
+resolved to the first.
 
 ## Place and name
 
@@ -51,7 +53,8 @@ is refused with their IDs, never resolved to the first.
   `X2`; a block that emits nothing gets none). A wrong prefix or a used name is
   rejected with a free name and nothing is placed. To draw another name (op-amp
   `X1` as A1) use `set-display-alias {target, text}` (`text:null` restores);
-  it survives Project Code and Copy.
+  it survives Project Code and Copy. A Reference outside letters, digits and
+  `_` (a prime, `C3'`) blocks the netlist (`INVALID_INSTANCE_REFERENCE`).
 - A device shows its name alone. `showValue:true` on `place-component` shows
   its value; `showReference:false` hides the name (native `displays` keyed by
   new Instance ID); Cell markers and ground take neither. Later,
@@ -250,7 +253,8 @@ information). Hidden bulk needs no decorative wire.
   markers only (native `terminalDirections` keys must be new markers). The
   first explicit supply in a batch initializes an absent bulk default. A
   `vdd-port`'s name stands beside its bar; `arrange-labels` `side:"top"`
-  centres it (house style).
+  centres it (house style). A `vdd-port` is a supply that can become the PMOS
+  body default; a rail on a signal Net (an input `VIN`) is a `port` of that name.
 - `set-port-direction` sets one terminal or a whole Port; `set-vdd-mode`
   switches VDD between Cell Pin and Global. Remove a Pin with
   `remove-cell-terminal` or selection deletion, never by disconnecting `P`.
@@ -371,7 +375,9 @@ means deleting the Cell.
   which create the name claim and bound text together (free text does not).
   Give `position` for a new label; its target is a Net or a pin (that pin's
   Net, on its wire). Plain text is a name drawn in its standard look (`VB1` as
-  V over B1); RichText (runs use `value`) sets its own look. Deleting a label
+  V over B1); RichText (runs use `value`) sets its own look. A math run in a
+  Port or Net label renames the Net to its LaTeX (`\phi_1`), which the netlist
+  export refuses: write Greek as the Unicode letter (`φ1`). Deleting a label
   removes its claim, not wires. Name nodes that scripts reference.
 - `annotate` is for independent notes, with GUI Text defaults. `annotate` and
   `edit-text` take plain text (keeps existing spans) or RichText (replaces
