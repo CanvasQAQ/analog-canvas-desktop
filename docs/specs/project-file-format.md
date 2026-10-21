@@ -2,7 +2,7 @@
 
 Status: `accepted`
 
-Portable file schema: `73`; normalized editor model schema: `58`.
+Portable file schema: `74`; normalized editor model schema: `58`.
 
 Primary owner: `packages/project-protocol` (portable source and codec);
 `packages/model` validates the decoded editor model.
@@ -17,12 +17,12 @@ preserves.
 ## Read and write
 
 ```text
-import text -> parse JSON -> require Project file schema 24 through 73
--> migrate old files or decode 59–73 -> strict runtime model validation -> install unbound
-export -> validate -> encode file schema 73 -> readable canonical JSON -> download
+import text -> parse JSON -> require Project file schema 24 through 74
+-> migrate old files or decode 59–74 -> strict runtime model validation -> install unbound
+export -> validate -> encode file schema 74 -> readable canonical JSON -> download
 ```
 
-- `parseProject` reads schemas 24–73; writers always emit 73. Envelope
+- `parseProject` reads schemas 24–74; writers always emit 74. Envelope
   metadata uses `CURRENT_PROJECT_FILE_VERSION`, never the model version.
   Optional additions keep model 58; older envelopes cannot carry them.
 - The reader rejects mixed legacy/current field names, conflicting endpoints,
@@ -44,7 +44,7 @@ export -> validate -> encode file schema 73 -> readable canonical JSON -> downlo
   existing endpoint contact); parsing, Cloud open and recovery stay exact.
 - Canonical serialization ends with one newline and is byte-stable across
   serialize/parse/serialize. `fixtures/projects/compatibility-corpus.json`:
-  `current` entries are already canonical 73; `migrated` witnesses keep source
+  `current` entries are already canonical 74; `migrated` witnesses keep source
   bytes and version and load/save byte-stable; the rejected corpus names
   expected failures.
 - A migrated imported file is dirty; the browser-selected source is never
@@ -117,6 +117,11 @@ Cloud or recovery data.
   same-Net terminal: `position` stays on the grid and the exact drawn contact
   derives from that terminal. Earlier envelopes cannot carry these fields.
   [Visual language](visual-language.md#style-overrides) owns its resolution.
+
+- 74: optional Cell symbol `bodyBounds` stores four explicit edges relative
+  to the stable Symbol origin. Older envelopes cannot carry it; absent bounds
+  retain the existing automatic/minimum-size geometry. The
+  [schematic model](schematic-model.md) owns containment and pin placement.
 
 ## One connection source
 

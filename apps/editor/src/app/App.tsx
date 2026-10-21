@@ -162,6 +162,7 @@ import {
 import { terminalCurrentDirectionPartners } from "../features/simulation/terminal-current-pick";
 import { PUBLIC_SIMULATION_UI_ENABLED } from "../features/simulation/public-simulation-ui";
 import { useCellSymbolLayout } from "../features/hierarchy/use-cell-symbol-layout";
+import { CellSymbolLayoutToolbar } from "../features/hierarchy/cell-symbol-layout-toolbar";
 import { selectedBlockSymbolTarget } from "../features/hierarchy/block-symbol-layout-target";
 import { cellInsertLaunch } from "../features/component-insert/insert-launch";
 import { useComponentPlacement } from "../features/component-insert/use-component-placement";
@@ -1383,6 +1384,8 @@ function WorkspaceEditor({
     useState<DraftingHandlePreview | null>(null);
   const snapGuideLayerRef = useRef<SVGGElement | null>(null);
   const {
+    state: interactionState,
+    setCellSymbolLayout: setCellSymbolLayoutSession,
     getCurrentState: getCurrentInteractionState,
     tool,
     pendingSymbolId,
@@ -1493,6 +1496,7 @@ function WorkspaceEditor({
     setExternalSubcircuitDefinition,
     removeExternalSubcircuitDefinition,
     setCellSymbolBodySize,
+    setCellSymbolPresentation,
     setCellSymbolPortPlacement,
     editCellTerminalAnnotation,
     removeCellTerminalSelection,
@@ -2321,15 +2325,47 @@ function WorkspaceEditor({
     beginDrag: beginCellSymbolLayoutDrag,
     previewDrag: previewCellSymbolLayoutDrag,
     completeDrag: completeCellSymbolLayoutDrag,
+    selectedTerminalIds: layoutSelectedTerminalIds,
+    actionPreview: cellLayoutActionPreview,
+    warnings: cellLayoutWarnings,
+    previewAction: previewCellLayoutAction,
+    applyAction: applyCellLayoutAction,
+    handleKeyDown: handleCellLayoutKeyDown,
   } = useCellSymbolLayout({
+    project,
+    document,
     selectedInstance,
-    target: selectedBlockLayout,
     resolver,
-    selectionOpen,
+    session:
+      interactionState.kind === "cell-symbol-layout" ? interactionState : null,
+    getSession: getCurrentInteractionState,
+    setSession: setCellSymbolLayoutSession,
+    cancelInteraction,
     canvasPointFromEvent: (event) =>
-      pointFromClient(event.clientX, event.clientY, event.currentTarget),
-    setBodySize: setCellSymbolBodySize,
-    setPortPlacement: setCellSymbolPortPlacement,
+      pointFromClient(event.clientX, event.clientY, event.currentTarget, false),
+    save: setCellSymbolPresentation,
+    report: setStatus,
+    startWire: (instanceId, pinName) => {
+      const source = visibleEndpoints.find(
+        (item) =>
+          item.endpoint.kind === "terminal" &&
+          item.endpoint.instanceId === instanceId &&
+          item.endpoint.pinName === pinName,
+      );
+      if (!source) {
+        setStatus("Cell pin no longer has a routable endpoint");
+        return;
+      }
+      activateTool("wire");
+      setWireSource(source, document.revision);
+      setWirePreview({
+        kind: "endpoint",
+        point: source.connection.contactPoint,
+        source,
+      });
+      setWireDraftSteps([]);
+      setStatus(`Wire source: ${instanceId}.${pinName}`);
+    },
   });
   const {
     netLabelForRoute,
@@ -3746,13 +3782,11 @@ function WorkspaceEditor({
   }
 
   function closeProperties(): void {
-    exitCellSymbolLayout();
     setSelectionOpen(false);
     setImportReviewOpen(false);
   }
 
   function showProjectPanel(mode: EditorProjectPanelMode): void {
-    exitCellSymbolLayout();
     if (projectPanel === null) {
       propertiesOpenBeforeProjectPanelRef.current =
         selectionOpen && !documentSettingsOpen;
@@ -4553,6 +4587,7 @@ function WorkspaceEditor({
       saveByHand,
       setWireOptionsOpen,
       getCurrentInteractionState,
+      handleCellLayoutKeyDown,
       tool,
       wireSource,
       wirePreviewPoint,
@@ -5657,12 +5692,10 @@ function WorkspaceEditor({
               open={selectionOpen}
               shelfRef={selectionShelfRef}
               onToggle={() => {
-                if (selectionOpen) {
-                  exitCellSymbolLayout();
-                }
                 // Narrow layouts have room for one side panel. Whichever the user
                 // just asked for wins.
-                else if (compactLayout) setCompactLibraryPanelOpen(false);
+                if (!selectionOpen && compactLayout)
+                  setCompactLibraryPanelOpen(false);
                 setSelectionOpen((current) => !current);
                 if (selectionOpen) setImportReviewOpen(false);
               }}
@@ -6816,6 +6849,10 @@ function WorkspaceEditor({
               ? {
                   placement: selectedCellSymbolLayout.instance.placement!,
                   body: selectedCellSymbolLayout.body,
+                  viewBounds: viewBox,
+                  selectedTerminalIds: layoutSelectedTerminalIds,
+                  activeDragPointerId: cellSymbolLayoutDragPointerId,
+                  actionPreview: cellLayoutActionPreview,
                   pins: selectedCellSymbolLayout.pins.map(
                     ({ terminal, pin }) => ({
                       terminalId: terminal.id,
@@ -6827,6 +6864,18 @@ function WorkspaceEditor({
                   onDragCancel: cancelCellSymbolLayoutDrag,
                 }
               : null
+          }
+          cellSymbolLayoutControls={
+            selectedCellSymbolLayout ? (
+              <CellSymbolLayoutToolbar
+                name={selectedCellSymbolLayout.target.name}
+                selectedTerminalIds={layoutSelectedTerminalIds}
+                warnings={cellLayoutWarnings}
+                onPreview={previewCellLayoutAction}
+                onApply={applyCellLayoutAction}
+                onDone={exitCellSymbolLayout}
+              />
+            ) : null
           }
           netHighlight={{
             highlight: shownNetHighlight,

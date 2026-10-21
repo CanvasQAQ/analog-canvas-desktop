@@ -141,6 +141,31 @@ export function executeTransaction(
     );
   }
 
+  if (
+    transaction.edits.every(
+      (edit) =>
+        edit.kind === "set_cell_symbol_presentation" &&
+        JSON.stringify(edit.presentation) ===
+          JSON.stringify(document.presentation.cellSymbol ?? null),
+    )
+  ) {
+    return {
+      ok: true,
+      applied: false,
+      revision: document.revision,
+      proposedRevision: document.revision,
+      document,
+      diff: {
+        documentId: document.id,
+        fromRevision: document.revision,
+        toRevision: document.revision,
+        editKinds: transaction.edits.map((edit) => edit.kind),
+        changedObjectIds: [],
+      },
+      diagnostics: [],
+    };
+  }
+
   const prepared = reusePreparedTransaction(document, transaction, context);
   if (prepared) return prepared;
 
