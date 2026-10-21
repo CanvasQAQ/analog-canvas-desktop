@@ -1,4 +1,6 @@
 import { richTextPresentsIdentifier } from "../identifier-text.js";
+import { cellSymbolPinContainmentProblems } from "../cell-symbol-layout.js";
+import { projectCellInterface } from "../cell-interface-projection.js";
 import { z } from "zod";
 
 import { StableIdSchema } from "./common.js";
@@ -316,6 +318,15 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
           path: ["presentation", "cellSymbol"],
         });
       } else {
+        for (const message of cellSymbolPinContainmentProblems(
+          projectCellInterface(document.netlist).ports,
+          cellSymbol,
+        ))
+          context.addIssue({
+            code: "custom",
+            message,
+            path: ["presentation", "cellSymbol"],
+          });
         const terminalIds = new Set(
           document.netlist.terminals.map((terminal) => terminal.id),
         );

@@ -123,6 +123,7 @@ is refused with their IDs, never resolved to the first.
     the gate's own Cell is refused, and used Pins cannot be renamed or removed.
 
   An empty model returns the ideal body and default parameters.
+
 - A D flip-flop (`d-flip-flop`, `d-flip-flop-q`, `d-flip-flop-reset`) binds to
   a Project Cell the same way, keeping its symbol: the Cell's Pins are `D`,
   `CK`, `Q`, `QBAR` where the symbol has it and `RST` for the reset form, plus
@@ -264,10 +265,10 @@ information). Hidden bulk needs no decorative wire.
 - `set-cell-symbol-pins` (`circuit_transform`, the Cell's `documentId`)
   arranges a block's Pins by name:
   `{kind:"set-cell-symbol-pins",pins:[{name:"bl",side:"east"},{name:"blb",side:"west",offset:0}]}`.
-  Sides `north|east|south|west`; `offset` from the side's middle in multiples
+  Sides `north|east|south|west`; `offset` along the side from the Symbol origin in multiples
   of 10. Unnamed Pins stay (on an unplaced Cell, where the first placement puts
   them); a named Pin without `offset` stays on an unchanged side, else takes
-  the first free slot (0, -20, 20, …). Unknown names and shared slots are
+  the first free slot inside the body (0, -20, 20, …). Unknown names and shared slots are
   refused with the names or free slots. Callers keep their Nets; stretched
   wiring is redrawn and labels it crosses move clear;
   `projectStructure.changedDocumentIds` and `changedObjectIds` name what moved.

@@ -99,6 +99,7 @@ export interface EditorCanvasSurfaceProps {
   sceneInnerHtml: { __html: string };
   selectionHalo: ComponentProps<typeof EditorSelectionHalo>;
   cellSymbolLayout: ComponentProps<typeof EditorCellSymbolLayoutOverlay> | null;
+  cellSymbolLayoutControls?: ReactNode;
   netHighlight: ComponentProps<typeof NetHighlightOverlay>;
   connectedNets: ComponentProps<typeof ConnectedNetGlow>;
   wireUnderSymbol: ComponentProps<typeof WireUnderSymbolOverlay>;
@@ -146,6 +147,7 @@ export function EditorCanvasSurface({
   sceneInnerHtml,
   selectionHalo,
   cellSymbolLayout,
+  cellSymbolLayoutControls,
   netHighlight,
   connectedNets,
   wireUnderSymbol,
@@ -414,6 +416,7 @@ export function EditorCanvasSurface({
           {textDraft ? <TextDraftEditorOverlay {...textDraft} /> : null}
         </g>
       </svg>
+      {cellSymbolLayoutControls}
       {notice}
     </section>
   );

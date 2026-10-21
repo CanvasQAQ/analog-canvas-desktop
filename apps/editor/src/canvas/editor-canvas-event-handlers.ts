@@ -144,7 +144,7 @@ interface CanvasEventHandlerDependencies {
 /** DOM event boundary for the editor canvas; domain mutations stay injected. */
 export function createEditorCanvasEventHandlers({
   model: { tool, document, resolver, selectionPolicy },
-  session: { interactionKind, cellSymbolLayoutEnabled, exitCellSymbolLayout },
+  session: { interactionKind, cellSymbolLayoutEnabled },
   coordinates: {
     pointFromClient,
     logicalRadiusForPixels,
@@ -340,7 +340,11 @@ export function createEditorCanvasEventHandlers({
         target.closest('[data-testid="cell-symbol-layout-overlay"]')
       )
         return;
-      if (cellSymbolLayoutEnabled) exitCellSymbolLayout();
+      if (cellSymbolLayoutEnabled && event.button === 0 && !event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (interactionKind() === "moving-selection") {
         event.stopPropagation();
         return;
@@ -430,6 +434,10 @@ export function createEditorCanvasEventHandlers({
       }
     },
     onDoubleClick(event: CanvasMouseEvent) {
+      if (cellSymbolLayoutEnabled) {
+        event.preventDefault();
+        return;
+      }
       const target = event.target as Element;
       if (tool === "pointer") {
         const pointHits = rankCanvasHits(

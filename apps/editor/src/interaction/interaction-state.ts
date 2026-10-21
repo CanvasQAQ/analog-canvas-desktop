@@ -9,6 +9,7 @@ import type {
   Rotation,
 } from "@icm/model";
 import type {
+  CellSymbolGrip,
   WireCornerOrder,
   WireDraftStep,
   WireRoutingMode,
@@ -160,7 +161,28 @@ export interface CopyPlacement<TClipboard> {
   orientationOperations: PlacementOrientationOperation[];
 }
 
+export interface CellSymbolLayoutInteraction {
+  kind: "cell-symbol-layout";
+  documentId: string;
+  instanceId: string;
+  definitionTarget: { kind: "cell" | "external"; ownerId: string };
+  selectedTerminalIds: string[];
+  gesture: {
+    kind: "resize" | "pins" | "marquee";
+    pointerId: number;
+    start: Point;
+    clientStart: Point;
+    revision: number;
+    documentRevision: number;
+    structureRevision: number;
+    grip?: CellSymbolGrip;
+    terminalId?: string;
+    additive: boolean;
+  } | null;
+}
+
 export type InteractionState<TClipboard = never> =
+  | CellSymbolLayoutInteraction
   | { kind: "idle" }
   | { kind: "no-connect" }
   | {
@@ -200,6 +222,7 @@ export type InteractionState<TClipboard = never> =
     };
 
 export type InteractionAction<TClipboard = never> =
+  | { type: "set-cell-symbol-layout"; session: CellSymbolLayoutInteraction }
   | { type: "activate-tool"; tool: EditorTool }
   | { type: "place-component"; placement: PendingComponentPlacement }
   | { type: "set-component-preview"; point: Point | null }
@@ -322,6 +345,8 @@ export function interactionReducer<TClipboard>(
   action: InteractionAction<TClipboard>,
 ): InteractionState<TClipboard> {
   switch (action.type) {
+    case "set-cell-symbol-layout":
+      return action.session;
     case "activate-tool":
       if (action.tool === "wire" && state.kind === "wire") return state;
       if (action.tool === "no-connect" && state.kind === "no-connect")
@@ -523,6 +548,7 @@ export function interactionTool<TClipboard>(
 ): EditorTool {
   switch (state.kind) {
     case "idle":
+    case "cell-symbol-layout":
     case "placing-component":
     case "placing-vdd-rail":
     case "copy-placement":
@@ -560,6 +586,8 @@ export function useInteractionState<TClipboard>() {
   const copyPlacement = state.kind === "copy-placement" ? state.copy : null;
   return {
     state,
+    setCellSymbolLayout: (session: CellSymbolLayoutInteraction) =>
+      dispatch({ type: "set-cell-symbol-layout", session }),
     getCurrentState: () => currentStateRef.current,
     tool: interactionTool(state),
     pendingSymbolId: componentPlacement?.placement.symbolId ?? null,

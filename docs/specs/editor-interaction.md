@@ -114,7 +114,7 @@ rendering and recovery.
 
 One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
 `VddRailPlacement`, `CopyPlacement`, `SelectionMove` (`M`/`Shift+M`), `Wire`,
-`NoConnect`, `Drawing`.
+`NoConnect`, `Drawing`, `CellSymbolLayout`.
 
 - Box selection, drag-move, pan and text editing are bounded gesture owners
   cancelled at every reset boundary; no transient state lives in parallel React
@@ -136,6 +136,27 @@ One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
   top.
 - Reference labels keep four units between their ink and the symbol ink, at
   whole-unit coordinates; eight 45° turns restore them.
+
+### Cell symbol layout
+
+- The canonical session pins a definition and invoking occurrence by identity,
+  with internal pin selection and one active gesture. Blank clicks clear only
+  that selection; Properties visibility and camera changes preserve the session.
+  Parent objects cannot acquire movement while it owns the pointer.
+- Eight screen-sized grips move their own edges against fixed opposite edges;
+  the Symbol origin and every occurrence placement stay fixed. Rotation and
+  mirror use the normal inverse transform. Limits appear before release.
+- Additive clicks and window/crossing frames select pins. Same-side groups
+  preserve order and spacing while moving or switching sides; mixed-side drags
+  use each edge's tangent. Explicit side arrangement previews its order.
+  Arrow keys nudge on the connection grid; equal spacing keeps outer pins.
+- A geometry proposal checks the whole selection before one Project commit;
+  occupied/out-of-body results reject without moving unselected pins. No-op,
+  stale and cancelled gestures add no history; one Undo restores all callers.
+- Done or idle Escape exits. Drag Escape, pointercancel and capture loss cancel
+  only that gesture; established Document/Project reset boundaries cancel it all.
+  `W` with one selected pin starts the existing Wire at that occurrence; any
+  other pin count stays in layout and asks for one pin.
 
 ### Wire
 
@@ -326,14 +347,14 @@ One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
 
 ### Text authority and formatting rules
 
-| Text on canvas           | Authority                         | Text edit                                   | Formatting-only edit                                 |
-| ------------------------ | --------------------------------- | ------------------------------------------- | ---------------------------------------------------- |
-| Following instance label | `Instance.reference`              | Renames the Reference (validated)           | Same-name `formatOverride`; binding stays live       |
-| Instance display alias   | Annotation `content`              | Alias only                                  | Alias only                                           |
-| Cell Pin label           | Formal terminal name              | Renames the declaration, reconciles callers | Same-name `formatOverride`, projected to parent pin  |
-| Cell Pin display alias   | Annotation `content`              | Alias only; Pin keeps its name              | Alias only, drawn by the parent pin                  |
-| Net or power label       | Its name claim or formal terminal | Owning Net/terminal rename path             | Keeps the name, stores presentation                  |
-| Free drafting text       | Drafting `content`                | Drawing only                                | Drawing only                                         |
+| Text on canvas           | Authority                         | Text edit                                   | Formatting-only edit                                |
+| ------------------------ | --------------------------------- | ------------------------------------------- | --------------------------------------------------- |
+| Following instance label | `Instance.reference`              | Renames the Reference (validated)           | Same-name `formatOverride`; binding stays live      |
+| Instance display alias   | Annotation `content`              | Alias only                                  | Alias only                                          |
+| Cell Pin label           | Formal terminal name              | Renames the declaration, reconciles callers | Same-name `formatOverride`, projected to parent pin |
+| Cell Pin display alias   | Annotation `content`              | Alias only; Pin keeps its name              | Alias only, drawn by the parent pin                 |
+| Net or power label       | Its name claim or formal terminal | Owning Net/terminal rename path             | Keeps the name, stores presentation                 |
+| Free drafting text       | Drafting `content`                | Drawing only                                | Drawing only                                        |
 
 - [Names and labels](names-and-labels.md) owns typography and drawing-wide
   formatting. Text edits rename exactly as typed; style never renames.
