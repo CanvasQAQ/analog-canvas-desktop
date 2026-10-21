@@ -87,6 +87,9 @@ export const OWNER_ACCOUNT_IDS: readonly string[] = [
 ];
 /** The super-admin's own session, kept while the browser is an AI account. */
 export const AUTH_OWNER_COOKIE = "icm_owner_session";
+/** How an Owner token (#1769) begins, so a leaked one is recognisable. */
+export const OWNER_TOKEN_PREFIX = "acot_";
+const OWNER_TOKEN_LABEL_MAX = 80;
 
 const TOKENZHANG_DISPLAY_NAME_MIGRATION =
   "2026-08-26-tokenzhang-to-zhishuai-zhang";
@@ -208,6 +211,13 @@ function parseCookies(header: string | null): Record<string, string> {
 function randomToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** An Owner token: the prefix and 32 random bytes, base64url. */
+function randomOwnerToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return `${OWNER_TOKEN_PREFIX}${base64.replace(/\+/gu, "-").replace(/\//gu, "_").replace(/=+$/u, "")}`;
 }
 
 /** Six random digits, every code equally likely (rejection sampling). */
@@ -383,9 +393,10 @@ function noStoreJson(payload: unknown, status = 200): Response {
 
 /**
  * Users, sessions, and the whole `/api/auth/*` surface. The worker entry
- * forwards those requests verbatim; `/internal/session-user` is the one
- * operation other modules (the gallery) call through the binding, and it
- * is never reachable publicly because only `/api/auth/*` is forwarded.
+ * forwards those requests verbatim; `/internal/session-user` and
+ * `/internal/owner-token-user` are the operations other modules (the
+ * gallery) call through the binding, never reachable publicly because only
+ * `/api/auth/*` is forwarded.
  */
 export class AuthDO {
   private readonly sql: SqlStorage;
@@ -512,6 +523,17 @@ export class AuthDO {
         expires_at TEXT NOT NULL
       ) WITHOUT ROWID
     `);
+    // Owner tokens (#1769): a bearer per machine for dataset imports.
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS owner_tokens (
+        token_hash TEXT PRIMARY KEY,
+        id TEXT NOT NULL UNIQUE,
+        user_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT
+      ) WITHOUT ROWID
+    `);
     this.ensureAiSeats(state);
   }
 
@@ -519,6 +541,9 @@ export class AuthDO {
     const url = new URL(request.url);
     if (url.pathname === "/internal/session-user") {
       return noStoreJson({ user: await this.sessionUser(request) });
+    }
+    if (url.pathname === "/internal/owner-token-user") {
+      return noStoreJson({ user: await this.ownerTokenUser(request) });
     }
     if (!url.pathname.startsWith("/api/auth/")) {
       return Response.json({ error: "not-found" }, { status: 404 });
@@ -583,6 +608,9 @@ export class AuthDO {
     }
     if (route === "users/role" && method === "POST") {
       return this.setRole(request);
+    }
+    if (route === "owner-tokens" || route.startsWith("owner-tokens/")) {
+      return this.ownerTokens(request, route.slice("owner-tokens".length));
     }
     if (route === "ai-accounts" && method === "GET") {
       return this.listAiAccounts(request);
@@ -1333,6 +1361,7 @@ export class AuthDO {
     if (!(await unlinkArenaVoter(this.env.ARENA, user, url.origin)))
       return noStoreJson({ error: "arena-unlink-failed" }, 503);
     this.sql.exec("DELETE FROM sessions WHERE user_id = ?", user.id);
+    this.sql.exec("DELETE FROM owner_tokens WHERE user_id = ?", user.id);
     if (user.email) {
       this.sql.exec("DELETE FROM login_codes WHERE email = ?", user.email);
       this.sql.exec(
@@ -1378,6 +1407,89 @@ export class AuthDO {
       email,
     );
     return noStoreJson({ updated: targets.length, role });
+  }
+
+  // --- Owner tokens (#1769) ----------------------------------------------
+
+  /**
+   * Mint (POST {label}), list (GET) and revoke (DELETE /<id>) Owner tokens:
+   * a signed-in Owner's same-origin session alone, never a token. The raw
+   * token is returned once, at minting; only its hash is kept.
+   */
+  private async ownerTokens(request: Request, rest: string): Promise<Response> {
+    if (!sameOrigin(request)) return noStoreJson({ error: "forbidden" }, 403);
+    const caller = await this.sessionUser(request);
+    if (!caller) return noStoreJson({ error: "unauthorized" }, 401);
+    if (!caller.isOwner) return noStoreJson({ error: "owner-only" }, 403);
+    const method = request.method;
+    if (rest === "" && method === "GET") {
+      const tokens = this.sql
+        .exec<{
+          id: string;
+          label: string;
+          createdAt: string;
+          lastUsedAt: string | null;
+        }>(
+          `SELECT id, label, created_at AS createdAt, last_used_at AS lastUsedAt
+           FROM owner_tokens ORDER BY created_at, id`,
+        )
+        .toArray();
+      return noStoreJson({ tokens });
+    }
+    if (rest === "" && method === "POST") {
+      const body = (await request.json().catch(() => null)) as {
+        label?: unknown;
+      } | null;
+      const label = typeof body?.label === "string" ? body.label.trim() : "";
+      if (!label || label.length > OWNER_TOKEN_LABEL_MAX)
+        return noStoreJson({ error: "invalid-fields" }, 400);
+      const token = randomOwnerToken();
+      const id = crypto.randomUUID();
+      const createdAt = this.now().toISOString();
+      this.sql.exec(
+        "INSERT INTO owner_tokens(token_hash, id, user_id, label, created_at) VALUES (?, ?, ?, ?, ?)",
+        await sha256(token),
+        id,
+        caller.id,
+        label,
+        createdAt,
+      );
+      return noStoreJson({ id, label, token, createdAt }, 201);
+    }
+    const id = /^\/([^/]+)$/u.exec(rest)?.[1];
+    if (id && method === "DELETE") {
+      const found = this.sql
+        .exec<{ id: string }>("SELECT id FROM owner_tokens WHERE id = ?", id)
+        .toArray();
+      if (found.length === 0) return noStoreJson({ error: "not-found" }, 404);
+      this.sql.exec("DELETE FROM owner_tokens WHERE id = ?", id);
+      return noStoreJson({ revoked: id });
+    }
+    return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  /** The account an Owner token's bearer belongs to; marks the token used. */
+  private async ownerTokenUser(request: Request): Promise<SessionUser | null> {
+    const token = /^Bearer (\S+)$/u.exec(
+      request.headers.get("Authorization") ?? "",
+    )?.[1];
+    if (!token?.startsWith(OWNER_TOKEN_PREFIX)) return null;
+    const tokenHash = await sha256(token);
+    const row = this.sql
+      .exec<UserRow>(
+        `SELECT users.* FROM owner_tokens
+         JOIN users ON users.id = owner_tokens.user_id
+         WHERE owner_tokens.token_hash = ?`,
+        tokenHash,
+      )
+      .toArray()[0];
+    if (!row) return null;
+    this.sql.exec(
+      "UPDATE owner_tokens SET last_used_at = ? WHERE token_hash = ?",
+      this.now().toISOString(),
+      tokenHash,
+    );
+    return this.publicUser(row);
   }
 
   // --- AI accounts --------------------------------------------------------
