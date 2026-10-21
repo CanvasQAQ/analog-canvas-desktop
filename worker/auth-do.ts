@@ -15,7 +15,19 @@
 // Provider HTTP calls go through an injectable fetch seam so
 // tests never touch the network.
 
+import {
+  ACCOUNT_BLOCKS_TABLE,
+  blockNotice,
+  isBlocked,
+  listBlocks,
+  markNotified,
+  recordBlock,
+  unblock,
+  unsentNotices,
+  type BlockEvidence,
+} from "./account-blocks";
 import { unlinkArenaVoter, type ArenaService } from "./arena-account";
+import { USAGE_CONTACT } from "./usage-policy";
 import {
   ARENA_ORIGIN,
   CANVAS_HOST,
@@ -160,6 +172,8 @@ export interface SessionUser {
   seat?: string;
   /** One of the Owner's own accounts (OWNER_ACCOUNT_IDS). */
   isOwner?: true;
+  /** Blocked from the Gallery for collecting it in bulk (account-blocks.ts). */
+  blocked?: true;
   /**
    * The super-admin who switched this browser to the AI account it is
    * signed in as, and can switch it back (`/api/auth/me` only).
@@ -534,6 +548,7 @@ export class AuthDO {
         last_used_at TEXT
       ) WITHOUT ROWID
     `);
+    this.sql.exec(ACCOUNT_BLOCKS_TABLE);
     this.ensureAiSeats(state);
   }
 
@@ -545,6 +560,10 @@ export class AuthDO {
     if (url.pathname === "/internal/owner-token-user") {
       return noStoreJson({ user: await this.ownerTokenUser(request) });
     }
+    if (url.pathname === "/internal/block-account" && request.method === "POST")
+      return this.blockAccount(request);
+    if (url.pathname === "/internal/block-notices" && request.method === "POST")
+      return noStoreJson({ sent: await this.sendBlockNotices() });
     if (!url.pathname.startsWith("/api/auth/")) {
       return Response.json({ error: "not-found" }, { status: 404 });
     }
@@ -621,7 +640,103 @@ export class AuthDO {
     if (route === "ai-accounts/return" && method === "POST") {
       return this.returnToOwner(request, url);
     }
+    if (route === "blocked" && method === "GET") {
+      if (!(await this.sessionUser(request))?.isOwner)
+        return Response.json({ error: "owner-only" }, { status: 403 });
+      return noStoreJson({ blocked: listBlocks(this.sql) });
+    }
+    if (route === "blocked/unblock" && method === "POST") {
+      if (!sameOrigin(request))
+        return Response.json({ error: "forbidden" }, { status: 403 });
+      if (!(await this.sessionUser(request))?.isOwner)
+        return Response.json({ error: "owner-only" }, { status: 403 });
+      const body = (await request.json().catch(() => null)) as {
+        userId?: unknown;
+      } | null;
+      if (typeof body?.userId !== "string")
+        return Response.json({ error: "invalid-user" }, { status: 400 });
+      return noStoreJson({
+        unblocked: unblock(this.sql, body.userId, this.now().toISOString()),
+      });
+    }
     return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  // --- Gallery blocks ---------------------------------------------------
+
+  /**
+   * Blocks the account that read a trap circuit, unless the Owner's own
+   * tools may read in bulk (`readsTraps` in gallery-traps.ts), and tells
+   * the Owner at once; the scheduled pass retries an unsent notice.
+   */
+  private async blockAccount(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => null)) as
+      ({ userId?: unknown } & Partial<BlockEvidence>) | null;
+    if (typeof body?.userId !== "string" || typeof body.entryId !== "string")
+      return Response.json({ error: "invalid-block" }, { status: 400 });
+    const row = this.sql
+      .exec<UserRow>("SELECT * FROM users WHERE id = ?", body.userId)
+      .toArray()[0];
+    if (!row) return Response.json({ error: "not-found" }, { status: 404 });
+    const user = this.publicUser(row);
+    if (user.isOwner || user.isAdmin || user.seat || user.role === "moderator")
+      return noStoreJson({ blocked: false });
+    const text = (value: unknown) =>
+      typeof value === "string" && value.length > 0 ? value : null;
+    const created = recordBlock(
+      this.sql,
+      user,
+      {
+        entryId: body.entryId,
+        path: text(body.path) ?? "",
+        ip: text(body.ip),
+        country: text(body.country),
+        userAgent: text(body.userAgent),
+      },
+      this.now().toISOString(),
+    );
+    if (created) await this.sendBlockNotices();
+    return noStoreJson({ blocked: true });
+  }
+
+  /** Emails the Owner every block not yet told; returns how many were. */
+  private async sendBlockNotices(): Promise<number> {
+    let sent = 0;
+    for (const row of unsentNotices(this.sql)) {
+      const { subject, text } = blockNotice(row);
+      if (!(await this.sendEmail(USAGE_CONTACT, subject, text))) break;
+      markNotified(this.sql, row.id, this.now().toISOString());
+      sent += 1;
+    }
+    return sent;
+  }
+
+  /** One plain-text email through Resend; false when it was not sent. */
+  private async sendEmail(
+    to: string,
+    subject: string,
+    text: string,
+  ): Promise<boolean> {
+    if (!this.env.RESEND_API_KEY) return false;
+    try {
+      const response = await this.fetchLike("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${this.env.RESEND_API_KEY}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from:
+            this.env.AUTH_EMAIL_FROM ?? "Analog Canvas <onboarding@resend.dev>",
+          to: [to],
+          subject,
+          text,
+        }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   // --- sessions ---------------------------------------------------------
@@ -660,7 +775,10 @@ export class AuthDO {
       this.sql.exec("DELETE FROM sessions WHERE token_hash = ?", tokenHash);
       return null;
     }
-    return this.publicUser(row);
+    const user = this.publicUser(row);
+    return isBlocked(this.sql, row.id, row.email)
+      ? { ...user, blocked: true }
+      : user;
   }
 
   private publicUser(row: UserRow): SessionUser {
@@ -1130,35 +1248,15 @@ export class AuthDO {
       await sha256(`code:${email}:${code}`),
       new Date(now.getTime() + AUTH_LOGIN_CODE_TTL_MS).toISOString(),
     );
-    try {
-      const sendResponse = await this.fetchLike(
-        "https://api.resend.com/emails",
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${this.env.RESEND_API_KEY}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            from:
-              this.env.AUTH_EMAIL_FROM ??
-              "Analog Canvas <onboarding@resend.dev>",
-            to: [email],
-            subject: `${code} is your Analog Canvas sign-in code`,
-            text:
-              `Your Analog Canvas sign-in code is:\n\n${code}\n\n` +
-              "Type it into the page where you asked to sign in. It works " +
-              "once and expires in 10 minutes. If you did not ask to sign " +
-              "in, ignore this email.",
-          }),
-        },
-      );
-      if (!sendResponse.ok) {
-        return Response.json({ error: "send-failed" }, { status: 502 });
-      }
-    } catch {
-      return Response.json({ error: "send-failed" }, { status: 502 });
-    }
+    const sent = await this.sendEmail(
+      email,
+      `${code} is your Analog Canvas sign-in code`,
+      `Your Analog Canvas sign-in code is:\n\n${code}\n\n` +
+        "Type it into the page where you asked to sign in. It works " +
+        "once and expires in 10 minutes. If you did not ask to sign " +
+        "in, ignore this email.",
+    );
+    if (!sent) return Response.json({ error: "send-failed" }, { status: 502 });
     return Response.json({ sent: true }, { status: 202 });
   }
 

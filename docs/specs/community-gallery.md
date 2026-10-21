@@ -46,13 +46,29 @@ restrictive CSP.
 - `robots.txt` states the usage policy (occasional manual use of single
   circuits is welcome; bulk collection, scraping, mirroring or AI training
   without the site author's permission, zzhishuai@ethz.ch, is strictly
-  prohibited and answered with a lawyer's letter), closes the site to AI
+  prohibited, detected and blocked at once, and answered with a lawyer's
+  letter), closes the site to AI
   training and answer-engine crawlers (`worker/usage-policy.ts`), and asks
   everyone else for `Content-Signal: search=yes, ai-train=no` with
   `Disallow: /g/`. A user's own assistant fetching one page is not refused.
   `llms.txt` states the same policy to AI agents and lists no resource while
   public Gallery documents are off; `sitemap.xml` stays 404. The Agent's
   Gallery tool description carries the same sentence.
+- Trap circuits (`worker/gallery-traps.ts`): a signed-in member's list page
+  (`GET /api/gallery`, six circuits or more) carries one circuit whose id is
+  reserved (`apps/editor/src/gallery-reserved-ids.ts`). The client drops
+  reserved ids and no real circuit gets one, so only a program walking the
+  list reads it. The Owner, curators, moderators, AI seats and the read
+  credential meet none; to them a trap id is `404`.
+- Any request under a trap id blocks the member's account (AuthDO
+  `account_blocks`, matched by account or email); it is answered like an
+  ordinary circuit. Every later `/api/gallery` request of the account is
+  `403 {"error":"account-blocked","usage":…}`. The record keeps the email,
+  display name, sign-in method, time, path, IP address, country and user
+  agent, and outlives an unblock and the account. The Owner is emailed at
+  once (Resend, to the usage contact); the scheduled pass resends an unsent
+  notice. Owner only: `GET /api/auth/blocked` lists the records, and
+  `POST /api/auth/blocked/unblock {userId}` (same origin) lifts a block.
 - `/api/*` has a flood limit of 1200 requests a minute per client address
   (Workers rate limiting, `API_RATE_LIMITER`). Past it:
   `429 {"error":"too-many-requests","retryAfterSeconds":60,"usage":…}` with
