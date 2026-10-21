@@ -12,6 +12,7 @@ import {
   svgPreviewDimensions,
 } from "./gallery-store";
 import workerEntry from "./index";
+import { withoutReservedEntries } from "../apps/editor/src/gallery-reserved-ids";
 import {
   type Harness,
   ORIGIN,
@@ -116,9 +117,13 @@ describe("Gallery readers", () => {
     for (let n = 1; n <= SIGNED_OUT_WALL_SIZE + 1; n += 1)
       await submitOne(env, `Circuit ${n}`, { cookie: admin });
     const member = cookieHeaders(await makerOf(env));
-    const wall = (await (await direct(env, "/api/gallery", member)).json()) as {
+    const listed = (await (
+      await direct(env, "/api/gallery", member)
+    ).json()) as {
       entries: { id: string; previewRevision: string }[];
     };
+    // As the client reads it: without the trap circuit (gallery-traps.ts).
+    const wall = { entries: withoutReservedEntries(listed.entries) };
     expect(wall.entries).toHaveLength(SIGNED_OUT_WALL_SIZE + 1);
 
     const signedOut = await direct(env, "/api/gallery");
