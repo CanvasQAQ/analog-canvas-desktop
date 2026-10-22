@@ -10,6 +10,7 @@ import {
   resolveDocumentRoutingGeometry,
   resolveVisualAnchor,
   buildProjectConnectivityIndex,
+  endpointKey,
   resolveAnnotationText,
   type ResolvedDocumentRoutingGeometry,
 } from "@icm/derived";
@@ -90,7 +91,15 @@ export function agentAnnotationTextMeasure(
       routing: resolveDocumentRoutingGeometry(document, resolver),
       logical: resolveDocumentLogicalNets(document),
     };
-    if (!isSchematicAnnotationVisible(document, annotation, context.logical))
+    if (
+      !isSchematicAnnotationVisible(
+        document,
+        annotation,
+        context.logical,
+        undefined,
+        resolver,
+      )
+    )
       return undefined;
     const drawn = resolveAnnotationPresentation(
       document,
@@ -130,6 +139,7 @@ export function selectAgentGeometry(
         kind: "route",
         id,
         netId: route.netId,
+        ...(route.members ? { members: structuredClone(route.members) } : {}),
         start: route.start,
         legs: route.legs,
         ...(route.presentation ? { presentation: route.presentation } : {}),
@@ -142,6 +152,9 @@ export function selectAgentGeometry(
         kind: "junction",
         id,
         netId: junction.netId,
+        ...(junction.members
+          ? { members: structuredClone(junction.members) }
+          : {}),
         position: junction.position,
       });
       continue;
@@ -467,7 +480,12 @@ function instanceLabels(
             ? annotation.anchor.objectId
             : undefined;
     if (instanceId === undefined || !wanted(instanceId)) continue;
-    const text = resolveAnnotationText(document, annotation, logicalNets);
+    const text = resolveAnnotationText(
+      document,
+      annotation,
+      logicalNets,
+      resolver,
+    );
     if (annotation.anchor.kind === "route")
       routing ??= resolveDocumentRoutingGeometry(document, resolver);
     const list = labels.get(instanceId) ?? [];
@@ -515,7 +533,7 @@ export function selectAgentInstances(
   for (const net of document.nets) {
     for (const terminal of net.terminals) {
       terminalNetByKey.set(
-        `${terminal.instanceId}\u0000${terminal.pinName}`,
+        endpointKey({ kind: "terminal", ...terminal }),
         logicalNets.byBaseNetId.get(net.id)?.id ?? net.id,
       );
     }
@@ -629,8 +647,30 @@ export function selectAgentInstances(
               instanceId: instance.id,
               pinName: name,
             });
+            const members =
+              cellTerminal?.signal && name === "P"
+                ? cellTerminal.signal.members
+                : pin?.signalMembers;
+            const memberNet = (memberId?: string) =>
+              terminalNetByKey.get(
+                endpointKey({
+                  kind: "terminal",
+                  instanceId: instance.id,
+                  pinName: name,
+                  ...(memberId ? { memberId } : {}),
+                }),
+              ) ?? null;
             return {
               name,
+              ...(members && members.length > 1
+                ? {
+                    members: members.map((member) => ({
+                      id: member.id,
+                      name: member.name,
+                      netId: memberNet(member.id),
+                    })),
+                  }
+                : {}),
               role: pin?.role ?? null,
               direction: effectivePin?.direction ?? null,
               visibility: pin
@@ -651,8 +691,7 @@ export function selectAgentInstances(
                       : null,
                   }
                 : null,
-              netId:
-                terminalNetByKey.get(`${instance.id}\u0000${name}`) ?? null,
+              netId: memberNet(),
             };
           }),
         ...(mosBulk
@@ -694,6 +733,15 @@ function documentSnapshot(
       return {
         id: route.id,
         netId: logicalNets.byBaseNetId.get(route.netId)?.id ?? route.netId,
+        ...(route.members
+          ? {
+              members: route.members.map((member) => ({
+                ...member,
+                netId:
+                  logicalNets.byBaseNetId.get(member.netId)?.id ?? member.netId,
+              })),
+            }
+          : {}),
         start: structuredClone(route.start),
         legs: structuredClone(route.legs),
         ...(route.presentation ? { presentation: route.presentation } : {}),
@@ -768,11 +816,19 @@ function documentSnapshot(
             left.pinName.localeCompare(right.pinName, "en"),
         ),
       routeIds: document.routes
-        .filter((route) => net.baseNetIds.includes(route.netId))
+        .filter((route) =>
+          (route.members ?? [route]).some((member) =>
+            net.baseNetIds.includes(member.netId),
+          ),
+        )
         .map((route) => route.id)
         .sort((left, right) => left.localeCompare(right, "en")),
       junctionIds: document.junctions
-        .filter((junction) => net.baseNetIds.includes(junction.netId))
+        .filter((junction) =>
+          (junction.members ?? [junction]).some((member) =>
+            net.baseNetIds.includes(member.netId),
+          ),
+        )
         .map((junction) => junction.id)
         .sort((left, right) => left.localeCompare(right, "en")),
     })),
@@ -783,6 +839,15 @@ function documentSnapshot(
         ...withoutKeptStyle(junction),
         netId:
           logicalNets.byBaseNetId.get(junction.netId)?.id ?? junction.netId,
+        ...(junction.members
+          ? {
+              members: junction.members.map((member) => ({
+                ...member,
+                netId:
+                  logicalNets.byBaseNetId.get(member.netId)?.id ?? member.netId,
+              })),
+            }
+          : {}),
       })),
     noConnects: [...document.noConnects]
       .sort((left, right) => left.id.localeCompare(right.id, "en"))
@@ -792,7 +857,7 @@ function documentSnapshot(
       .map((annotation) => ({
         ...withoutKeptStyle(annotation),
         resolvedText: flattenRichText(
-          resolveAnnotationText(document, annotation, logicalNets),
+          resolveAnnotationText(document, annotation, logicalNets, resolver),
         ),
       })),
     // ADR 0010 WP-R4: each drafting object carries its canonical shape plus the

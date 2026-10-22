@@ -44,6 +44,26 @@ export function splitRoute(
   segmentIndex: number,
   resolver: SymbolResolver,
 ): { first: RouteBranch; second: RouteBranch } | string {
+  const splitMembers =
+    splitEndpoint.kind === "junction"
+      ? document.junctions.find((item) => item.id === splitEndpoint.junctionId)
+          ?.members
+      : undefined;
+  if (
+    route.members &&
+    (!splitMembers ||
+      splitMembers.length !== route.members.length ||
+      splitEndpoint.memberId)
+  )
+    return "A bus split requires an aggregate junction with matching width";
+  const firstMembers = route.members?.map((member, index) => ({
+    ...member,
+    endMemberId: splitMembers![index]!.id,
+  }));
+  const secondMembers = route.members?.map((member, index) => ({
+    ...member,
+    startMemberId: splitMembers![index]!.id,
+  }));
   const polyline = resolveRouteEditPath(document, resolver, route);
   if (!polyline) return `Route ${route.id} has an unresolved endpoint`;
   if (segmentIndex >= polyline.points.length - 1) {
@@ -71,6 +91,7 @@ export function splitRoute(
     );
     const first = createRoutePath({
       id: firstRouteId,
+      ...(firstMembers ? { members: firstMembers } : {}),
       netId: route.netId,
       start: structuredClone(route.start),
       end: structuredClone(splitEndpoint),
@@ -84,6 +105,7 @@ export function splitRoute(
     });
     const second = createRoutePath({
       id: secondRouteId,
+      ...(secondMembers ? { members: secondMembers } : {}),
       netId: route.netId,
       start: structuredClone(splitEndpoint),
       end: structuredClone(routeEnd(route)),
@@ -120,6 +142,7 @@ export function splitRoute(
   );
   const first = createRoutePath({
     id: firstRouteId,
+    ...(firstMembers ? { members: firstMembers } : {}),
     netId: route.netId,
     start: structuredClone(route.start),
     end: structuredClone(splitEndpoint),
@@ -133,6 +156,7 @@ export function splitRoute(
   });
   const second = createRoutePath({
     id: secondRouteId,
+    ...(secondMembers ? { members: secondMembers } : {}),
     netId: route.netId,
     start: structuredClone(splitEndpoint),
     end: structuredClone(routeEnd(route)),

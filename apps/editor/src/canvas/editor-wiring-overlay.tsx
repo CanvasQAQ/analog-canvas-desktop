@@ -1,4 +1,10 @@
-import type { MouseEvent as ReactMouseEvent, Ref } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type Ref,
+} from "react";
 
 import {
   razaviTextbookProfile,
@@ -9,6 +15,7 @@ import type { GridRect, Point, RichTextDocument } from "@icm/model";
 import { renderRichTextDocument } from "@icm/render-svg";
 
 import { CanvasTextEditorOverlay } from "../features/text-editing/canvas-text-editor-overlay";
+import type { WireMemberChoice } from "@icm/edit-engine";
 import type { WireDraftPreview } from "../features/wiring/wire-draft-preview";
 import { serializePolylinePoints } from "./canvas-geometry";
 
@@ -44,6 +51,9 @@ export interface EditorWiringOverlayProps {
     flightline: Flightline,
   ) => void;
   wireDraftPreview: WireDraftPreview;
+  memberChoice?: WireMemberChoice | null | undefined;
+  onWireMemberChoose?: ((memberId: string | null) => void) | undefined;
+  onWireMemberCancel?: (() => void) | undefined;
   wireSnapTarget?: Point | undefined;
   bulkRoutePreview: boolean;
   snapGuideLayerRef: Ref<SVGGElement>;
@@ -192,8 +202,25 @@ export function EditorWiringOverlay({
               ? "wire-preview bulk-route-preview"
               : "wire-preview"
           }
+          data-blocked={wireDraftPreview.blocked || undefined}
+          data-bus-width={
+            wireDraftPreview.width && wireDraftPreview.width > 1
+              ? wireDraftPreview.width
+              : undefined
+          }
           points={serializePolylinePoints(wireDraftPreview.points)}
         />
+      ) : null}
+      {wireDraftPreview.message && wireDraftPreview.points.at(-1) ? (
+        <text
+          aria-label="Wire connection preview"
+          className="wire-connection-preview"
+          pointerEvents="none"
+          x={wireDraftPreview.points.at(-1)!.x + 12}
+          y={wireDraftPreview.points.at(-1)!.y - 12}
+        >
+          {wireDraftPreview.message}
+        </text>
       ) : null}
       {/* A pin the run passes straight through is a connection the release
           will make. Drawing the contact is the difference between a wire
@@ -223,5 +250,99 @@ export function EditorWiringOverlay({
       ) : null}
       <g ref={snapGuideLayerRef} data-layer="snap-guides" />
     </>
+  );
+}
+
+/** Above canvas hit targets, like the existing inline Label editor. */
+export function WireMemberChoiceOverlay({
+  memberChoice,
+  onWireMemberChoose,
+  onWireMemberCancel,
+  viewBox,
+}: Pick<
+  EditorWiringOverlayProps,
+  "memberChoice" | "onWireMemberChoose" | "onWireMemberCancel" | "viewBox"
+>) {
+  const root = useRef<SVGForeignObjectElement | null>(null);
+  const [unitsPerPixel, setUnitsPerPixel] = useState(1);
+  useLayoutEffect(() => {
+    const svg = root.current?.ownerSVGElement;
+    if (!svg) return;
+    const measure = () => {
+      const matrix = svg.getScreenCTM();
+      if (matrix) setUnitsPerPixel(1 / Math.hypot(matrix.a, matrix.b));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [memberChoice, viewBox]);
+  if (!memberChoice) return null;
+  const point = memberChoice.source.connection.contactPoint;
+  const widthPixels = Math.min(240, viewBox.width / unitsPerPixel - 16);
+  const width = widthPixels * unitsPerPixel;
+  const x = Math.max(
+    viewBox.x + 8,
+    Math.min(point.x + 12, viewBox.x + viewBox.width - width - 8),
+  );
+  const y = Math.max(
+    viewBox.y + 8,
+    Math.min(point.y + 12, viewBox.y + viewBox.height - 106 * unitsPerPixel),
+  );
+  return (
+    <foreignObject
+      ref={root}
+      x={x}
+      y={y}
+      width={width}
+      height={98 * unitsPerPixel}
+      data-canvas-overlay="wire-member-choice"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onPointerMove={(event) => event.stopPropagation()}
+    >
+      <div
+        style={{
+          width: widthPixels,
+          transform: `scale(${unitsPerPixel})`,
+          transformOrigin: "top left",
+        }}
+        className="wire-member-choice"
+        role="group"
+        aria-label="Bus member choice"
+      >
+        <label>
+          Connect {memberChoice.options.length}-member bus
+          <select
+            aria-label="Bus connection"
+            autoFocus={!memberChoice.allowWhole}
+            value={memberChoice.allowWhole ? "whole" : ""}
+            onChange={(event) => {
+              if (event.target.value === "whole") onWireMemberChoose?.(null);
+              else if (event.target.value.startsWith("member:"))
+                onWireMemberChoose?.(event.target.value.slice(7));
+            }}
+          >
+            <option value="" disabled>
+              Choose connection…
+            </option>
+            {memberChoice.allowWhole ? (
+              <option value="whole">
+                Whole bus · {memberChoice.options.length} members
+              </option>
+            ) : null}
+            {memberChoice.options.map((option) => (
+              <option key={option.id} value={`member:${option.id}`}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onWireMemberCancel}>
+          {memberChoice.allowWhole ? "Hide" : "Cancel · Esc"}
+        </button>
+      </div>
+    </foreignObject>
   );
 }

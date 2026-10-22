@@ -41,7 +41,10 @@ export function createContactPlanningDraft(
       edit.kind === "remove_connectivity_evidence"
     )
       applyNetPowerEdit(edit, context);
-    else if (edit.kind === "remove_schematic_annotation")
+    else if (
+      edit.kind === "remove_schematic_annotation" ||
+      edit.kind === "upsert_schematic_annotation"
+    )
       applyPresentationLayoutEdit(edit, context);
     // A wire from a body on its Cell's default takes it off the default.
     else if (edit.kind === "clear_mos_bulk_default")

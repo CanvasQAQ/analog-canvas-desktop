@@ -18,6 +18,47 @@ import { simulationArguments } from "./operation-arguments.js";
 beforeAll(() => void listToolDefinitions(), 30_000);
 
 describe("focused tools", () => {
+  it("keeps bus member targets discoverable and strictly validated in circuit_wire", async () => {
+    const schema = listToolDefinitions().find(
+      (tool) => tool.name === "circuit_wire",
+    )!.inputSchema as any;
+    const connect = schema.properties.actions.items.oneOf.find(
+      (action: any) => action.properties.kind.const === "connect",
+    );
+    for (const end of ["from", "to"]) {
+      for (const kind of ["pin", "junction", "route-segment"]) {
+        const target = connect.properties[end].oneOf.find(
+          (branch: any) => branch.properties.kind.const === kind,
+        );
+        expect(target.properties.memberId).toMatchObject({
+          type: "string",
+          maxLength: 256,
+        });
+        expect(target.required).not.toContain("memberId");
+      }
+    }
+    const invalid = await callTool(
+      "circuit_wire",
+      {
+        actions: [
+          {
+            kind: "connect",
+            from: {
+              kind: "pin",
+              instance: "X1",
+              pin: "DATA<3:0>",
+              memberId: 2,
+            },
+            to: { kind: "point", x: 100, y: 100 },
+          },
+        ],
+      },
+      {} as never,
+    );
+    expect(invalid.isError).toBe(true);
+    expect(invalid.content[0]!.text).toContain("INVALID_TOOL_INPUT");
+  });
+
   it("omits repetitive scalar bounds only in discovery while preserving domain bounds and exact rejection", async () => {
     const exact = {
       type: "object",

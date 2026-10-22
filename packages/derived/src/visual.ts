@@ -951,6 +951,8 @@ export function diagnoseVisualQuality(
         document,
         annotation,
         options.logicalNetResolution,
+        undefined,
+        resolver,
       ),
     )
     .map((annotation) => {
@@ -1046,6 +1048,9 @@ export function diagnoseVisualQuality(
     }
   }
   for (const junction of document.junctions) {
+    // Aggregate anchors have no junction dot: each scalar contact is explicit
+    // in a member-qualified endpoint, and crossings retain their plain ink.
+    if (junction.members) continue;
     for (const route of candidateRoutesAtPoint(
       document,
       routesById,
@@ -1089,10 +1094,13 @@ export function diagnoseVisualQuality(
   // 8 published abbreviated schematics (floating pins parked on power
   // rails), and the gallery contract welcomes abbreviated drawings — the
   // finding is evidence for the author, not a wall in front of them.
-  const terminalNetIds = new Map<string, string>();
+  const terminalNetIds = new Map<string, Set<string>>();
   for (const net of document.nets) {
     for (const terminal of net.terminals) {
-      terminalNetIds.set(`${terminal.instanceId}\0${terminal.pinName}`, net.id);
+      const key = `${terminal.instanceId}\0${terminal.pinName}`;
+      const ids = terminalNetIds.get(key) ?? new Set<string>();
+      ids.add(net.id);
+      terminalNetIds.set(key, ids);
     }
   }
   const noConnectKeys = new Set(
@@ -1130,7 +1138,12 @@ export function diagnoseVisualQuality(
         spatialIndex,
         candidateSearch,
       )) {
-        if (route.netId === terminalNetId) continue;
+        if (
+          (route.members?.map((member) => member.netId) ?? [route.netId]).some(
+            (netId) => terminalNetId?.has(netId),
+          )
+        )
+          continue;
         const centerline = routingGeometry.routes.get(route.id)?.centerline;
         if (
           centerline
@@ -1151,7 +1164,9 @@ export function diagnoseVisualQuality(
             parameters: {
               instanceId: instance.id,
               pinName: pin.name,
-              ...(terminalNetId === undefined ? {} : { terminalNetId }),
+              ...(terminalNetId === undefined
+                ? {}
+                : { terminalNetId: [...terminalNetId].join(",") }),
               routeNetId: route.netId,
             },
           });

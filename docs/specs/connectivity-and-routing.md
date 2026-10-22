@@ -10,14 +10,14 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   store [connection facts](project-file-format.md#one-connection-source).
   Logical connectivity resolves from membership, owner-addressed names, scope
   and interfaces. A terminal is an Instance pin (`port`/`port-filled` use pin `P`).
-- A Route belongs to one Net and joins terminal or Junction endpoints: one
+- A scalar Route belongs to one Net and joins terminal or Junction endpoints: one
   `start` plus ordered legs ending at stable dot-free bends, each leg with its
   own mode and stable `legId`.
 - Crossings never connect. Collinear same-Net overlap is never persisted: the
   Edit Engine unions coverage, materializes branch vertices and removes every
   unowned degree-two ordinary-Wire Junction (arms coalesce; an angle becomes a
   bend), whatever its historical role. Rail, MOS bulk and locked geometry stay
-  out of the union. Overlapping styles: largest coverage wins, Route ID breaks
+  out of the union, as do aggregate bus paths. Overlapping styles: largest coverage wins, Route ID breaks
   ties.
 - A [Junction color override](visual-language.md#style-overrides) owns its
   Junction through conductor normalization. An unreferenced styled Junction at
@@ -32,6 +32,41 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
 - `orthogonal` (default), `octilinear` and `free` constrain only the unresolved
   authored leg; `power-rail` is one straight non-zero horizontal or vertical
   segment. All share one segment kernel and Route transaction.
+
+## Ordered signals and buses
+
+- Explicit Cell Pin and Net Label authoring accepts a scalar, `NAME<index>`,
+  or inclusive `NAME<first:last>` in either direction. Expressions are bounded
+  to 256 characters and 256 members; indices are 0–65535. Expansion order is
+  electrical order. Text editing previews that order and width; invalid Enter
+  keeps the draft, Escape discards it. Old bracketed names without a signal
+  declaration remain scalar.
+- A vector formal terminal owns ordered stable member IDs, each on a scalar
+  Base Net. Its generated parent Symbol has one aggregate pin. A Route's
+  ordered member mappings join scalar endpoints, never one aggregate Net;
+  Junctions retain ordered member identities. Parent names are independent of
+  child formal names. Initial equal-width connections map the two declared
+  lists positionally, including opposite orders.
+- Wire uses the existing routing modes, corners, snapping and cancellation.
+  A vector source supplies width; a loose unnamed conductor can acquire width
+  from a vector Label. Scalar contacts require a selected member. A unique
+  authoritative name in the parent Document may select it; otherwise the
+  inline chooser remains editable. Hover and commit evaluate the same landing.
+- Whole-bus continuation preserves every member. A scalar branch and its
+  bound selector commit together; the selector follows that scalar Net and
+  is removed with the branch. Member endpoints never acquire connections from
+  passive crossings or aggregate pin coincidence.
+- A selector's display binding identifies the selected endpoint/member. It
+  reads the parent Net name, falling back to the current formal member name
+  when unnamed. This fallback is display-only: it creates no name claim or
+  virtual label connection. Stale text formatting cannot hide a changed name.
+- Bus stroke and tap slashes are presentation. Width overrides change ink,
+  never membership. Aggregate Junctions have no scalar junction dot. Formal
+  SVG, PNG and PDF share this geometry and exclude editing controls.
+- Unknown members, unequal widths and malformed expressions refuse atomically.
+  Slices, bundles, connected interface/name/mapping migration, legacy scalar
+  conversion, bus group copy and member NoConnect authoring require subsequent
+  support and are refused without changing the circuit.
 
 ## Completed-edit connectivity
 

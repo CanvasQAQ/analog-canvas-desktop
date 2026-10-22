@@ -28,6 +28,7 @@ import {
   revealPropertiesShelf,
   clickCommand,
   exportedProject,
+  downloadBytes,
   expectStatus,
   openCellManager,
   openCellManagerTab,
@@ -37,7 +38,8 @@ import {
   copyNetlistText,
   showNetlistPanel,
 } from "./editor-fixtures.js";
-import { placedInstance } from "./canvas-fixtures.js";
+import { placedInstance, clickRoute } from "./canvas-fixtures.js";
+import { resolveDocumentLogicalNets } from "@icm/derived";
 
 function fitsWidth(locator: Locator): Promise<boolean> {
   return locator.evaluate((el) => el.scrollWidth <= el.clientWidth);
@@ -1250,6 +1252,47 @@ test("a Cell Pin shows a display alias, here and on its block, and keeps its nam
   await expect(pinLabel).toHaveText("IN");
 });
 
+test("edits a vector Cell Pin with width feedback, invalid draft retention and Escape cancellation", async ({
+  page,
+}) => {
+  await page.goto("/editor?new=1");
+  await createCell(page, "VectorStage");
+  await placeCellPin(page, { name: "IN", position: { x: 300, y: 180 } });
+  const label = page.getByTestId("annotation-hit-instance-label-P1");
+  await label.dblclick();
+  const editor = page.getByRole("textbox", { name: "Canvas text editor" });
+  const preview = page.getByLabel("Cell Pin signal preview");
+  await editor.fill("IN<3:>");
+  await expect(preview).toContainText("Use a scalar name");
+  await editor.press("Enter");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveText("IN<3:>");
+  await editor.fill("IN<3:0>");
+  await expect(preview).toHaveText("4 members · IN<3> → IN<2> → IN<1> → IN<0>");
+  await editor.press("Enter");
+  await expect(editor).toHaveCount(0);
+  await label.dblclick();
+  await editor.fill("IN<0:3>");
+  await expect(preview).toHaveText("4 members · IN<0> → IN<1> → IN<2> → IN<3>");
+  await editor.press("Escape");
+  await expect(editor).toHaveCount(0);
+  const saved: CircuitProject = await exportedProject(page);
+  const child = saved.documents.find((cell) => cell.name === "VectorStage")!;
+  expect(
+    child.netlist!.terminals[0]!.signal?.members.map((member) => member.name),
+  ).toEqual(["IN<3>", "IN<2>", "IN<1>", "IN<0>"]);
+  await openTopCell(page);
+  await clickCommand(page, "Edit", "Place Cell from this Project…");
+  await page
+    .getByRole("dialog", { name: "Place Hierarchical Cell" })
+    .getByRole("option", { name: /VectorStage/u })
+    .click();
+  await placeFirstAt(page, { x: 420, y: 180 });
+  await expect(
+    page.getByTestId("schematic-canvas").locator('[data-pin-name="IN<3:0>"]'),
+  ).toHaveCount(1);
+});
+
 test("declares and places a Cell Pin on a new local Net", async ({ page }) => {
   await page.goto("/editor");
   await createCell(page, "ReusableStage");
@@ -1698,4 +1741,408 @@ test("entering a Cell with E, and leaving it, lands on the F fit (#1686)", async
   await page.keyboard.press("Shift+E");
   await expect(page.getByTestId("hit-X1")).toBeInViewport();
   await expectFitted();
+});
+
+test("starts a whole bus by default and optionally chooses a member without committing cancelled drafts", async ({
+  page,
+}) => {
+  await page.goto("/editor?new=1");
+  await createCell(page, "BusDrawing");
+  await placeCellPin(page, { name: "DATA<3:0>", position: { x: 300, y: 180 } });
+  await placeCellPin(page, { name: "SINK", position: { x: 300, y: 360 } });
+  await placeCellPin(page, { name: "OTHER", position: { x: 470, y: 360 } });
+  await placeCellPin(page, {
+    name: "NARROW<1:0>",
+    position: { x: 650, y: 360 },
+  });
+  const canvas = page.getByTestId("schematic-canvas");
+  const busPin = canvas.locator('[data-endpoint-key="terminal:P1:P"]');
+  const scalarPin = canvas.locator('[data-endpoint-key="terminal:P2:P"]');
+  await page.keyboard.press("w");
+  await busPin.click();
+  const choice = page.getByRole("combobox", { name: "Bus connection" });
+  await expect(choice).toBeVisible();
+  await expect(choice).toHaveValue("whole");
+  await expect(choice).not.toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(choice).toHaveCount(0);
+  let saved: CircuitProject = await exportedProject(page);
+  expect(
+    saved.documents.find((cell) => cell.name === "BusDrawing")!.routes,
+  ).toHaveLength(0);
+  await page.keyboard.press("w");
+  await busPin.click();
+  await canvas.dblclick({ position: { x: 530, y: 180 } });
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  saved = await exportedProject(page);
+  const child = saved.documents.find((cell) => cell.name === "BusDrawing")!;
+  expect(child.routes).toHaveLength(1);
+  expect(child.routes[0]!.members).toHaveLength(4);
+  await page.keyboard.press("w");
+  await scalarPin.click();
+  await busPin.click();
+  await expect(choice).toBeVisible();
+  await expect(choice.locator("option")).toHaveCount(5);
+  await choice.selectOption({ label: "DATA<2>" });
+  await page.keyboard.press("Escape");
+  saved = await exportedProject(page);
+  const after = saved.documents.find((cell) => cell.name === "BusDrawing")!;
+  expect(after.routes).toHaveLength(2);
+  const member = after.netlist!.terminals.find(
+    (pin) => pin.name === "DATA<3:0>",
+  )!.signal!.members[1]!;
+  const sink = after.netlist!.terminals.find((pin) => pin.name === "SINK")!;
+  expect(sink.netId).toBe(member.netId);
+  await page.keyboard.press("w");
+  await busPin.click();
+  await choice.selectOption({ label: "DATA<1>" });
+  await canvas.locator('[data-endpoint-key="terminal:P3:P"]').click();
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  const reverse: CircuitProject = await exportedProject(page);
+  const final = reverse.documents.find((cell) => cell.name === "BusDrawing")!;
+  expect(final.routes).toHaveLength(3);
+  expect(
+    final.netlist!.terminals.find((pin) => pin.name === "OTHER")!.netId,
+  ).toBe(
+    final.netlist!.terminals.find((pin) => pin.name === "DATA<3:0>")!.signal!
+      .members[2]!.netId,
+  );
+  await page.keyboard.press("w");
+  await busPin.click();
+  const narrow = canvas.locator('[data-endpoint-key="terminal:P4:P"]');
+  await narrow.hover();
+  await expect(page.getByLabel("Wire connection preview")).toContainText(
+    "Bus widths differ: 4 and 2",
+  );
+  await narrow.click();
+  await expectStatus(page, "Bus widths differ: 4 and 2");
+  await page.keyboard.press("Escape");
+  const refused: CircuitProject = await exportedProject(page);
+  const refusedCell = refused.documents.find(
+    (cell) => cell.name === "BusDrawing",
+  )!;
+  expect(refusedCell.routes).toEqual(final.routes);
+  expect(refusedCell.nets).toEqual(final.nets);
+  expect(refusedCell.annotations).toEqual(final.annotations);
+});
+
+test("names a loose bus with a Label and maps its order into differently named Cell pins after reopening", async ({
+  page,
+}) => {
+  await page.goto("/editor?new=1");
+  await createCell(page, "InputStage");
+  await placeCellPin(page, { name: "IN<0:3>", position: { x: 300, y: 180 } });
+  await openTopCell(page);
+  await clickCommand(page, "Edit", "Place Cell from this Project…");
+  await page
+    .getByRole("dialog", { name: "Place Hierarchical Cell" })
+    .getByRole("option", { name: /InputStage/u })
+    .click();
+  await placeFirstAt(page, { x: 600, y: 180 });
+  const canvas = page.getByTestId("schematic-canvas");
+  await page.keyboard.press("w");
+  await canvas.click({ position: { x: 310, y: 350 } });
+  await canvas.dblclick({ position: { x: 600, y: 350 } });
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  const loose: CircuitProject = await exportedProject(page);
+  const routeId = loose.documents[0]!.routes[0]!.id;
+  await clickRoute(page, routeId, 0.5, 0);
+  await page.keyboard.press("l");
+  const editor = page.getByRole("textbox", { name: "Canvas text editor" });
+  for (const invalidName of ["A,B", "DATA[3:0]"]) {
+    await editor.fill(invalidName);
+    await editor.press("Enter");
+    await expect(editor).toBeVisible();
+    await editor.press("Escape");
+    expect((await exportedProject(page)).documents).toEqual(loose.documents);
+    await clickRoute(page, routeId, 0.5, 0);
+    await page.keyboard.press("l");
+  }
+  await editor.fill("PARENT<3:0>");
+  await expect(page.getByLabel("Net Label signal preview")).toContainText(
+    "4 members",
+  );
+  await editor.press("Enter");
+  await expect(editor).toHaveCount(0);
+  await page.keyboard.press("w");
+  await clickRoute(page, routeId, 0.7, 0);
+  await expect(
+    page.getByRole("combobox", { name: "Bus connection" }),
+  ).toHaveValue("whole");
+  await canvas.locator('[data-endpoint-key="terminal:X1:IN<0:3>"]').click();
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  await placeCellPin(page, { name: "PARENT<2>", position: { x: 300, y: 260 } });
+  await page.keyboard.press("w");
+  await canvas.locator('[data-endpoint-key="terminal:P1:P"]').click();
+  await canvas.locator('[data-endpoint-key="terminal:X1:IN<0:3>"]').click();
+  await expect(
+    page.getByRole("combobox", { name: "Bus connection" }),
+  ).toHaveCount(0);
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  const saved: CircuitProject = await exportedProject(page);
+  await openProject(page, serializeProject(saved));
+  const reopened: CircuitProject = await exportedProject(page);
+  const top = reopened.documents[0]!;
+  const child = reopened.documents.find((cell) => cell.name === "InputStage")!;
+  const logical = resolveDocumentLogicalNets(top);
+  expect(child.netlist!.terminals[0]!.name).toBe("IN<0:3>");
+  const formal = child.netlist!.terminals[0]!.signal!.members;
+  expect(
+    formal.map((member) => {
+      const net = top.nets.find((item) =>
+        item.terminals.some(
+          (terminal) =>
+            terminal.instanceId === "X1" && terminal.memberId === member.id,
+        ),
+      )!;
+      return logical.byBaseNetId.get(net.id)?.name;
+    }),
+  ).toEqual(["PARENT<3>", "PARENT<2>", "PARENT<1>", "PARENT<0>"]);
+  const netlist = await copyNetlistText(page, "spice");
+  const call = netlist.split("\n").find((line) => /^X1\s/iu.test(line));
+  expect(call).toBeDefined();
+  const nodes = call!.trim().split(/\s+/u).slice(1, -1);
+  expect(nodes).toHaveLength(4);
+  expect(new Set(nodes).size).toBe(4);
+  for (const node of nodes) expect(node).toContain("PARENT");
+});
+
+test("keeps a legacy bracketed Cell Pin scalar when changing only its formatting", async ({
+  page,
+}) => {
+  const project = createEmptyProject("legacy-format", "Legacy format");
+  const document = project.documents[0]!;
+  document.instances.push(placedInstance("P1", "port", 300, 200));
+  document.nets.push({
+    id: "legacy",
+    terminals: [{ instanceId: "P1", pinName: "P" }],
+  });
+  document.netlist!.terminals.push({
+    id: "legacy-pin",
+    name: "OLD<3:>",
+    netId: "legacy",
+    direction: "input",
+    interfaceInstanceIds: ["P1"],
+  });
+  document.annotations.push({
+    id: "pin-label",
+    kind: "instance-label",
+    binding: { kind: "cell-terminal-name", terminalId: "legacy-pin" },
+    anchor: {
+      kind: "object",
+      objectId: "P1",
+      localOffset: { x: 0, y: -20 },
+      fallbackPosition: { x: 300, y: 180 },
+    },
+    alignment: "middle",
+    rotation: 0,
+    locked: false,
+  });
+  await openProject(page, serializeProject(project));
+  await page.getByTestId("annotation-hit-pin-label").dblclick();
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
+  await expect(page.getByLabel("Cell Pin signal preview")).toHaveCount(0);
+  await page.getByRole("button", { name: "Apply text changes" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Canvas text editor" }),
+  ).toHaveCount(0);
+  const saved: CircuitProject = await exportedProject(page);
+  expect(saved.documents[0]!.netlist!.terminals[0]).toMatchObject({
+    name: "OLD<3:>",
+  });
+  expect(saved.documents[0]!.netlist!.terminals[0]).not.toHaveProperty(
+    "signal",
+  );
+});
+
+test("keeps an unnamed caller member selector visible without creating a parent name when reopened or formatted", async ({
+  page,
+}) => {
+  await page.goto("/editor?new=1");
+  await createCell(page, "UnnamedInputStage");
+  await placeCellPin(page, {
+    name: "INPUT<7:4>",
+    position: { x: 300, y: 180 },
+  });
+  await openTopCell(page);
+  await clickCommand(page, "Edit", "Place Cell from this Project…");
+  await page
+    .getByRole("dialog", { name: "Place Hierarchical Cell" })
+    .getByRole("option", { name: /UnnamedInputStage/u })
+    .click();
+  await placeFirstAt(page, { x: 600, y: 180 });
+  const canvas = page.getByTestId("schematic-canvas");
+  await page.keyboard.press("w");
+  await canvas.locator('[data-endpoint-key="terminal:X1:INPUT<7:4>"]').click();
+  await page
+    .getByRole("combobox", { name: "Bus connection" })
+    .selectOption({ label: "INPUT<6>" });
+  await canvas.dblclick({ position: { x: 310, y: 350 } });
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  const before: CircuitProject = await exportedProject(page);
+  const parentBefore = before.documents[0]!;
+  const childBefore = before.documents.find(
+    (cell) => cell.name === "UnnamedInputStage",
+  )!;
+  const selectedMember = childBefore.netlist!.terminals[0]!.signal!.members[1]!;
+  const selector = parentBefore.annotations.find(
+    (annotation) =>
+      annotation.binding?.kind === "net-name" &&
+      annotation.binding.memberEndpoint,
+  )!;
+  expect(selector).toBeDefined();
+  expect(selector.binding).toMatchObject({
+    kind: "net-name",
+    memberEndpoint: {
+      kind: "terminal",
+      instanceId: "X1",
+      pinName: "INPUT<7:4>",
+      memberId: selectedMember.id,
+    },
+  });
+  expect(parentBefore.connectivityEvidence).toEqual([]);
+  expect(
+    resolveDocumentLogicalNets(parentBefore).groups.every(
+      (net) => net.name === undefined,
+    ),
+  ).toBe(true);
+  const visibleLabel = () =>
+    canvas.locator(`[data-object-id="${selector.id}"]`);
+  const textWeights = (locator: ReturnType<typeof visibleLabel>) =>
+    locator.evaluate((element) => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const weights: string[] = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.textContent?.trim())
+          weights.push(getComputedStyle(node.parentElement!).fontWeight);
+      }
+      return weights;
+    });
+  await expect(visibleLabel()).toContainText("INPUT<6>");
+  await openProject(page, serializeProject(before));
+  await expect(visibleLabel()).toContainText("INPUT<6>");
+  await page.getByTestId(`annotation-hit-${selector.id}`).dblclick();
+  const editor = page.getByRole("textbox", { name: "Canvas text editor" });
+  await expect(editor).toHaveText("INPUT<6>");
+  await editor.press("ControlOrMeta+A");
+  const bold = page.getByRole("button", { name: "Bold", exact: true });
+  await expect(bold).toHaveAttribute("aria-pressed", "true");
+  await bold.click();
+  await expect(bold).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => textWeights(editor)).toEqual(["400"]);
+  await page.getByRole("button", { name: "Apply text changes" }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(visibleLabel()).toContainText("INPUT<6>");
+  const after: CircuitProject = await exportedProject(page);
+  const parentAfter = after.documents[0]!;
+  expect(parentAfter.connectivityEvidence).toEqual([]);
+  expect(parentAfter.nets).toEqual(parentBefore.nets);
+  expect(parentAfter.routes).toEqual(parentBefore.routes);
+  expect(
+    parentAfter.annotations.find((annotation) => annotation.id === selector.id)!
+      .binding,
+  ).toEqual(selector.binding);
+  expect(
+    parentAfter.annotations.find((annotation) => annotation.id === selector.id)
+      ?.formatOverride,
+  ).toBeDefined();
+  await expect.poll(() => textWeights(visibleLabel())).toEqual(["400"]);
+  expect(
+    after.documents.find((cell) => cell.id === childBefore.id)!.netlist!
+      .terminals,
+  ).toEqual(childBefore.netlist!.terminals);
+  await openProject(page, serializeProject(after));
+  await expect(visibleLabel()).toContainText("INPUT<6>");
+  await expect.poll(() => textWeights(visibleLabel())).toEqual(["400"]);
+  await page.keyboard.press("w");
+  await canvas.locator('[data-endpoint-key="terminal:X1:INPUT<7:4>"]').click();
+  await page
+    .getByRole("combobox", { name: "Bus connection" })
+    .selectOption({ label: "Whole bus · 4 members" });
+  await canvas.dblclick({ position: { x: 310, y: 180 } });
+  await expectStatus(page, "Committed route");
+  await page.keyboard.press("Escape");
+  const drawing: CircuitProject = await exportedProject(page);
+  expect(drawing.documents[0]!.connectivityEvidence).toEqual([]);
+  const bus = drawing.documents[0]!.routes.find((route) => route.members)!;
+  expect(bus.members).toHaveLength(4);
+  const svg = (await downloadBytes(page, "File", "Export SVG")).toString(
+    "utf8",
+  );
+  const exportedStructure = await page.evaluate(
+    ({ svg, busId, selectorId, memberId }) => {
+      const document = new DOMParser().parseFromString(svg, "image/svg+xml");
+      return {
+        valid: document.querySelector("parsererror") === null,
+        bus:
+          document.querySelector(`polyline[data-object-id="${busId}"]`) !==
+          null,
+        tap:
+          document.querySelector(
+            `[data-role="bus-tap"][data-member-id="${memberId}"]`,
+          ) !== null,
+        label: document.querySelector(`[data-object-id="${selectorId}"]`)
+          ?.textContent,
+        editing:
+          document.querySelector(
+            '[data-layer="editor-overlay"], .hit-target, [data-canvas-overlay]',
+          ) !== null,
+      };
+    },
+    {
+      svg,
+      busId: bus.id,
+      selectorId: selector.id,
+      memberId: selectedMember.id,
+    },
+  );
+  expect(exportedStructure).toEqual({
+    valid: true,
+    bus: true,
+    tap: true,
+    label: "INPUT<6>",
+    editing: false,
+  });
+  const png = await downloadBytes(page, "File", "Export PNG");
+  expect(png.subarray(0, 8)).toEqual(
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  const raster = await page.evaluate(
+    async (bytes) => {
+      const image = await createImageBitmap(
+        new Blob([new Uint8Array(bytes)], { type: "image/png" }),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d")!;
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, image.width, image.height).data;
+      let ink = 0;
+      for (let i = 0; i < pixels.length; i += 4)
+        if (
+          pixels[i + 3]! > 0 &&
+          Math.min(pixels[i]!, pixels[i + 1]!, pixels[i + 2]!) < 128
+        )
+          ink++;
+      const result = { width: image.width, height: image.height, ink };
+      image.close();
+      return result;
+    },
+    [...png],
+  );
+  expect(raster.width).toBeGreaterThan(0);
+  expect(raster.height).toBeGreaterThan(0);
+  expect(raster.ink).toBeGreaterThan(0);
+  const pdf = await downloadBytes(page, "File", "Export PDF");
+  const pdfText = pdf.toString("latin1");
+  expect(pdfText).toMatch(/^%PDF-/u);
+  expect(pdfText).toMatch(/\/Type\s*\/Page\b/u);
+  expect(pdfText.trimEnd()).toMatch(/%%EOF$/u);
 });

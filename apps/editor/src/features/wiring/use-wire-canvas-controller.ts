@@ -18,7 +18,6 @@ import type { Point, SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 
 import {
-  freeWireDraftTarget,
   type EditorTool,
   type WireDraftTarget,
 } from "../../interaction/interaction-state";
@@ -63,8 +62,7 @@ export interface UseWireCanvasControllerOptions {
     componentPlacementPending: boolean;
     getInteractionKind: () => string;
     cancelInteraction: () => void;
-    setWireSource: (source: WireSource, revision: number) => void;
-    setWirePreview: (target: WireDraftTarget | null) => void;
+    memberChoicePending: boolean;
     setWireDraftSteps: (steps: WireDraftStep[]) => void;
     setWireRoutingMode: (mode: WireRoutingMode) => void;
     setWireCornerOrder: (order: WireCornerOrder) => void;
@@ -112,6 +110,7 @@ export interface UseWireCanvasControllerOptions {
     paintSnapGuides: (guides: readonly SnapGuideLine[]) => void;
   };
   commands: {
+    startWire: (source: WireSource, description?: string) => void;
     commitWire: (source: WireSource) => void;
     fixWirePoint: (point: Point) => void;
     finishWireAtPoint: (point: Point) => void;
@@ -138,8 +137,7 @@ export function useWireCanvasController({
     componentPlacementPending,
     getInteractionKind,
     cancelInteraction,
-    setWireSource,
-    setWirePreview,
+    memberChoicePending,
     setWireDraftSteps,
     setWireRoutingMode,
     setWireCornerOrder,
@@ -159,7 +157,13 @@ export function useWireCanvasController({
     sourceForTarget,
   },
   viewport: { pointFromClient, logicalRadiusForPixels, paintSnapGuides },
-  commands: { commitWire, fixWirePoint, finishWireAtPoint, setStatus },
+  commands: {
+    startWire,
+    commitWire,
+    fixWirePoint,
+    finishWireAtPoint,
+    setStatus,
+  },
 }: UseWireCanvasControllerOptions) {
   const lastWireShapeRef = useRef<{
     routingMode: WireRoutingMode;
@@ -267,6 +271,7 @@ export function useWireCanvasController({
     suppressSnap: boolean,
     finish: boolean,
   ): void => {
+    if (memberChoicePending) return;
     const resolved = resolveWireCanvasSnap(rawPoint, svg, suppressSnap);
     paintSnapGuides([]);
     const liveSource = readCurrentWireSession().source;
@@ -322,13 +327,9 @@ export function useWireCanvasController({
       return;
     }
     if (!liveSource) {
-      setWireSource(candidate, document.revision);
-      setWirePreview(freeWireDraftTarget(candidate.connection.contactPoint));
-      setWireDraftSteps([]);
-      setStatus(
-        target.kind === "route"
-          ? `Wire source: route ${target.routeId}`
-          : `Wire source: ${endpointKey(candidate.endpoint)}`,
+      startWire(
+        candidate,
+        target.kind === "route" ? `route ${target.routeId}` : undefined,
       );
       return;
     }

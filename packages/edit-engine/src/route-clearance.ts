@@ -9,12 +9,15 @@ import {
 } from "@icm/derived";
 import {
   transformPoint,
+  routeEndpoints,
+  routeElectricalConnections,
   type Point,
   type RouteEndpoint,
   type SchematicDocument,
 } from "@icm/model";
 import { resolveInstanceSymbol, type SymbolResolver } from "@icm/symbols";
 import { compileWireDraft } from "./wire-draft.js";
+import { signalEndpointMembers } from "./signal-endpoint.js";
 
 type Rect = { x: number; y: number; width: number; height: number };
 type CornerOrder = "horizontal-first" | "vertical-first";
@@ -202,6 +205,9 @@ export function createRouteClearance(
   own: {
     logicalIds: ReadonlySet<string>;
     endpointKeys: ReadonlySet<string>;
+    signalWidth?: number;
+    /** Explicit, validated taps may meet this route only at the selected point. */
+    routeContacts?: readonly { routeId: string; point: Point }[];
     /** Points of other Nets a path must not touch although no wire of
      * `document` reaches them, such as the ends of wires left out of it. */
     blockedPoints?: readonly Point[];
@@ -331,8 +337,13 @@ export function createRouteClearance(
   const routes = document.routes.flatMap((route) => {
     const points = context.routingGeometry.routes.get(route.id)?.centerline;
     const logicalId = logicalOf(route.netId);
-    return points && points.length > 1 && !ownNet(logicalId)
-      ? [{ id: route.id, logicalId, points }]
+    const sameSignal =
+      (route.members?.length ?? 1) === (own.signalWidth ?? 1) &&
+      routeElectricalConnections(route).every((connection) =>
+        ownNet(logicalOf(connection.netId)),
+      );
+    return points && points.length > 1 && !sameSignal
+      ? [{ id: route.id, logicalId, points, endpoints: routeEndpoints(route) }]
       : [];
   });
   const endpointText = (endpoint: RouteEndpoint) =>
@@ -345,11 +356,48 @@ export function createRouteClearance(
       end ? connectionOf(end) : undefined,
     );
     const endKeys = new Set(
-      ends.flatMap((end) => (end ? [endpointKey(end)] : [])),
+      ends.flatMap((end) => {
+        if (!end) return [];
+        const keys = [endpointKey(end)];
+        const { memberId, ...aggregate } = end;
+        if (
+          memberId &&
+          signalEndpointMembers(document, resolver, aggregate)?.some(
+            (member) => member.id === memberId,
+          )
+        )
+          keys.push(endpointKey(aggregate));
+        return keys;
+      }),
     );
     const segments = points
       .slice(1)
       .map((to, index) => [points[index]!, to] as const);
+    const sharedBusContact = (
+      point: Point,
+      endpoint: RouteEndpoint | undefined,
+      route: (typeof routes)[number],
+    ) => {
+      if (!endpoint) return false;
+      const { memberId, ...aggregate } = endpoint;
+      const members = signalEndpointMembers(document, resolver, aggregate);
+      if (
+        !members ||
+        (memberId && !members.some((member) => member.id === memberId))
+      )
+        return false;
+      const connection = connectionOf(endpoint);
+      if (
+        !connection ||
+        (!same(point, connection.contactPoint) &&
+          !same(point, connection.gridLanding))
+      )
+        return false;
+      return route.endpoints.some((candidate) => {
+        const { memberId: _memberId, ...physical } = candidate;
+        return endpointKey(physical) === endpointKey(aggregate);
+      });
+    };
     // Which stretch of the path meets it, so a caller moves the right via
     // point (#1527).
     const between = ([a, b]: readonly [Point, Point]) =>
@@ -434,6 +482,12 @@ export function createRouteClearance(
       }
     }
     for (const route of routes) {
+      const selectedContact = (point: Point) =>
+        (same(point, points[0]!) || same(point, points.at(-1)!)) &&
+        own.routeContacts?.some(
+          (contact) =>
+            contact.routeId === route.id && same(contact.point, point),
+        );
       const routeSegments = route.points
         .slice(1)
         .map((to, index) => [route.points[index]!, to] as const);
@@ -447,11 +501,18 @@ export function createRouteClearance(
             : index === points.length - 1
               ? ends.at(-1)
               : undefined;
+        if (selectedContact(point) || sharedBusContact(point, end, route))
+          continue;
         return end
           ? `${endpointText(end)} sits on ${text}`
           : `touches ${text} at ${format(point)}`;
       }
       for (const point of route.points) {
+        if (
+          selectedContact(point) ||
+          ends.some((end) => sharedBusContact(point, end, route))
+        )
+          continue;
         const segment = segments.find(([a, b]) => pointOnSegment(point, a, b));
         if (segment)
           return `touches ${text} at ${format(point)}${between(segment)}`;

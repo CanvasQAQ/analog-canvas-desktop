@@ -2,7 +2,7 @@
 
 Status: `accepted`
 
-Portable file schema: `74`; normalized editor model schema: `58`.
+Portable file schema: `75`; normalized editor model schema: `58`.
 
 Primary owner: `packages/project-protocol` (portable source and codec);
 `packages/model` validates the decoded editor model.
@@ -17,12 +17,12 @@ preserves.
 ## Read and write
 
 ```text
-import text -> parse JSON -> require Project file schema 24 through 74
--> migrate old files or decode 59–74 -> strict runtime model validation -> install unbound
-export -> validate -> encode file schema 74 -> readable canonical JSON -> download
+import text -> parse JSON -> require Project file schema 24 through 75
+-> migrate old files or decode 59–75 -> strict runtime model validation -> install unbound
+export -> validate -> encode file schema 75 -> readable canonical JSON -> download
 ```
 
-- `parseProject` reads schemas 24–74; writers always emit 74. Envelope
+- `parseProject` reads schemas 24–75; writers always emit 75. Envelope
   metadata uses `CURRENT_PROJECT_FILE_VERSION`, never the model version.
   Optional additions keep model 58; older envelopes cannot carry them.
 - The reader rejects mixed legacy/current field names, conflicting endpoints,
@@ -44,7 +44,7 @@ export -> validate -> encode file schema 74 -> readable canonical JSON -> downlo
   existing endpoint contact); parsing, Cloud open and recovery stay exact.
 - Canonical serialization ends with one newline and is byte-stable across
   serialize/parse/serialize. `fixtures/projects/compatibility-corpus.json`:
-  `current` entries are already canonical 74; `migrated` witnesses keep source
+  `current` entries are already canonical 75; `migrated` witnesses keep source
   bytes and version and load/save byte-stable; the rejected corpus names
   expected failures.
 - A migrated imported file is dirty; the browser-selected source is never
@@ -123,10 +123,19 @@ Cloud or recovery data.
   retain the existing automatic/minimum-size geometry. The
   [schematic model](schematic-model.md) owns containment and pin placement.
 
+- 75: explicit ordered `signal` declarations on Cell terminals and name
+  claims; Routes carry ordered member endpoint mappings and Junctions carry
+  member identities. Member-qualified endpoints add `memberId`. The codec
+  preserves selector `net-name` bindings with `memberEndpoint` as a display
+  reference to a selected branch endpoint. It
+  derives route/junction member `netId` from the same connection graph as
+  scalar conductors. Older envelopes refuse these fields; bracket spelling
+  alone never creates a signal declaration.
+
 ## One connection source
 
-- Routes hold only endpoints and geometry, never `netId`; Junctions hold
-  geometry only. `nets` is an identity/metadata directory:
+- Routes hold endpoints, optional member mappings and geometry, never
+  `netId`; Junctions hold geometry and optional member identities. `nets` is an identity/metadata directory:
   `{ "id": "signal", "at": { "terminal": ["M1", "D"] } }` names the component
   containing that anchor and cannot join disconnected wires; `at: null` for an
   empty metadata-only Net.
@@ -138,7 +147,8 @@ Cloud or recovery data.
 - Components are computed after all wire facts; runtime `nets.terminals` and
   route/junction `netId` are derived, never editable. Splits allocate unused
   IDs; merges retarget metadata. Terminal-array order is canonical.
-- Endpoints: `{ "terminal": ["M1", "D"] }` or `{ "junction": "J1" }`. A
+- Endpoints: `{ "terminal": ["M1", "D"] }` or `{ "junction": "J1" }`,
+  with `memberId` when selecting a declared scalar bus member. A
   straight route has `start`, `end`, `legId`; a multi-leg route has `start`
   and `legs` (bends with `id`, `bend`, `coordinate`, optional `mode`); never
   mixed. `defaults.routeLeg.mode` is explicit. All IDs, leg order and modes

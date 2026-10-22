@@ -1594,7 +1594,11 @@ export function directConnectIntent(
     if (target.kind === "junction")
       return {
         kind: "endpoint",
-        endpoint: { kind: "junction", junctionId: target.junction },
+        endpoint: {
+          kind: "junction",
+          junctionId: target.junction,
+          ...(target.memberId ? { memberId: target.memberId } : {}),
+        },
       };
     if (
       target.kind === "pin" &&
@@ -1607,6 +1611,7 @@ export function directConnectIntent(
           kind: "terminal",
           instanceId: target.instance.id,
           pinName: target.pin,
+          ...(target.memberId ? { memberId: target.memberId } : {}),
         },
       };
     return undefined;
@@ -1666,7 +1671,10 @@ function compileConnect(
       requirePin(index, action.kind, instance, target.pin);
       return {
         kind: "endpoint",
-        endpoint: terminalEndpoint(instance, target.pin),
+        endpoint: {
+          ...terminalEndpoint(instance, target.pin),
+          ...(target.memberId ? { memberId: target.memberId } : {}),
+        },
       };
     }
     if (target.kind === "point") {
@@ -1685,7 +1693,11 @@ function compileConnect(
       );
       return {
         kind: "endpoint",
-        endpoint: { kind: "junction", junctionId: junction.id },
+        endpoint: {
+          kind: "junction",
+          junctionId: junction.id,
+          ...(target.memberId ? { memberId: target.memberId } : {}),
+        },
       };
     }
     return target;

@@ -86,7 +86,8 @@ export function resolveWireIntentTarget(
       net.terminals.some(
         (pin) =>
           pin.instanceId === member.instanceId &&
-          pin.pinName === member.pinName,
+          pin.pinName === member.pinName &&
+          pin.memberId === member.memberId,
       ),
     );
     if (!owner || (allowed && !allowed.has(owner.id)))
@@ -100,7 +101,9 @@ export function resolveWireIntentTarget(
     return geometry ? [{ route, geometry }] : [];
   });
   const records = allRecords.filter(
-    ({ route }) => !allowed || allowed.has(route.netId),
+    ({ route }) =>
+      !allowed ||
+      (route.members ?? [route]).some((member) => allowed.has(member.netId)),
   );
   const equal = (a: Point | undefined, b: Point) => a?.x === b.x && a.y === b.y;
   let point: Point;
@@ -124,17 +127,28 @@ export function resolveWireIntentTarget(
       .sort((a, b) => a.distanceSquared - b.distanceSquared);
     if (!hits.length) {
       const junction = document.junctions
-        .filter((j) => allowed?.has(j.netId))
+        .filter((j) =>
+          (j.members ?? [j]).some((member) => allowed?.has(member.netId)),
+        )
         .sort(
           (a, b) =>
             (near.x - a.position.x) ** 2 +
             (near.y - a.position.y) ** 2 -
             ((near.x - b.position.x) ** 2 + (near.y - b.position.y) ** 2),
         )[0];
+      const members = junction?.members?.filter((member) =>
+        allowed?.has(member.netId),
+      );
+      if (members && members.length !== 1)
+        return "Net target matches more than one bus member; select an explicit member";
       return junction
         ? {
             kind: "endpoint",
-            endpoint: { kind: "junction", junctionId: junction.id },
+            endpoint: {
+              kind: "junction",
+              junctionId: junction.id,
+              ...(members ? { memberId: members[0]!.id } : {}),
+            },
           }
         : "Net has no route or Junction geometry; connect pin-to-pin first";
     }
@@ -152,6 +166,20 @@ export function resolveWireIntentTarget(
   );
   if (!matches.length)
     return `No wire at (${point.x}, ${point.y}) for this target`;
+  const selectedMembers = new Map(
+    matches.flatMap(({ route }) => {
+      if (!allowed || !route.members) return [];
+      const members = route.members.filter((member) =>
+        allowed.has(member.netId),
+      );
+      return members.length === 1 ? [[route.id, members[0]!] as const] : [];
+    }),
+  );
+  if (
+    allowed &&
+    matches.some(({ route }) => route.members && !selectedMembers.has(route.id))
+  )
+    return "Net target matches more than one bus member; select an explicit member";
   const netIds = new Set(matches.map(({ route }) => route.netId));
   if (netIds.size > 1)
     return `Ambiguous wire crossing at (${point.x}, ${point.y}); choose a tap away from the crossing (${[...netIds].join(", ")})`;
@@ -169,11 +197,21 @@ export function resolveWireIntentTarget(
     return `Tap at (${point.x}, ${point.y}) would join a different Net; choose a point away from the crossing`;
   const endpoints = matches.flatMap(({ route, geometry }) =>
     [
-      { endpoint: route.start, point: geometry.centerline[0] },
-      { endpoint: routeEnd(route), point: geometry.centerline.at(-1) },
+      {
+        endpoint: route.start,
+        point: geometry.centerline[0],
+        memberId: selectedMembers.get(route.id)?.startMemberId,
+      },
+      {
+        endpoint: routeEnd(route),
+        point: geometry.centerline.at(-1),
+        memberId: selectedMembers.get(route.id)?.endMemberId,
+      },
     ]
       .filter((candidate) => equal(candidate.point, point))
-      .map(({ endpoint }) => endpoint),
+      .map(({ endpoint, memberId }) =>
+        memberId ? { ...endpoint, memberId } : endpoint,
+      ),
   );
   const uniqueEndpoints = new Map(
     endpoints.map((endpoint) => [endpointKey(endpoint), endpoint]),
@@ -189,6 +227,9 @@ export function resolveWireIntentTarget(
     kind: "route-segment",
     routeId: match.route.id,
     legId: match.segment.address.legId,
+    ...(selectedMembers.has(match.route.id)
+      ? { memberId: selectedMembers.get(match.route.id)!.id }
+      : {}),
     point,
   };
 }

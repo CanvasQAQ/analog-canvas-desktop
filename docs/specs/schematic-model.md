@@ -38,16 +38,18 @@ cross-Document edits use one Project transaction guarded by
   role); Insert, Properties, validation, Value and export all consume it.
   Import terminal order and symbol mapping live only in
   `Instance.importProvenance`; `Instance.properties` does not persist.
-- A Base Net indexes physical membership; a terminal `{instanceId, pinName}`
+- A Base Net indexes physical membership; a terminal `{instanceId, pinName, memberId?}`
   belongs to at most one. [Portable connection facts](project-file-format.md#one-connection-source)
   are authoritative at the file boundary.
 - `ConnectivityEvidence` records owner-addressed name claims, explicit SPICE
   globals, non-electrical source-name hints and SPICE source identity, one
-  Base Net each; no generic persisted equivalence edge.
+  scalar Base Net each; explicit signal claims expand in declared member order.
+  No generic persisted equivalence edge.
   [Connectivity](connectivity-and-routing.md#net-naming-and-lifecycle) owns
   name equivalence, scope and conflicts.
-- `Route` owns one Net's geometry between terminal or Junction endpoints; its
-  Net agrees with both ends; legs end at stable bend IDs and own their mode.
+- A scalar `Route` owns one Net's geometry; a bus carries ordered scalar
+  member mappings, as defined by [connectivity](connectivity-and-routing.md#ordered-signals-and-buses).
+  Each electrical edge agrees with both ends; legs retain stable IDs and modes.
   `Junction` owns branch geometry. `NoConnect` targets one terminal and
   excludes Net membership.
 - `Document.netlist.terminals` lists authored Cell Pins: stable ID, name,

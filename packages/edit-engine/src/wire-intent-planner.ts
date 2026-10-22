@@ -16,6 +16,8 @@ import type {
 import { electricalConnectionGrid } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import { splitRoutePieceIds } from "./split-route-ids.js";
+import { signalEndpointMembers } from "./signal-endpoint.js";
+import { evaluateWireMembers, selectWireMember } from "./wire-member-choice.js";
 import {
   resolveWireIntentTarget,
   wireTargetReference,
@@ -39,7 +41,9 @@ export type WireIntentAnchor =
       kind: "wire-at";
       point: Point;
       net?: string | undefined;
-      member?: { instanceId: string; pinName: string } | undefined;
+      member?:
+        | { instanceId: string; pinName: string; memberId?: string | undefined }
+        | undefined;
     }
   | { kind: "net"; net: string }
   | { kind: "endpoint"; endpoint: RouteEndpoint }
@@ -47,6 +51,7 @@ export type WireIntentAnchor =
       kind: "route-segment";
       routeId: string;
       legId: string;
+      memberId?: string | undefined;
       point: Point;
     }
   | { kind: "free"; point: Point };
@@ -71,16 +76,20 @@ function endpointNetId(
           net.terminals.some(
             (terminal) =>
               terminal.instanceId === endpoint.instanceId &&
-              terminal.pinName === endpoint.pinName,
+              terminal.pinName === endpoint.pinName &&
+              (!endpoint.memberId || terminal.memberId === endpoint.memberId),
           ),
         )?.id ?? null
       );
-    case "junction":
-      return (
-        document.junctions.find(
-          (junction) => junction.id === endpoint.junctionId,
-        )?.netId ?? null
+    case "junction": {
+      const junction = document.junctions.find(
+        (item) => item.id === endpoint.junctionId,
       );
+      return endpoint.memberId
+        ? (junction?.members?.find((member) => member.id === endpoint.memberId)
+            ?.netId ?? null)
+        : (junction?.netId ?? null);
+    }
   }
 }
 
@@ -122,9 +131,11 @@ function endpointWireSource(
   // wire from such a body joined the default's Net to whatever it reached:
   // a body wired to its own source put that source on VDD.
   const body = defaultBoundMosBody(document, endpoint);
+  const members = signalEndpointMembers(document, resolver, endpoint);
   return {
     endpoint,
     connection,
+    ...(members ? { members } : {}),
     netId: body ? null : endpointNetId(document, endpoint),
     preludeEdits: body
       ? [{ kind: "clear_mos_bulk_default", instanceId: body.id }]
@@ -246,7 +257,7 @@ export function proposeWireIntent(
       const pitch = electricalConnectionGrid(document.presentation.grid);
       if (anchor.point.x % pitch !== 0 || anchor.point.y % pitch !== 0)
         return `Tap (${anchor.point.x}, ${anchor.point.y}) is off grid ${pitch}; a tap on a wire, like a via point, must align to it`;
-      return createRouteWireAnchor(
+      const source = createRouteWireAnchor(
         document,
         route,
         anchor.point,
@@ -258,6 +269,10 @@ export function proposeWireIntent(
         },
         resolver,
       );
+      if (!anchor.memberId) return source;
+      return source.members?.some((member) => member.id === anchor.memberId)
+        ? selectWireMember(source, anchor.memberId)
+        : `Route ${route.id} has no member ${anchor.memberId}`;
     }
     const netId = existingNetId ?? newNetId;
     const createNet = existingNetId === undefined && !freeAnchorCreatedNet;
@@ -269,10 +284,16 @@ export function proposeWireIntent(
       `${intent.id}-${side}-junction`,
     );
   };
-  const from = source(intent.from, "from");
+  let from = source(intent.from, "from");
   if (typeof from === "string") return from;
-  const to = source(intent.to, "to");
+  let to = source(intent.to, "to");
   if (typeof to === "string") return to;
+  const evaluated = evaluateWireMembers(document, from, to);
+  if (evaluated.kind === "invalid") return evaluated.message;
+  if (evaluated.kind === "choose")
+    return "Select one bus member before connecting a scalar endpoint";
+  from = evaluated.from;
+  to = evaluated.to;
   const diagonal =
     intent.routingMode || !intent.waypoints?.length
       ? undefined

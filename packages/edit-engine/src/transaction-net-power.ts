@@ -327,6 +327,17 @@ export function applyNetPowerEdit(
       }
       const previous = draft.connectivityEvidence[existingIndex];
       const evidence = ConnectivityEvidenceSchema.parse(edit.evidence);
+      if (
+        previous?.kind === "name-claim" &&
+        previous.signal &&
+        (evidence.kind !== "name-claim" ||
+          JSON.stringify(previous.signal) !== JSON.stringify(evidence.signal))
+      ) {
+        return rejectAt(
+          "EDIT_PRECONDITION",
+          "Changing an established bus declaration requires an explicit migration, which is not supported yet",
+        );
+      }
       if (existingIndex >= 0) {
         draft.connectivityEvidence[existingIndex] = evidence;
       } else {

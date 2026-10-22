@@ -131,6 +131,9 @@ to a name or netlist. `legacyLooks` (pre-standard drawings only) also
 converts looks that merely copy the historical look and straightens scripts
 that inherited italic.
 
+Explicit vector/indexed authoring and legacy bracket compatibility follow
+[ordered signals](connectivity-and-routing.md#ordered-signals-and-buses).
+
 ## Netlist
 
 Netlists print names verbatim; export-format obligations (prefixes, escaping,

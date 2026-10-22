@@ -2,6 +2,7 @@ import {
   boundAnnotationName,
   flattenRichText,
   labelTextDocument,
+  richTextPresentsIdentifier,
 } from "@icm/model";
 import type {
   Annotation,
@@ -17,6 +18,58 @@ import {
   resolveDocumentLogicalNets,
   type ResolvedDocumentLogicalNets,
 } from "./logical-net.js";
+import type { SymbolResolver } from "@icm/symbols";
+import type { RouteEndpoint } from "@icm/model";
+
+function selectedMemberName(
+  document: SchematicDocument,
+  endpoint: RouteEndpoint,
+  netId: string,
+  resolver?: SymbolResolver,
+): string {
+  const terminalName = (selected: RouteEndpoint): string | undefined => {
+    if (selected.kind !== "terminal" || !selected.memberId) return undefined;
+    const local = document.netlist?.terminals.find(
+      (terminal) =>
+        selected.pinName === "P" &&
+        terminal.interfaceInstanceIds.includes(selected.instanceId),
+    );
+    const localName = local?.signal?.members.find(
+      (member) => member.id === selected.memberId,
+    )?.name;
+    if (localName) return localName;
+    const instance = document.instances.find(
+      (item) => item.id === selected.instanceId,
+    );
+    return (
+      instance &&
+      resolver
+        ?.resolve(instance.symbolId, instance.symbolVariantId)
+        ?.definition.pins.find((pin) => pin.name === selected.pinName)
+        ?.signalMembers?.find((member) => member.id === selected.memberId)?.name
+    );
+  };
+  const direct = terminalName(endpoint);
+  if (direct) return direct;
+  const names = [
+    ...new Set(
+      document.nets
+        .find((net) => net.id === netId)
+        ?.terminals.flatMap((terminal) => {
+          const name = terminalName({ kind: "terminal", ...terminal });
+          return name ? [name] : [];
+        }) ?? [],
+    ),
+  ].sort();
+  if (names.length) return names.join(" / ");
+  if (endpoint.kind === "junction") {
+    const index = document.junctions
+      .find((item) => item.id === endpoint.junctionId)
+      ?.members?.findIndex((member) => member.id === endpoint.memberId);
+    if (index !== undefined && index >= 0) return `Member ${index + 1}`;
+  }
+  return "";
+}
 
 const EMPTY_TEXT: RichTextDocument = { runs: [{ kind: "line-break" }] };
 
@@ -29,6 +82,7 @@ export function resolveAnnotationText(
   document: SchematicDocument,
   annotation: Annotation,
   logicalNets?: ResolvedDocumentLogicalNets,
+  resolver?: SymbolResolver,
 ): RichTextDocument {
   const semanticLabel = (name: string): RichTextDocument =>
     labelTextDocument(name, document.presentation);
@@ -37,7 +91,7 @@ export function resolveAnnotationText(
   if (
     annotation.formatOverride &&
     (binding.kind === "instance-reference" ||
-      binding.kind === "net-name" ||
+      (binding.kind === "net-name" && !binding.memberEndpoint) ||
       binding.kind === "cell-terminal-name")
   ) {
     return annotation.formatOverride;
@@ -86,7 +140,21 @@ export function resolveAnnotationText(
       ).byBaseNetId.get(binding.netId)?.name;
       const ownerClaimName =
         ownerClaim?.kind === "name-claim" ? ownerClaim.name : undefined;
-      return semanticLabel(ownerClaimName ?? logicalName ?? "");
+      const name =
+        ownerClaimName ??
+        logicalName ??
+        (binding.memberEndpoint
+          ? selectedMemberName(
+              document,
+              binding.memberEndpoint,
+              binding.netId,
+              resolver,
+            )
+          : "");
+      return annotation.formatOverride &&
+        richTextPresentsIdentifier(annotation.formatOverride, name)
+        ? annotation.formatOverride
+        : semanticLabel(name);
     }
     case "cell-terminal-name": {
       const terminal = document.netlist?.terminals.find(

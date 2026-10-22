@@ -1,6 +1,11 @@
 // Nets and their names: each Cell's net context, from its logical Nets and
 // their spellings to NoConnect nodes, and the node a pin is written on.
-import { deriveStableId, foldNetName, projectCellInterface } from "@icm/model";
+import {
+  deriveStableId,
+  foldNetName,
+  projectCellInterface,
+  projectScalarCellInterface,
+} from "@icm/model";
 import {
   mosBulkKind,
   resolveMosBulkConnection,
@@ -211,7 +216,7 @@ export function buildNetContext(
   }
 
   const formalTerminalByLogicalId = new Map<string, string>();
-  for (const port of projectCellInterface(document.netlist).ports) {
+  for (const port of projectScalarCellInterface(document.netlist).ports) {
     for (const netId of port.netIds) {
       const logicalNet = logicalNets.byBaseNetId.get(netId);
       const logicalId = logicalNet?.id ?? netId;
@@ -455,7 +460,7 @@ export function buildNetContext(
           );
         }
       }
-      const key = `${terminal.instanceId}\u0000${terminal.pinName}`;
+      const key = `${terminal.instanceId}\u0000${terminal.pinName}${terminal.memberId ? `\u0000${terminal.memberId}` : ""}`;
       const prior = netByTerminal.get(key);
       if (prior) {
         diagnostic(
@@ -545,6 +550,7 @@ export function terminalNetName(
   pinName: string,
   context: CellNetContext,
   diagnostics: NetlistDiagnostic[],
+  memberId?: string,
 ): string | null {
   // A MOS body has one authority, and membership is not always it: a body
   // left alone on the Net its own policy binding named is residue from a
@@ -556,7 +562,10 @@ export function terminalNetName(
       ? resolveMosBulkConnection(document, instance, context.logicalNets)?.net
       : undefined;
   const net =
-    bodyNet ?? context.netByTerminal.get(`${instance.id}\u0000${pinName}`);
+    bodyNet ??
+    context.netByTerminal.get(
+      `${instance.id}\u0000${pinName}${memberId ? `\u0000${memberId}` : ""}`,
+    );
   const name = net ? context.nameByNetId.get(net.id) : undefined;
   const noConnectName = context.noConnectNameByTerminal.get(
     `${instance.id}\u0000${pinName}`,

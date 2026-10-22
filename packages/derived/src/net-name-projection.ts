@@ -1,4 +1,8 @@
-import { foldNetName } from "@icm/model";
+import {
+  foldNetName,
+  scalarCellTerminals,
+  scalarConnectivityEvidence,
+} from "@icm/model";
 import type { CircuitProject, SchematicDocument } from "@icm/model";
 
 import {
@@ -86,7 +90,7 @@ function candidatesForLogicalNet(
   const authoritative: NameCandidate[] = [];
   const hints: NameCandidate[] = [];
 
-  for (const evidence of document.connectivityEvidence) {
+  for (const evidence of scalarConnectivityEvidence(document)) {
     if (!memberNetIds.has(evidence.netId)) continue;
     if (evidence.kind === "name-claim") {
       if (foldedIdentity && foldNetName(evidence.name) !== foldedIdentity) {
@@ -112,7 +116,7 @@ function candidatesForLogicalNet(
     }
   }
 
-  for (const terminal of document.netlist?.terminals ?? []) {
+  for (const terminal of scalarCellTerminals(document.netlist)) {
     if (!memberNetIds.has(terminal.netId)) continue;
     if (foldedIdentity && foldNetName(terminal.name) !== foldedIdentity) {
       continue;

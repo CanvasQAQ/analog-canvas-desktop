@@ -3,7 +3,8 @@
 import {
   circuitComponentTerminals,
   foldNetName,
-  projectCellInterface,
+  projectScalarCellInterface,
+  scalarCellTerminals,
   routeEndpoints,
 } from "@icm/model";
 import { drawnSupplyNet, namesNegativeSupply } from "@icm/derived";
@@ -124,7 +125,8 @@ export function extractHierarchyInstance(
     diagnostics,
   );
   // Callers and definitions share the authored interface, including its order.
-  const childPorts = projectCellInterface(child.netlist).ports;
+  const childPorts = projectScalarCellInterface(child.netlist).ports;
+  const scalarTerminals = scalarCellTerminals(child.netlist);
   // A Library gate bound to the Cell keeps its own pins, and meets the
   // Cell's Pins by name (#1450).
   const gate = bindsProjectCell(instance.symbolId)
@@ -144,9 +146,10 @@ export function extractHierarchyInstance(
     );
   const railsAsked = new Set<string>();
   const nodes = childPorts.map((port) => {
+    const member = scalarTerminals.find((terminal) => terminal.id === port.id);
     const pin: Omit<GateCellPin, "portName"> | undefined = gate
       ? gate.pins.find((item) => item.portName === port.name)
-      : { pinName: port.name };
+      : { pinName: member?.aggregateName ?? port.name };
     // Strict extraction rejects the accompanying error. Authoring keeps an
     // explicit non-executable slot rather than shifting positional arguments.
     const netName = !pin
@@ -167,6 +170,7 @@ export function extractHierarchyInstance(
             pin.pinName,
             context,
             diagnostics,
+            member?.memberId,
           );
     return {
       pinName: port.name,

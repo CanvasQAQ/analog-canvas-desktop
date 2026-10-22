@@ -114,7 +114,13 @@ export function marqueeSelection(
       .filter(
         (annotation) =>
           policy.allowsAnnotation(annotation, "select") &&
-          isSchematicAnnotationVisible(document, annotation, logicalRead()) &&
+          isSchematicAnnotationVisible(
+            document,
+            annotation,
+            logicalRead(),
+            undefined,
+            resolver,
+          ) &&
           boxSelected(
             annotationHitBox(
               document,

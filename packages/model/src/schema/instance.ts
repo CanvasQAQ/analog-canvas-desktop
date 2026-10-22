@@ -49,6 +49,7 @@ export const SignalFlowParametersSchema = z.strictObject({
 export const TerminalRefSchema = z.strictObject({
   instanceId: StableIdSchema,
   pinName: z.string().min(1),
+  memberId: StableIdSchema.optional(),
 });
 export const PlacementSchema = z.strictObject({
   position: PointSchema,

@@ -1,5 +1,10 @@
 import { registerDocumentCache } from "./document-caches.js";
-import { routeEnd, isFrozenSnapshot } from "@icm/model";
+import {
+  routeEnd,
+  isFrozenSnapshot,
+  junctionElectricalEndpoints,
+  routeElectricalConnections,
+} from "@icm/model";
 import type { SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 
@@ -75,15 +80,17 @@ const contextCache = registerDocumentCache(
 
 function groupedBy<T>(
   values: readonly T[],
-  keyOf: (value: T) => string | undefined,
+  keyOf: (value: T) => string | readonly string[] | undefined,
 ): ReadonlyMap<string, readonly T[]> {
   const groups = new Map<string, T[]>();
   for (const value of values) {
     const key = keyOf(value);
     if (!key) continue;
-    const group = groups.get(key) ?? [];
-    group.push(value);
-    groups.set(key, group);
+    for (const entry of typeof key === "string" ? [key] : new Set(key)) {
+      const group = groups.get(entry) ?? [];
+      group.push(value);
+      groups.set(entry, group);
+    }
   }
   return groups;
 }
@@ -105,9 +112,15 @@ export function buildDocumentDerivedContext(
     junctionsById,
     logicalNets: logicalNetResolution,
   } = endpointLookup;
-  const routesByNetId = groupedBy(document.routes, (item) => item.netId);
+  const routesByNetId = groupedBy(
+    document.routes,
+    (item) => item.members?.map((member) => member.netId) ?? item.netId,
+  );
   const routesById = new Map(document.routes.map((route) => [route.id, route]));
-  const junctionsByNetId = groupedBy(document.junctions, (item) => item.netId);
+  const junctionsByNetId = groupedBy(
+    document.junctions,
+    (item) => item.members?.map((member) => member.netId) ?? item.netId,
+  );
   const annotationsByNetId = groupedBy(
     document.annotations,
     (item) => item.netId,
@@ -124,6 +137,12 @@ export function buildDocumentDerivedContext(
         kind: "junction" as const,
         junctionId: junction.id,
       })),
+      ...document.junctions
+        .flatMap(junctionElectricalEndpoints)
+        .map((item) => item.endpoint),
+      ...document.routes
+        .flatMap(routeElectricalConnections)
+        .flatMap((edge) => edge.endpoints),
       ...document.routes.flatMap((route) => [route.start, routeEnd(route)]),
     ].map((endpoint) => [endpointKey(endpoint), endpoint] as const),
   );
@@ -175,7 +194,15 @@ export function buildDocumentDerivedContext(
   }
   const routeDegreeByEndpointKey = new Map<string, number>();
   for (const route of document.routes) {
-    for (const endpoint of [route.start, routeEnd(route)]) {
+    for (const endpoint of route.members
+      ? [
+          ...routeElectricalConnections(route).flatMap(
+            (edge) => edge.endpoints,
+          ),
+          route.start,
+          routeEnd(route),
+        ]
+      : [route.start, routeEnd(route)]) {
       const key = endpointKey(endpoint);
       routeDegreeByEndpointKey.set(
         key,

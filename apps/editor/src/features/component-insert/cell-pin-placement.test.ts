@@ -83,3 +83,62 @@ describe("placing a VDD marker", () => {
     ]);
   });
 });
+
+it("authors a vector Cell Pin through the GUI placement transaction with independent members", () => {
+  const project = createEmptyProject("bus-pins", "Bus pins");
+  const document = project.documents[0]!;
+  const endpoint = {
+    kind: "terminal" as const,
+    instanceId: "data",
+    pinName: "P",
+  };
+  const result = executeProjectTransaction(project, {
+    transactionId: "place-data",
+    projectId: project.id,
+    expectedStructureRevision: project.structureRevision,
+    actor: { kind: "human", id: "test" },
+    edits: planPlacedCellPin(project, document.id, resolver, {
+      instance: {
+        id: "data",
+        symbolId: "port",
+        placement: {
+          position: { x: 100, y: 100 },
+          rotation: 0,
+          mirror: "none",
+        },
+      },
+      terminalId: "data-port",
+      name: "DATA<3:0>",
+      netId: "data-net",
+      direction: "input",
+      connectionEdits: [
+        {
+          kind: "connect_endpoints",
+          from: endpoint,
+          to: endpoint,
+          newNetId: "data-net",
+        },
+      ],
+    }),
+  });
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  const authored = result.project.documents[0]!;
+  const pin = authored.netlist!.terminals[0]!;
+  expect(pin.signal?.members.map((member) => member.name)).toEqual([
+    "DATA<3>",
+    "DATA<2>",
+    "DATA<1>",
+    "DATA<0>",
+  ]);
+  expect(new Set(pin.signal?.members.map((member) => member.netId)).size).toBe(
+    4,
+  );
+  expect(authored.annotations).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        binding: { kind: "cell-terminal-name", terminalId: "data-port" },
+      }),
+    ]),
+  );
+});

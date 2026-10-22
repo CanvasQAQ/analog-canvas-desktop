@@ -285,6 +285,7 @@ export function agentEditCategory(
     case "set_route_path":
     case "route_orthogonal":
     case "add_junction":
+    case "set_junction_signal":
     case "attach_endpoint_to_route":
     case "remove_junction":
     case "remove_route_geometry":

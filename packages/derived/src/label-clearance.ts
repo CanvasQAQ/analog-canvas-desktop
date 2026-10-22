@@ -100,7 +100,7 @@ export function createLabelClearanceContext(
   const logical = resolveDocumentLogicalNets(document);
   const grid = document.presentation.grid;
   const visible = document.annotations.filter((a) =>
-    isSchematicAnnotationVisible(document, a, logical),
+    isSchematicAnnotationVisible(document, a, logical, undefined, resolver),
   );
   const measurements = new WeakMap<Annotation, AnnotationPresentation>();
   const measure = (annotation: Annotation) => {

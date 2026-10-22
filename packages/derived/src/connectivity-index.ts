@@ -351,6 +351,11 @@ function deriveLabelVirtualEdges(
     const annotation = document.annotations.find(
       (candidate) => candidate.id === binding.annotationId,
     )!;
+    if (
+      annotation.binding?.kind === "net-name" &&
+      annotation.binding.memberEndpoint
+    )
+      continue;
     const label = resolveAnnotationName(
       document,
       annotation,

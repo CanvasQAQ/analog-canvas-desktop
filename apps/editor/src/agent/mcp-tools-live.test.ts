@@ -261,7 +261,7 @@ describe("MCP tools on the live editor", () => {
       targetDocumentId: "main",
       position: { x: 300, y: 200 },
     });
-    expect(receipt).toMatchObject({
+    expect(receipt, JSON.stringify(receipt)).toMatchObject({
       ok: true,
       operation: "insert-gallery-entry",
       galleryEntryId: "g1",

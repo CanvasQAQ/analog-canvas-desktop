@@ -1,4 +1,9 @@
-import { deriveStableId, routeEnd } from "@icm/model";
+import {
+  deriveStableId,
+  routeEnd,
+  routeElectricalConnections,
+  junctionElectricalEndpoints,
+} from "@icm/model";
 import type { SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 
@@ -12,6 +17,10 @@ export interface NameClaimFact {
   readonly name: string;
   readonly scope: "local" | "global";
   readonly powerDomain?: "vdd" | "ground";
+  readonly signal?: {
+    expression: string;
+    members: ReadonlyArray<{ id: string; name: string; netId: string }>;
+  };
 }
 
 export interface ElectricalTopologyProjection {
@@ -91,18 +100,23 @@ export function deriveElectricalTopologyProjection(
       sets.add(key);
     }
   }
-  for (const junction of document.junctions) {
-    const key = endpointKey({ kind: "junction", junctionId: junction.id });
-    endpointToBaseNet.set(key, junction.netId);
+  for (const item of document.junctions.flatMap(junctionElectricalEndpoints)) {
+    const key = endpointKey(item.endpoint);
+    endpointToBaseNet.set(key, item.netId);
     sets.add(key);
   }
 
   const routeIncidence = new Map<string, readonly string[]>();
   const junctionIncidenceMutable = new Map<string, string[]>();
   for (const route of document.routes) {
-    const keys = [endpointKey(route.start), endpointKey(routeEnd(route))];
+    const edges = routeElectricalConnections(route);
+    const keys = edges.flatMap((edge) => edge.endpoints.map(endpointKey));
     routeIncidence.set(route.id, keys);
-    sets.union(keys[0]!, keys[1]!);
+    for (const edge of edges)
+      sets.union(
+        endpointKey(edge.endpoints[0]),
+        endpointKey(edge.endpoints[1]),
+      );
     for (const endpoint of [route.start, routeEnd(route)]) {
       if (endpoint.kind !== "junction") continue;
       const incident = junctionIncidenceMutable.get(endpoint.junctionId) ?? [];
@@ -141,6 +155,7 @@ export function deriveElectricalTopologyProjection(
       evidenceId: evidence.id,
       netId: evidence.netId,
       name: evidence.name,
+      ...(evidence.signal ? { signal: evidence.signal } : {}),
       scope: evidence.scope,
       ...(evidence.powerDomain ? { powerDomain: evidence.powerDomain } : {}),
     });

@@ -17,6 +17,7 @@ import {
   type PhysicalContactLicense,
 } from "./transaction-connectivity.js";
 import { endpointOwnerNetId } from "./transaction-routing.js";
+import { signalEndpointMembers } from "./signal-endpoint.js";
 
 export type PhysicalContactOperation =
   | {
@@ -60,6 +61,7 @@ function visibleEndpoints(
         instanceId: instance.id,
         pinName: pin.name,
       };
+      if (signalEndpointMembers(document, resolver, endpoint)) return [];
       return isVisibleEndpoint(document, resolver, endpoint, lookup)
         ? [endpoint]
         : [];
@@ -67,10 +69,12 @@ function visibleEndpoints(
   });
   return [
     ...terminals,
-    ...document.junctions.map((junction): RouteEndpoint => ({
-      kind: "junction",
-      junctionId: junction.id,
-    })),
+    ...document.junctions
+      .filter((junction) => !junction.members)
+      .map((junction): RouteEndpoint => ({
+        kind: "junction",
+        junctionId: junction.id,
+      })),
   ].sort((left, right) =>
     endpointKey(left).localeCompare(endpointKey(right), "en"),
   );
@@ -98,6 +102,7 @@ function authoredRoutesAtPoint(
       // Rail taps and MOS bodies retain their dedicated contact planners.
       if (
         !route ||
+        route.members ||
         route.presentation === "bulk-dashed" ||
         route.presentation === "power-rail"
       )

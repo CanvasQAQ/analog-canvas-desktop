@@ -57,6 +57,7 @@ export type ConnectivityEvidence = z.infer<
   typeof Schema.ConnectivityEvidenceSchema
 >;
 export type RouteEndpoint = z.infer<typeof Schema.RouteEndpointSchema>;
+export type Junction = z.infer<typeof Schema.JunctionSchema>;
 export type SegmentMode = z.infer<typeof Schema.SegmentModeSchema>;
 export type RouteBranch = z.infer<typeof Schema.RouteBranchSchema>;
 export type RoutePresentation = z.infer<typeof Schema.RoutePresentationSchema>;

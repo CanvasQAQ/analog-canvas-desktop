@@ -7,6 +7,7 @@ import type {
   SegmentMode,
   StableId,
   StyleOverrides,
+  Junction,
 } from "./schema.js";
 import { deriveStableId } from "./ids.js";
 
@@ -20,6 +21,7 @@ export interface NewRoutePath {
   readonly presentation?: RoutePresentation;
   readonly styleOverride?: RouteStyleOverride;
   readonly documentStyle?: StyleOverrides;
+  readonly members?: RouteBranch["members"];
 }
 
 /**
@@ -54,6 +56,7 @@ export function createRoutePath(input: NewRoutePath): RouteBranch {
     id: input.id,
     netId: input.netId,
     start: input.start,
+    ...(input.members ? { members: structuredClone(input.members) } : {}),
     legs: input.modes.map((mode, index) => ({
       id: childIds[index * 2]!,
       to:
@@ -88,6 +91,45 @@ export function routeEndpoints(
   route: RouteBranch,
 ): readonly [RouteEndpoint, RouteEndpoint] {
   return [route.start, routeEnd(route)];
+}
+
+/** One scalar graph edge per lane. Geometric aggregate anchors never form an edge. */
+export function routeElectricalConnections(route: RouteBranch): Array<{
+  netId: string;
+  memberId?: string;
+  endpoints: readonly [RouteEndpoint, RouteEndpoint];
+}> {
+  const end = routeEnd(route);
+  return route.members
+    ? route.members.map((member) => ({
+        netId: member.netId,
+        memberId: member.id,
+        endpoints: [
+          { ...route.start, memberId: member.startMemberId },
+          { ...end, memberId: member.endMemberId },
+        ],
+      }))
+    : [{ netId: route.netId, endpoints: [route.start, end] }];
+}
+
+export function junctionElectricalEndpoints(
+  junction: Junction,
+): Array<{ netId: string; endpoint: RouteEndpoint }> {
+  return junction.members
+    ? junction.members.map((member) => ({
+        netId: member.netId,
+        endpoint: {
+          kind: "junction",
+          junctionId: junction.id,
+          memberId: member.id,
+        },
+      }))
+    : [
+        {
+          netId: junction.netId,
+          endpoint: { kind: "junction", junctionId: junction.id },
+        },
+      ];
 }
 
 export function routeBends(route: RouteBranch): GridPoint[] {

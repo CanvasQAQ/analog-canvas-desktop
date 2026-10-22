@@ -254,7 +254,10 @@ export function normalizeSameNetConductorTopology(
   )) {
     if (netIds && !netIds.has(net.id)) continue;
     const routes = document.routes
-      .filter((route) => route.netId === net.id && routeCanNormalize(route))
+      .filter(
+        (route) =>
+          !route.members && route.netId === net.id && routeCanNormalize(route),
+      )
       .sort((left, right) => left.id.localeCompare(right.id, "en"));
     if (routes.length === 0) continue;
 
@@ -322,7 +325,7 @@ export function normalizeSameNetConductorTopology(
 
     const protectedIds = protectedObjectIds(document);
     const junctions = document.junctions.filter(
-      (junction) => junction.netId === net.id,
+      (junction) => !junction.members && junction.netId === net.id,
     );
     const junctionsByPoint = new Map<string, typeof junctions>();
     for (const junction of junctions) {

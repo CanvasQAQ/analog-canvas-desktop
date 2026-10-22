@@ -24,6 +24,7 @@ import type {
 import type { SymbolResolver } from "@icm/symbols";
 import {
   createRoutePath,
+  deriveStableId,
   controlledSourceExpressionDocument,
   controlledSourceExpressionSource,
   defaultControlledSourceExpression,
@@ -455,6 +456,24 @@ export function proposePaste(
         ...terminal,
         id: terminalIds.get(terminal.id)!,
         netId: netIds.get(terminal.netId) ?? terminal.netId,
+        ...(terminal.signal?.members.length === 1
+          ? {
+              signal: {
+                ...terminal.signal,
+                members: [
+                  {
+                    ...terminal.signal.members[0]!,
+                    id: deriveStableId(
+                      "signal-member",
+                      terminalIds.get(terminal.id)!,
+                      "0",
+                    ),
+                    netId: netIds.get(terminal.netId) ?? terminal.netId,
+                  },
+                ],
+              },
+            }
+          : {}),
         interfaceInstanceIds: copiedMarkerIds,
         ...(copiedAnnotationId
           ? { interfaceAnnotationId: copiedAnnotationId }
@@ -635,6 +654,14 @@ export function proposePaste(
       clone.id = evidenceIds.get(evidence.id)!;
       clone.netId = netIds.get(clone.netId) ?? clone.netId;
       if (clone.kind === "name-claim") {
+        if (clone.signal?.members.length === 1) {
+          clone.signal.members[0]!.id = deriveStableId(
+            "signal-member",
+            clone.id,
+            "0",
+          );
+          clone.signal.members[0]!.netId = clone.netId;
+        }
         switch (clone.owner.kind) {
           case "net-label":
             clone.owner.annotationId =

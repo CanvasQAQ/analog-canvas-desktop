@@ -56,6 +56,7 @@ import {
   CURRENT_PROJECT_FILE_VERSION,
   decodeProjectFile,
   rejectKeptDocumentStyle,
+  rejectSignalMembers,
 } from "./owned-project-file.js";
 
 /**
@@ -249,6 +250,7 @@ export function tryParseProjectWithMetadata(
 
   let current: Record<string, unknown>;
   try {
+    if (sourceSchemaVersion < 75) rejectSignalMembers(parsed);
     if (sourceSchemaVersion < 74 && hasExplicitCellBody(parsed))
       throw new ProjectFormatError([
         {

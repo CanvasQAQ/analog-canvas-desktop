@@ -101,11 +101,16 @@ const ConnectTargetSchema = z.discriminatedUnion("kind", [
     kind: z.literal("route-segment"),
     routeId: z.string().min(1),
     legId: z.string().min(1),
+    memberId: StableIdSchema.optional(),
     point: PointInputSchema,
   }),
-  PinTargetSchema,
+  PinTargetSchema.extend({ memberId: StableIdSchema.optional() }),
   z.strictObject({ kind: z.literal("net"), net: z.string().min(1) }),
-  z.strictObject({ kind: z.literal("junction"), junction: z.string().min(1) }),
+  z.strictObject({
+    kind: z.literal("junction"),
+    junction: z.string().min(1),
+    memberId: StableIdSchema.optional(),
+  }),
   z.strictObject({
     kind: z.literal("point"),
     x: z.number().int(),

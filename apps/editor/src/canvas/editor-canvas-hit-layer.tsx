@@ -534,7 +534,13 @@ function SelectionHitTargets({
       {children}
       {document.annotations
         .filter((annotation) =>
-          isSchematicAnnotationVisible(document, annotation, logicalNets),
+          isSchematicAnnotationVisible(
+            document,
+            annotation,
+            logicalNets,
+            undefined,
+            resolver,
+          ),
         )
         .map((annotation) => {
           const hitBox = annotationHitBoxes.get(annotation.id)!;

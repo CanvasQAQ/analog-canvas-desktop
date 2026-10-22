@@ -3,7 +3,7 @@
 import {
   deriveStableId,
   foldNetName,
-  projectCellInterface,
+  projectScalarCellInterface,
   spellGreekLetters,
 } from "@icm/model";
 import {
@@ -125,7 +125,7 @@ export function extractCell(
     options,
     diagnostics,
   );
-  const interfaceProjection = projectCellInterface(document.netlist);
+  const interfaceProjection = projectScalarCellInterface(document.netlist);
   // Formal pins read the authored Document, not buildNetContext's recovered
   // power-marker claims. All pins share that same logical projection.
   const interfaceLogicalNets = resolveCommittedDocumentLogicalNets(document);

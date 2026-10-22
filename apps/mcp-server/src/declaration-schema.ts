@@ -9,6 +9,10 @@ export function declarationSchema(input: Schema, tool?: string): Schema {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
     const schema = { ...(value as Schema) };
+    // A string literal already fixes its type. Keeping the discriminator alone
+    // preserves its exact meaning while avoiding repeated bytes on wire targets.
+    if (schema.type === "string" && typeof schema.const === "string")
+      delete schema.type;
     // Zod repeats JS safe-integer limits on every grid coordinate. Keep the
     // integer type and meaningful domain bounds; execution/exact contracts
     // still enforce these machine-representation limits.

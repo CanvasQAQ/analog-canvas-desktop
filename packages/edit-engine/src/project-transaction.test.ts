@@ -674,74 +674,86 @@ describe("Project structural transaction", () => {
     },
   );
 
-  it("merges shared caller Nets once and reconciles NoConnect declarations", () => {
-    const project = createEmptyProject("project", "Project");
-    const child = createEmptyDocument("child", "Child");
-    for (const name of ["A", "B"])
-      addCellPin(child, {
-        instanceId: `P${name}`,
-        terminalId: name,
-        name,
-        netId: `net-${name}`,
+  it.each([false, true])(
+    "merges shared caller Nets once and reconciles NoConnect declarations (explicit scalar: %s)",
+    (explicitScalar) => {
+      const project = createEmptyProject("project", "Project");
+      const child = createEmptyDocument("child", "Child");
+      for (const name of ["A", "B"])
+        addCellPin(child, {
+          instanceId: `P${name}`,
+          terminalId: name,
+          name,
+          netId: `net-${name}`,
+        });
+      project.documents.push(child);
+      if (explicitScalar)
+        for (const terminal of child.netlist!.terminals) {
+          terminal.signal = {
+            expression: terminal.name,
+            members: [
+              { id: terminal.id, name: terminal.name, netId: terminal.netId },
+            ],
+          };
+        }
+      const parent = project.documents[0]!;
+      for (const id of ["X1", "X2", "X3", "X4"])
+        parent.instances.push(hierarchyInstance(id, "Child", child.id));
+      parent.nets.push(
+        {
+          id: "left",
+          terminals: ["X1", "X2", "X3"].map((instanceId) => ({
+            instanceId,
+            pinName: "A",
+          })),
+        },
+        {
+          id: "right",
+          terminals: ["X1", "X2"].map((instanceId) => ({
+            instanceId,
+            pinName: "B",
+          })),
+        },
+      );
+      parent.noConnects.push(
+        {
+          id: "nc3",
+          endpoint: { kind: "terminal", instanceId: "X3", pinName: "B" },
+        },
+        {
+          id: "nc4a",
+          endpoint: { kind: "terminal", instanceId: "X4", pinName: "A" },
+        },
+        {
+          id: "nc4b",
+          endpoint: { kind: "terminal", instanceId: "X4", pinName: "B" },
+        },
+      );
+      const result = executeProjectTransaction(project, {
+        transactionId: "merge-shared-callers",
+        projectId: project.id,
+        expectedStructureRevision: project.structureRevision,
+        actor: { kind: "human", id: "local" },
+        edits: planRenameCellTerminal(project, child.id, "A", "B", {
+          mergeExistingPort: true,
+        }),
       });
-    project.documents.push(child);
-    const parent = project.documents[0]!;
-    for (const id of ["X1", "X2", "X3", "X4"])
-      parent.instances.push(hierarchyInstance(id, "Child", child.id));
-    parent.nets.push(
-      {
-        id: "left",
-        terminals: ["X1", "X2", "X3"].map((instanceId) => ({
-          instanceId,
-          pinName: "A",
-        })),
-      },
-      {
-        id: "right",
-        terminals: ["X1", "X2"].map((instanceId) => ({
-          instanceId,
-          pinName: "B",
-        })),
-      },
-    );
-    parent.noConnects.push(
-      {
-        id: "nc3",
-        endpoint: { kind: "terminal", instanceId: "X3", pinName: "B" },
-      },
-      {
-        id: "nc4a",
-        endpoint: { kind: "terminal", instanceId: "X4", pinName: "A" },
-      },
-      {
-        id: "nc4b",
-        endpoint: { kind: "terminal", instanceId: "X4", pinName: "B" },
-      },
-    );
-    const result = executeProjectTransaction(project, {
-      transactionId: "merge-shared-callers",
-      projectId: project.id,
-      expectedStructureRevision: project.structureRevision,
-      actor: { kind: "human", id: "local" },
-      edits: planRenameCellTerminal(project, child.id, "A", "B", {
-        mergeExistingPort: true,
-      }),
-    });
-    if (!result.ok) throw new Error(JSON.stringify(result, null, 2));
-    const updated = result.project.documents[0]!;
-    expect(updated.nets).toHaveLength(1);
-    expect(updated.nets[0]!.terminals).toEqual(
-      ["X1", "X2", "X3"].map((instanceId) => ({ instanceId, pinName: "B" })),
-    );
-    expect(updated.noConnects).toEqual([
-      {
-        id: "nc4a",
-        endpoint: { kind: "terminal", instanceId: "X4", pinName: "B" },
-      },
-    ]);
-    expect(parent.nets).toHaveLength(2);
-    expect(parent.noConnects).toHaveLength(3);
-  });
+      if (!result.ok) throw new Error(JSON.stringify(result, null, 2));
+      const updated = result.project.documents[0]!;
+      expect(updated.nets).toHaveLength(1);
+      expect(updated.nets[0]!.terminals).toEqual(
+        ["X1", "X2", "X3"].map((instanceId) => ({ instanceId, pinName: "B" })),
+      );
+      expect(updated.noConnects).toEqual([
+        {
+          id: "nc4a",
+          endpoint: { kind: "terminal", instanceId: "X4", pinName: "B" },
+        },
+      ]);
+      expect(parent.nets).toHaveLength(2);
+      expect(parent.noConnects).toHaveLength(3);
+    },
+  );
 
   it("renames the surviving caller spelling when the first same-named Pin leaves its group", () => {
     const project = createEmptyProject("project", "Project");

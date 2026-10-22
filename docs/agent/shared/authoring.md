@@ -281,6 +281,29 @@ information). Hidden bulk needs no decorative wire.
   with all `pinPlacements` by terminal ID. HTTP callers use their published
   transact schema; its `actions` form takes `apply_actions`' actions.
 
+## Ordered bus members
+
+Explicit Cell Pin and Net Label names accept `NAME<index>` and inclusive
+`NAME<first:last>` in either order (at most 256 members). Older bracketed
+scalar names keep their meaning. A parent Label may name its bus independently
+of the child's formal pin.
+
+Inspect before wiring: an aggregate pin reports `netId:null` and ordered
+`members:[{id,name,netId}]`; Route and Junction member records expose their
+scalar logical Net IDs. Select a member with `memberId` on a terminal or
+Junction endpoint, or on a `wireIntent` `route-segment` target. Omitting it
+continues the whole bus; connecting to a fixed scalar requires an explicit
+member or a unique authoritative name match in the current Document. Geometry
+and child formal spelling never guess a member. Whole-bus connections map
+equal-width ordered lists positionally. The shared planner rejects wrong
+widths, unknown members and ambiguous selections without mutation.
+
+A scalar branch and its bound selector are one transaction. Its `net-name`
+binding's `memberEndpoint` is a display reference: unnamed parent members
+display the current formal name without creating a parent name claim. Slices, bundles,
+connected member/name migration, legacy scalar conversion, bus group copy and
+member NoConnect authoring are not yet supported; use the reported refusal.
+
 ## Wiring
 
 Wires are drawn as a person draws them: never over another Net's pin, through

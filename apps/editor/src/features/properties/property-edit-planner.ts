@@ -9,7 +9,11 @@ import {
   resolveNetLabelBinding,
 } from "@icm/derived";
 import { instanceParameterContract } from "@icm/devices";
-import { planEnsureNamedNet, type SchematicEdit } from "@icm/edit-engine";
+import {
+  planEnsureNamedNet,
+  planEnsureNamedRoute,
+  type SchematicEdit,
+} from "@icm/edit-engine";
 import {
   deriveStableId,
   renamedLabelFormat,
@@ -109,7 +113,7 @@ export function createPropertyEditPlanner({
         : null;
     }
     const labelId = existingLabel?.id ?? `net-label-${route.id}`;
-    const namedNetPlan = planEnsureNamedNet(document, {
+    const namedNetPlan = planEnsureNamedRoute(document, route.id, {
       candidateNetId: net.id,
       name,
       evidenceId:
@@ -287,7 +291,7 @@ export function createPropertyEditPlanner({
           evidence.owner.kind === "net-label" &&
           evidence.owner.annotationId === annotation.id,
       );
-      const namedNetPlan = planEnsureNamedNet(document, {
+      const request = {
         candidateNetId: net.id,
         name,
         evidenceId:
@@ -299,9 +303,17 @@ export function createPropertyEditPlanner({
             net.id,
             annotation.id,
           ),
-        owner: { kind: "net-label", annotationId: annotation.id },
+        owner: { kind: "net-label" as const, annotationId: annotation.id },
         ...(labelClaim ? { scope: labelClaim.scope } : {}),
-      });
+      };
+      const route = document.routes.find((candidate) =>
+        annotation.anchor.kind === "route"
+          ? candidate.id === annotation.anchor.routeId
+          : candidate.netId === net.id,
+      );
+      const namedNetPlan = route
+        ? planEnsureNamedRoute(document, route.id, request)
+        : planEnsureNamedNet(document, request);
       if (!namedNetPlan.ok) {
         setStatus(namedNetPlan.message);
         return null;

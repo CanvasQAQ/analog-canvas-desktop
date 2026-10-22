@@ -32,6 +32,7 @@ export interface WireSource extends WireEndpointGeometry {
   netId: string | null;
   preludeEdits: SchematicEdit[];
   routePresentation?: RoutePresentation;
+  members?: ReadonlyArray<{ id: string; netId: string; name?: string }>;
 }
 
 export interface WireCommitProposal {
@@ -211,6 +212,11 @@ export function proposeWireCommit(
   suffixOrIds: number | { routeId: string; newNetId: string },
   draft: WireDraftOptions = {},
 ): WireCommitProposal {
+  if (from.members && !to.members) to = promoteFreeBusAnchor(to, from.members);
+  if (to.members && !from.members)
+    from = promoteFreeBusAnchor(from, to.members);
+  if (from.members?.length !== to.members?.length)
+    throw new Error("Wire endpoints have incompatible signal widths");
   const ids =
     typeof suffixOrIds === "number"
       ? {
@@ -228,7 +234,8 @@ export function proposeWireCommit(
         ? "power-rail"
         : undefined;
   // Only an identity hint; the completed endpoint graph derives membership.
-  const netId = from.netId ?? to.netId ?? ids.newNetId;
+  const netId =
+    from.members?.[0]?.netId ?? from.netId ?? to.netId ?? ids.newNetId;
   const routeId = ids.routeId;
   const routed = compileWireDraft(
     from,
@@ -244,6 +251,17 @@ export function proposeWireCommit(
   );
   // Direct contact has no path to persist and remains an explicit connection.
   if (routed.points.length < 2) {
+    if (from.members && to.members) {
+      from.members.forEach((member, index) =>
+        edits.push({
+          kind: "connect_endpoints",
+          from: { ...from.endpoint, memberId: member.id },
+          to: { ...to.endpoint, memberId: to.members![index]!.id },
+          newNetId: member.netId,
+        }),
+      );
+      return { routeId, netId, edits };
+    }
     edits.push({
       kind: "connect_endpoints",
       from: from.endpoint,
@@ -261,14 +279,103 @@ export function proposeWireCommit(
       end: to.endpoint,
       bends: routed.waypoints,
       modes: routed.segmentModes,
+      ...(from.members && to.members
+        ? {
+            members: from.members.map((member, index) => ({
+              id: `${routeId}-member-${index}`,
+              netId: member.netId,
+              startMemberId: member.id,
+              endMemberId: to.members![index]!.id,
+            })),
+          }
+        : {}),
       ...(presentation ? { presentation } : {}),
     }),
   });
+  if (
+    !from.members &&
+    !to.members &&
+    (from.endpoint.memberId || to.endpoint.memberId)
+  ) {
+    const routeEdit = edits.at(-1)!;
+    if (routeEdit.kind === "set_route_path")
+      edits.push({
+        kind: "upsert_schematic_annotation",
+        annotation: {
+          id: `${routeId}-selector`,
+          kind: "net-label",
+          netId,
+          binding: {
+            kind: "net-name",
+            netId,
+            memberEndpoint: from.endpoint.memberId
+              ? from.endpoint
+              : to.endpoint,
+          },
+          anchor: {
+            kind: "route",
+            routeId,
+            legId: routeEdit.route.legs[0]!.id,
+            t: 0.25,
+            normalOffset: 10,
+            direction: "forward",
+            orientation: "horizontal",
+            fallbackPosition: from.connection.contactPoint,
+          },
+          alignment: "start",
+          rotation: 0,
+          locked: false,
+        },
+      });
+  }
   return { routeId, netId, edits };
 }
 
+export function isFreeWireAnchor(source: WireSource): boolean {
+  const endpoint = source.endpoint;
+  return (
+    endpoint.kind === "junction" &&
+    source.preludeEdits.some(
+      (edit) =>
+        edit.kind === "add_junction" &&
+        edit.junctionId === endpoint.junctionId &&
+        !edit.split,
+    )
+  );
+}
+
+function promoteFreeBusAnchor(
+  source: WireSource,
+  members: NonNullable<WireSource["members"]>,
+): WireSource {
+  const endpoint = source.endpoint;
+  if (endpoint.kind !== "junction" || !isFreeWireAnchor(source))
+    throw new Error(
+      "Select one bus member before connecting a scalar endpoint",
+    );
+  return {
+    ...source,
+    members,
+    netId: members[0]!.netId,
+    preludeEdits: source.preludeEdits.map((edit) =>
+      edit.kind === "add_junction" && edit.junctionId === endpoint.junctionId
+        ? {
+            ...edit,
+            netId: members[0]!.netId,
+            createNet: true,
+            members: members.map((member) => ({
+              id: member.id,
+              netId: member.netId,
+            })),
+          }
+        : edit,
+    ),
+  };
+}
+
 function sameEndpoint(left: RouteEndpoint, right: RouteEndpoint): boolean {
-  if (left.kind !== right.kind) return false;
+  if (left.kind !== right.kind || left.memberId !== right.memberId)
+    return false;
   switch (left.kind) {
     case "terminal":
       return (
@@ -349,6 +456,8 @@ export function proposeWireCommitThroughContacts(
   suffixOrIds: number | { routeId: string; newNetId: string },
   draft: WireDraftOptions = {},
 ): WireCommitProposal {
+  if (from.members || to.members)
+    return proposeWireCommit(from, to, manualWaypoints, suffixOrIds, draft);
   const path = compileWireDraft(
     from,
     to,
@@ -372,6 +481,7 @@ export function proposeWireCommitThroughContacts(
   }, 0);
   const ordered = contacts
     .flatMap((source): OrderedWireContact[] => {
+      if (source.members) return [];
       if (
         sameEndpoint(source.endpoint, from.endpoint) ||
         sameEndpoint(source.endpoint, to.endpoint) ||
@@ -516,6 +626,10 @@ export function createRouteWireAnchor(
   resolver?: SymbolResolver,
 ): WireSource {
   const junctionId = ids.junctionId;
+  const members = route.members?.map((member) => ({
+    id: member.id,
+    netId: member.netId,
+  }));
   const splitPoint = routeTapLanding(
     resolver
       ? resolveRouteGeometry(document, resolver, route)?.segments[segmentIndex]
@@ -526,6 +640,7 @@ export function createRouteWireAnchor(
   return {
     endpoint: { kind: "junction", junctionId },
     netId: route.netId,
+    ...(members ? { members } : {}),
     connection: {
       endpoint: { kind: "junction", junctionId },
       contactPoint: splitPoint,
@@ -541,6 +656,7 @@ export function createRouteWireAnchor(
         kind: "add_junction",
         junctionId,
         netId: route.netId,
+        ...(members ? { members } : {}),
         position: splitPoint,
         split: {
           routeId: route.id,

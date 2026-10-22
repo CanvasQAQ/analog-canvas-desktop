@@ -73,6 +73,26 @@ export function applyRouteGeometryEdit(
         };
       }
       const route = routeFromEdit(edit);
+      const mapping = (value: RouteBranch) =>
+        value.members?.map(({ id, startMemberId, endMemberId }) => ({
+          id,
+          startMemberId,
+          endMemberId,
+        }));
+      if (
+        existing?.members &&
+        JSON.stringify(mapping(existing)) !== JSON.stringify(mapping(route))
+      ) {
+        return {
+          ok: false,
+          rejection: reject(
+            "EDIT_PRECONDITION",
+            "Connected bus member mapping cannot be changed without an explicit migration",
+            [],
+            [route.id],
+          ),
+        };
+      }
       if (!route.presentation && existing?.presentation) {
         route.presentation = existing.presentation;
       }
@@ -113,6 +133,9 @@ export function applyRouteGeometryEdit(
         normalized.segmentModes,
         `set-route-${draft.revision}`,
       );
+      if (route.members)
+        normalizedRoute.members = structuredClone(route.members);
+      else delete normalizedRoute.members;
       if (route.presentation) normalizedRoute.presentation = route.presentation;
       if (existingIndex >= 0) draft.routes[existingIndex] = normalizedRoute;
       else draft.routes.push(normalizedRoute);

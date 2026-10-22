@@ -1,5 +1,6 @@
 import {
-  routeEndpoints,
+  routeElectricalConnections,
+  junctionElectricalEndpoints,
   type CircuitProject,
   type RouteEndpoint,
   type SchematicDocument,
@@ -13,7 +14,9 @@ import {
 } from "@icm/derived";
 import { createProjectSymbolResolver, type SymbolResolver } from "@icm/symbols";
 
-type Endpoint = { terminal: [string, string] } | { junction: string };
+type Endpoint = ({ terminal: [string, string] } | { junction: string }) & {
+  memberId?: string;
+};
 type Identity = { id: string; at: Endpoint | null };
 export interface SourceConnectivity {
   nets: Identity[];
@@ -21,10 +24,25 @@ export interface SourceConnectivity {
 }
 const encode = (e: RouteEndpoint): Endpoint =>
   e.kind === "terminal"
-    ? { terminal: [e.instanceId, e.pinName] }
-    : { junction: e.junctionId };
+    ? {
+        terminal: [e.instanceId, e.pinName],
+        ...(e.memberId ? { memberId: e.memberId } : {}),
+      }
+    : {
+        junction: e.junctionId,
+        ...(e.memberId ? { memberId: e.memberId } : {}),
+      };
 function decode(e: Endpoint): RouteEndpoint {
-  if (!e || typeof e !== "object" || Object.keys(e).length !== 1)
+  if (
+    !e ||
+    typeof e !== "object" ||
+    Object.keys(e).some(
+      (key) => !["terminal", "junction", "memberId"].includes(key),
+    ) ||
+    "terminal" in e === "junction" in e ||
+    (e.memberId !== undefined &&
+      (typeof e.memberId !== "string" || !e.memberId))
+  )
     throw new Error("A connection endpoint specifies one terminal or junction");
   if (
     "terminal" in e &&
@@ -36,9 +54,14 @@ function decode(e: Endpoint): RouteEndpoint {
       kind: "terminal",
       instanceId: e.terminal[0],
       pinName: e.terminal[1],
+      ...(e.memberId ? { memberId: e.memberId } : {}),
     };
   if ("junction" in e && typeof e.junction === "string")
-    return { kind: "junction", junctionId: e.junction };
+    return {
+      kind: "junction",
+      junctionId: e.junction,
+      ...(e.memberId ? { memberId: e.memberId } : {}),
+    };
   throw new Error("Invalid connection endpoint");
 }
 
@@ -56,7 +79,8 @@ export function captureSourceConnectivity(
         graph.add(endpointKey(e));
       }
     for (const route of document.routes)
-      graph.join(routeEndpoints(route).map(endpointKey));
+      for (const edge of routeElectricalConnections(route))
+        graph.join(edge.endpoints.map(endpointKey));
     const contacts: Endpoint[][] = [];
     for (const contact of deriveDocumentContactEvidence(document, resolver)
       .contacts) {
@@ -146,14 +170,24 @@ export function materializeSourceConnectivity(
   // a source edit removes the last physical path. These add nodes, never edges.
   for (const terminal of document.netlist?.terminals ?? [])
     for (const instanceId of terminal.interfaceInstanceIds)
-      add({ kind: "terminal", instanceId, pinName: "P" });
+      if (terminal.signal && terminal.signal.members.length > 1) {
+        for (const member of terminal.signal.members)
+          add({
+            kind: "terminal",
+            instanceId,
+            pinName: "P",
+            memberId: member.id,
+          });
+      } else add({ kind: "terminal", instanceId, pinName: "P" });
   for (const instance of document.instances)
     if (instance.mosBulkBinding)
       add({ kind: "terminal", instanceId: instance.id, pinName: "B" });
   for (const junction of document.junctions)
-    add({ kind: "junction", junctionId: junction.id });
+    for (const member of junctionElectricalEndpoints(junction))
+      add(member.endpoint);
   for (const route of document.routes)
-    graph.join(routeEndpoints(route).map(add));
+    for (const edge of routeElectricalConnections(route))
+      graph.join(edge.endpoints.map(add));
   for (const kind of ["contacts", "unrouted"] as const) {
     if (!Array.isArray(source.connections[kind]))
       throw new Error(`connections.${kind} must be an array`);
@@ -206,8 +240,18 @@ export function materializeSourceConnectivity(
     }
     return netForRoot.get(root)!;
   };
-  for (const route of document.routes)
-    route.netId = assign(endpointKey(route.start), route.id);
+  for (const route of document.routes) {
+    const edges = routeElectricalConnections(route);
+    for (const edge of edges) {
+      const netId = assign(
+        endpointKey(edge.endpoints[0]),
+        edge.memberId ?? route.id,
+      );
+      const member = route.members?.find((item) => item.id === edge.memberId);
+      if (member) member.netId = netId;
+    }
+    route.netId = assign(endpointKey(edges[0]!.endpoints[0]), route.id);
+  }
   for (const [key] of endpoints) assign(key, key.replaceAll(":", "-"));
   const netByEndpoint = new Map(
     [...endpoints.keys()].map((key) => [key, netForRoot.get(graph.root(key))!]),
@@ -225,10 +269,22 @@ export function materializeSourceConnectivity(
         return terminal;
       }),
   }));
-  for (const junction of document.junctions)
-    junction.netId = netByEndpoint.get(
-      endpointKey({ kind: "junction", junctionId: junction.id }),
-    )!;
+  for (const junction of document.junctions) {
+    if (junction.members) {
+      for (const member of junction.members)
+        member.netId = netByEndpoint.get(
+          endpointKey({
+            kind: "junction",
+            junctionId: junction.id,
+            memberId: member.id,
+          }),
+        )!;
+      junction.netId = junction.members[0]!.netId;
+    } else
+      junction.netId = netByEndpoint.get(
+        endpointKey({ kind: "junction", junctionId: junction.id }),
+      )!;
+  }
   const alias = (id: string) => aliases.get(id) ?? id;
   // Names and interfaces attach to stable network anchors, independently of
   // visual label placement. A historical label may deliberately be positioned
@@ -240,6 +296,24 @@ export function materializeSourceConnectivity(
   }
   for (const terminal of document.netlist?.terminals ?? []) {
     const owner = terminal.interfaceInstanceIds[0];
+    if (terminal.signal) {
+      for (const member of terminal.signal.members)
+        member.netId =
+          (owner
+            ? netByEndpoint.get(
+                endpointKey({
+                  kind: "terminal",
+                  instanceId: owner,
+                  pinName: "P",
+                  ...(terminal.signal.members.length > 1
+                    ? { memberId: member.id }
+                    : {}),
+                }),
+              )
+            : undefined) ?? alias(member.netId);
+      terminal.netId = terminal.signal.members[0]!.netId;
+      continue;
+    }
     terminal.netId =
       (owner
         ? netByEndpoint.get(
@@ -247,8 +321,14 @@ export function materializeSourceConnectivity(
           )
         : undefined) ?? alias(terminal.netId);
   }
-  for (const evidence of document.connectivityEvidence)
+  for (const evidence of document.connectivityEvidence) {
     evidence.netId = alias(evidence.netId);
+    if (evidence.kind === "name-claim" && evidence.signal) {
+      for (const member of evidence.signal.members)
+        member.netId = alias(member.netId);
+      evidence.netId = evidence.signal.members[0]!.netId;
+    }
+  }
   for (const instance of document.instances)
     if (instance.mosBulkBinding)
       instance.mosBulkBinding.netId =

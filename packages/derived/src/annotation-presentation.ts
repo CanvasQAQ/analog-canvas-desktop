@@ -74,11 +74,13 @@ export function isSchematicAnnotationVisible(
   annotation: Annotation,
   logicalNets?: ResolvedDocumentLogicalNets,
   resolvedText?: RichTextDocument,
+  resolver?: SymbolResolver,
 ): boolean {
   if (annotation.visible === false) return false;
   if (
     !flattenRichText(
-      resolvedText ?? resolveAnnotationText(document, annotation, logicalNets),
+      resolvedText ??
+        resolveAnnotationText(document, annotation, logicalNets, resolver),
     ).trim()
   ) {
     return false;
@@ -148,7 +150,8 @@ export function resolveAnnotationPresentation(
   const sizeScale = annotation.sizeScale ?? 1;
   const fontSize = annotationFontSize(annotation, styleProfile) * sizeScale;
   const text =
-    resolvedText ?? resolveAnnotationText(document, annotation, logicalNets);
+    resolvedText ??
+    resolveAnnotationText(document, annotation, logicalNets, resolver);
   const metrics = {
     ...richTextMetrics(styleProfile, "label", sizeScale),
     fontSize,

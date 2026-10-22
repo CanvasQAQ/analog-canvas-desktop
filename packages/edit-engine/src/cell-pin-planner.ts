@@ -1,7 +1,12 @@
 // Cell Pins: adding one, the supply-edge rule for a supply Pin, VDD as a
 // Cell Pin or a Global name, and a Pin's direction and order.
 import type { Annotation, CircuitProject, SchematicDocument } from "@icm/model";
-import { deriveStableId, foldNetName, projectCellInterface } from "@icm/model";
+import {
+  deriveStableId,
+  foldNetName,
+  projectCellInterface,
+  parseSignalExpression,
+} from "@icm/model";
 import {
   derivePowerRailComponent,
   resolveDocumentLogicalNets,
@@ -102,11 +107,65 @@ export function planCreateCellPin(
     connectionEdits: DocumentEdits;
     terminal: NonNullable<SchematicDocument["netlist"]>["terminals"][number];
     annotation?: Annotation;
+    signalExpression?: string | undefined;
   },
 ): ProjectStructureEdit[] {
   const document = requireDocument(project, documentId);
   if (!document.netlist)
     throw new Error(`Cell has no interface: ${documentId}`);
+  if (input.signalExpression !== undefined) {
+    const names = parseSignalExpression(input.signalExpression);
+    if (
+      names.length > 1 &&
+      input.connectionEdits.some(
+        (edit) =>
+          edit.kind !== "connect_endpoints" ||
+          [edit.from, edit.to].some(
+            (endpoint) =>
+              endpoint.kind !== "terminal" ||
+              endpoint.instanceId !== input.instance.id ||
+              endpoint.pinName !== "P",
+          ),
+      )
+    )
+      throw new Error(
+        "A vector Cell Pin cannot acquire scalar contacts during placement",
+      );
+    const members = names.map((name, index) => ({
+      id: deriveStableId("signal-member", input.terminal.id, String(index)),
+      name,
+      netId:
+        index === 0
+          ? input.terminal.netId
+          : deriveStableId("signal-net", input.terminal.id, String(index)),
+    }));
+    return planCreateCellPin(project, documentId, {
+      ...input,
+      signalExpression: undefined,
+      terminal: {
+        ...input.terminal,
+        name: input.signalExpression.trim(),
+        signal: { expression: input.signalExpression.trim(), members },
+      },
+      connectionEdits:
+        names.length === 1 && input.connectionEdits.length
+          ? input.connectionEdits
+          : members.map((member) => {
+              const endpoint = {
+                kind: "terminal" as const,
+                instanceId: input.instance.id,
+                pinName: "P",
+                ...(members.length > 1 ? { memberId: member.id } : {}),
+              };
+              return {
+                kind: "connect_endpoints",
+                from: endpoint,
+                to: endpoint,
+                newNetId: member.netId,
+              };
+            }),
+    });
+  }
   if (
     input.terminal.interfaceInstanceIds.length !== 1 ||
     input.terminal.interfaceInstanceIds[0] !== input.instance.id

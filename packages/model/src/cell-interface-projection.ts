@@ -1,7 +1,43 @@
 import { foldNetName } from "./net-name.js";
-import type { CellNetlistInterface } from "./schema.js";
+import type { CellNetlistInterface, CellNetlistTerminal } from "./schema.js";
 
 export type CellPortDirection = "input" | "output" | "inout" | "passive";
+
+/** Scalar interface view for electrical consumers; symbols keep the aggregate declarations. */
+export function scalarCellTerminals(
+  netlist: CellNetlistInterface | undefined,
+): Array<
+  CellNetlistTerminal & { aggregateName: string; memberId: string | undefined }
+> {
+  return (netlist?.terminals ?? []).flatMap<
+    CellNetlistTerminal & {
+      aggregateName: string;
+      memberId: string | undefined;
+    }
+  >((terminal) =>
+    terminal.signal && terminal.signal.members.length > 1
+      ? terminal.signal.members.map((member) => ({
+          ...terminal,
+          id: member.id,
+          name: member.name,
+          netId: member.netId,
+          signal: undefined,
+          aggregateName: terminal.name,
+          memberId: member.id,
+        }))
+      : [{ ...terminal, aggregateName: terminal.name, memberId: undefined }],
+  );
+}
+
+export function projectScalarCellInterface(
+  netlist: CellNetlistInterface | undefined,
+) {
+  return projectCellInterface(
+    netlist
+      ? { ...netlist, terminals: scalarCellTerminals(netlist) }
+      : undefined,
+  );
+}
 
 /**
  * One consumer-facing Cell port derived from independently authored canvas

@@ -7,14 +7,18 @@ import {
 } from "react";
 
 import type { DerivedRect, GridRect } from "@icm/model";
-import { flattenRichText, semanticTextDocument } from "@icm/model";
+import {
+  flattenRichText,
+  parseSignalExpression,
+  semanticTextDocument,
+} from "@icm/model";
 
 import {
   canvasInsetsFromOverlays,
   type CanvasInsets,
 } from "../../canvas/fit-view";
 import { RichTextEditor } from "./rich-text-editor";
-import type { TextEditingSession } from "./text-editing";
+import { spliceVisibleEdit, type TextEditingSession } from "./text-editing";
 
 type TextEditingUpdate = Partial<
   Pick<TextEditingSession, "content" | "sizeScale" | "alignment">
@@ -287,12 +291,42 @@ export function CanvasTextEditorOverlay({
         bottom: obscuredPixels.bottom / pixelsPerUnit,
       }
     : NO_INSETS;
+  const signalPreview = (() => {
+    const visible = flattenRichText(session.content);
+    if (
+      !visible.trim() ||
+      !["cell-terminal-name", "net-name"].includes(session.bindingKind ?? "") ||
+      session.displayAlias ||
+      (!session.signalExpression && visible === session.initialNameText)
+    )
+      return undefined;
+    try {
+      const expression =
+        session.signalExpression && session.initialNameText !== undefined
+          ? spliceVisibleEdit(
+              session.signalExpression,
+              session.initialNameText,
+              visible,
+            )
+          : visible;
+      const members = parseSignalExpression(expression);
+      return { members, error: undefined };
+    } catch (error) {
+      return {
+        members: undefined,
+        error:
+          error instanceof Error ? error.message : "Invalid signal expression",
+      };
+    }
+  })();
   const frame = resolveCanvasTextEditorFrame(
     bounds,
     viewBox,
     session.sizeScale,
     pixelsPerUnit,
-    measuredLayoutHeight,
+    measuredLayoutHeight === null
+      ? null
+      : measuredLayoutHeight + (signalPreview ? 48 : 0),
     obscured,
   );
   const inlineFrame = resolveInlineTextEditorFrame(
@@ -396,7 +430,9 @@ export function CanvasTextEditorOverlay({
           onChange={(content) => onUpdate({ content })}
           onSizeChange={(sizeScale) => onUpdate({ sizeScale })}
           onAlignmentChange={(alignment) => onUpdate({ alignment })}
-          onCommit={onCommit}
+          onCommit={() => {
+            if (!signalPreview?.error) onCommit();
+          }}
           onCancel={onCancel}
           {...(onEscape ? { onEscape } : {})}
           onDelete={onDelete}
@@ -414,6 +450,20 @@ export function CanvasTextEditorOverlay({
             : {})}
           onLayoutHeightChange={handleLayoutHeightChange}
         />
+        {signalPreview ? (
+          <div
+            className="signal-expression-preview"
+            role={signalPreview.error ? "alert" : "status"}
+            aria-label={
+              session.bindingKind === "net-name"
+                ? "Net Label signal preview"
+                : "Cell Pin signal preview"
+            }
+          >
+            {signalPreview.error ??
+              `${signalPreview.members!.length} ${signalPreview.members!.length === 1 ? "member" : "members"} · ${signalPreview.members!.slice(0, 8).join(" → ")}${signalPreview.members!.length > 8 ? " → …" : ""}`}
+          </div>
+        ) : null}
       </foreignObject>
     </g>
   );

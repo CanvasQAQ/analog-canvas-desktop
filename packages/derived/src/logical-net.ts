@@ -1,5 +1,10 @@
 import { registerDocumentCache } from "./document-caches.js";
-import { foldNetName, isFrozenSnapshot } from "@icm/model";
+import {
+  foldNetName,
+  isFrozenSnapshot,
+  scalarCellTerminals,
+  scalarConnectivityEvidence,
+} from "@icm/model";
 import type { SchematicDocument } from "@icm/model";
 
 export type LogicalNetConflictCode =
@@ -106,13 +111,14 @@ function unionGroups(
 export function resolveDocumentLogicalNets(
   document: SchematicDocument,
 ): ResolvedDocumentLogicalNets {
+  const electricalEvidence = scalarConnectivityEvidence(document);
   const baseNetIds = document.nets
     .map((net) => net.id)
     .sort((left, right) => left.localeCompare(right, "en"));
   const set = new DisjointSet(baseNetIds);
 
   const byScopedName = new Map<string, string[]>();
-  const formalNames = (document.netlist?.terminals ?? []).map((terminal) => {
+  const formalNames = scalarCellTerminals(document.netlist).map((terminal) => {
     const interfaceInstances = terminal.interfaceInstanceIds.flatMap(
       (instanceId) => {
         const instance = document.instances.find(
@@ -126,7 +132,7 @@ export function resolveDocumentLogicalNets(
           (candidate) => candidate.id === terminal.interfaceAnnotationId,
         )
       : undefined;
-    const matchingGlobalClaim = document.connectivityEvidence.some(
+    const matchingGlobalClaim = electricalEvidence.some(
       (evidence) =>
         evidence.kind === "name-claim" &&
         evidence.netId === terminal.netId &&
@@ -153,7 +159,7 @@ export function resolveDocumentLogicalNets(
       powerDomain,
     };
   });
-  for (const evidence of document.connectivityEvidence) {
+  for (const evidence of electricalEvidence) {
     if (evidence.kind !== "name-claim") continue;
     const key = `${evidence.scope}\u0000${foldNetName(evidence.name)}`;
     const ids = byScopedName.get(key) ?? [];
@@ -180,7 +186,7 @@ export function resolveDocumentLogicalNets(
     .map((members): ResolvedLogicalNet => {
       members.sort((left, right) => left.localeCompare(right, "en"));
       const memberSet = new Set(members);
-      const evidence = document.connectivityEvidence
+      const evidence = electricalEvidence
         .filter((item) => memberSet.has(item.netId))
         .sort((left, right) => left.id.localeCompare(right.id, "en"));
       const memberFormalNames = formalNames.filter((item) =>
