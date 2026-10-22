@@ -1,12 +1,15 @@
 // Accounts blocked from the Gallery for collecting it in bulk: who, from
-// where, when, and which trap circuit gave them away. A block holds by the
-// account and by its email, so a new account on the same address stays
-// blocked. Records outlive the account and an unblock: they are the Owner's
-// evidence (docs/specs/community-gallery.md#crawlers-ai-and-floods).
+// where, when, and which trap circuit gave them away. A program is blocked
+// at its first trap; a browser only once it has read the circuits of two
+// different traps within a day, since a page left open across a deploy can
+// show one (2026-10-22). A block holds by the account and by its email, so a
+// new account on the same address stays blocked. Records outlive the
+// account and an unblock: they are the Owner's evidence
+// (docs/specs/community-gallery.md#crawlers-ai-and-floods).
 
 import type { SqlStorage } from "./gallery-store";
 
-export const ACCOUNT_BLOCKS_TABLE = `
+const ACCOUNT_BLOCKS_TABLE = `
   CREATE TABLE IF NOT EXISTS account_blocks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
@@ -24,6 +27,61 @@ export const ACCOUNT_BLOCKS_TABLE = `
   )
 `;
 
+/** Traps whose circuit a browser read, per account, for the day's count. */
+const TRAP_READS_TABLE = `
+  CREATE TABLE IF NOT EXISTS trap_reads (
+    user_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    read_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, entry_id)
+  ) WITHOUT ROWID
+`;
+
+/** How many different traps a browser reads within a day before a block. */
+export const BROWSER_TRAP_READS = 2;
+const TRAP_READ_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Why an account was blocked. */
+export type BlockReason = "script" | "two-traps";
+
+export function ensureAccountBlockTables(sql: SqlStorage): void {
+  sql.exec(ACCOUNT_BLOCKS_TABLE);
+  sql.exec(TRAP_READS_TABLE);
+  try {
+    // Additive upgrade: blocks recorded before reasons existed.
+    sql.exec("ALTER TABLE account_blocks ADD COLUMN reason TEXT");
+  } catch {
+    // Column already present.
+  }
+}
+
+/**
+ * Notes that a browser read a trap's circuit and returns how many different
+ * traps the account has read within the day.
+ */
+export function noteTrapRead(
+  sql: SqlStorage,
+  userId: string,
+  entryId: string,
+  at: Date,
+): number {
+  const since = new Date(at.getTime() - TRAP_READ_WINDOW_MS).toISOString();
+  sql.exec("DELETE FROM trap_reads WHERE read_at < ?", since);
+  sql.exec(
+    `INSERT INTO trap_reads(user_id, entry_id, read_at) VALUES (?, ?, ?)
+     ON CONFLICT(user_id, entry_id) DO UPDATE SET read_at = excluded.read_at`,
+    userId,
+    entryId.slice(0, 64),
+    at.toISOString(),
+  );
+  return sql
+    .exec<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM trap_reads WHERE user_id = ?",
+      userId,
+    )
+    .one().count;
+}
+
 export interface AccountBlockRow {
   id: number;
   user_id: string;
@@ -38,6 +96,7 @@ export interface AccountBlockRow {
   user_agent: string | null;
   notified_at: string | null;
   unblocked_at: string | null;
+  reason: BlockReason | null;
 }
 
 export interface BlockEvidence {
@@ -81,13 +140,14 @@ export function recordBlock(
   sql: SqlStorage,
   account: BlockedAccount,
   evidence: BlockEvidence,
+  reason: BlockReason,
   at: string,
 ): boolean {
   if (isBlocked(sql, account.id, account.email)) return false;
   sql.exec(
     `INSERT INTO account_blocks(user_id, email, display_name, provider,
-       blocked_at, entry_id, path, ip, country, user_agent)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       blocked_at, entry_id, path, ip, country, user_agent, reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     account.id,
     account.email,
     account.displayName,
@@ -98,6 +158,7 @@ export function recordBlock(
     evidence.ip?.slice(0, 64) ?? null,
     evidence.country?.slice(0, 8) ?? null,
     evidence.userAgent?.slice(0, 512) ?? null,
+    reason,
   );
   return true;
 }
@@ -132,6 +193,7 @@ export function listBlocks(sql: SqlStorage) {
       userAgent: row.user_agent,
       notifiedAt: row.notified_at,
       unblockedAt: row.unblocked_at,
+      reason: row.reason,
     }));
 }
 
@@ -168,6 +230,11 @@ export function blockNotice(row: AccountBlockRow): {
       `登录方式：${row.provider}`,
       `账号 ID：${row.user_id}`,
       `时间（UTC）：${row.blocked_at}`,
+      `触发方式：${
+        row.reason === "two-traps"
+          ? "浏览器在 24 小时内读取了 2 个不同蜜罐电路的内容"
+          : "程序访问（User-Agent 不是浏览器）读到蜜罐"
+      }`,
       `读取的蜜罐：${row.entry_id}（${row.path}）`,
       `IP：${row.ip ?? "（未知）"}${row.country ? `，国家/地区：${row.country}` : ""}`,
       `User-Agent：${row.user_agent ?? "（无）"}`,

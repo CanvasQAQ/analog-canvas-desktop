@@ -16,11 +16,13 @@
 // tests never touch the network.
 
 import {
-  ACCOUNT_BLOCKS_TABLE,
+  BROWSER_TRAP_READS,
   blockNotice,
+  ensureAccountBlockTables,
   isBlocked,
   listBlocks,
   markNotified,
+  noteTrapRead,
   recordBlock,
   unblock,
   unsentNotices,
@@ -548,7 +550,7 @@ export class AuthDO {
         last_used_at TEXT
       ) WITHOUT ROWID
     `);
-    this.sql.exec(ACCOUNT_BLOCKS_TABLE);
+    ensureAccountBlockTables(this.sql);
     this.ensureAiSeats(state);
   }
 
@@ -665,13 +667,15 @@ export class AuthDO {
   // --- Gallery blocks ---------------------------------------------------
 
   /**
-   * Blocks the account that read a trap circuit, unless the Owner's own
-   * tools may read in bulk (`readsTraps` in gallery-traps.ts), and tells
-   * the Owner at once; the scheduled pass retries an unsent notice.
+   * A trap circuit read (`trapReadKind` in gallery-traps.ts): a program's
+   * blocks the account at once, a browser's once it has read two different
+   * traps within the day. Never the Owner's own tools, which may read in
+   * bulk. The Owner is told at once; the scheduled pass retries an unsent
+   * notice.
    */
   private async blockAccount(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => null)) as
-      ({ userId?: unknown } & Partial<BlockEvidence>) | null;
+      ({ userId?: unknown; kind?: unknown } & Partial<BlockEvidence>) | null;
     if (typeof body?.userId !== "string" || typeof body.entryId !== "string")
       return Response.json({ error: "invalid-block" }, { status: 400 });
     const row = this.sql
@@ -680,6 +684,13 @@ export class AuthDO {
     if (!row) return Response.json({ error: "not-found" }, { status: 404 });
     const user = this.publicUser(row);
     if (user.isOwner || user.isAdmin || user.seat || user.role === "moderator")
+      return noStoreJson({ blocked: false });
+    const script = body.kind !== "read";
+    if (
+      !script &&
+      noteTrapRead(this.sql, user.id, body.entryId, this.now()) <
+        BROWSER_TRAP_READS
+    )
       return noStoreJson({ blocked: false });
     const text = (value: unknown) =>
       typeof value === "string" && value.length > 0 ? value : null;
@@ -693,6 +704,7 @@ export class AuthDO {
         country: text(body.country),
         userAgent: text(body.userAgent),
       },
+      script ? "script" : "two-traps",
       this.now().toISOString(),
     );
     if (created) await this.sendBlockNotices();

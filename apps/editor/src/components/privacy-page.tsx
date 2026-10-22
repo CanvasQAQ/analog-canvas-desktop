@@ -245,13 +245,14 @@ export function PrivacyPage() {
           <li>
             <strong>Bulk collection</strong>: the Gallery&rsquo;s lists hold a
             few circuits the site never shows, which only a program reading the
-            Gallery in bulk opens. An account that opens one is blocked from the
-            Gallery. The site keeps a record of it (email address, display name
-            and sign-in method, with the time, the IP address, country and
-            browser identification of that request) and emails it to the
-            site&rsquo;s operator. The record is kept, also after the account is
-            deleted, as evidence for enforcing the usage policy. Write to{" "}
-            {contact} if you think a block is a mistake.
+            Gallery in bulk opens. An account that reads one with a program, or
+            opens two of them within a day, is blocked from the Gallery. The
+            site keeps a record of it (email address, display name and sign-in
+            method, with the time, the IP address, country and browser
+            identification of that request) and emails it to the site&rsquo;s
+            operator. The record is kept, also after the account is deleted, as
+            evidence for enforcing the usage policy. Write to {contact} if you
+            think a block is a mistake.
           </li>
           <li>
             <strong>Backups</strong> of the Gallery and Cloud Projects, with the
