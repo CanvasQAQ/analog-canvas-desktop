@@ -242,13 +242,6 @@ export function applyCellSignalMigration(
       const matches = (endpoint: { instanceId?: string; pinName?: string }) =>
         endpoint.instanceId === target.instanceId &&
         endpoint.pinName === target.pinName;
-      if (
-        migration.members.length > 1 &&
-        document.noConnects.some((item) => matches(item.endpoint))
-      )
-        throw new Error(
-          `Clear NoConnect on ${target.instanceId}.${target.pinName} before converting to an aggregate; member NoConnect is unsupported`,
-        );
       migrateSignalContacts(
         document,
         resolver,
@@ -270,9 +263,22 @@ export function applyCellSignalMigration(
             },
           ];
         });
-      for (const noConnect of document.noConnects)
-        if (matches(noConnect.endpoint))
-          noConnect.endpoint.pinName = target.nextName;
+      document.noConnects = document.noConnects.flatMap((noConnect) => {
+        if (!matches(noConnect.endpoint)) return [noConnect];
+        const id = noConnect.endpoint.memberId ?? previous[0]!.id;
+        if (!surviving.has(id)) return [];
+        const { memberId: _memberId, ...endpoint } = noConnect.endpoint;
+        return [
+          {
+            ...noConnect,
+            endpoint: {
+              ...endpoint,
+              pinName: target.nextName,
+              ...(migration.members.length > 1 ? { memberId: id } : {}),
+            },
+          },
+        ];
+      });
     }
     for (const instance of document.instances) {
       const symbolId = symbolUpdates.get(instance.id);

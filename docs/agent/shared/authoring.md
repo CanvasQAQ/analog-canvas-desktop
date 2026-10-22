@@ -315,8 +315,20 @@ members require an explicit choice; reordering never remaps by position. Set
 terminal or naming-claim ID to one member or `null`. Inspect the result before
 continuing; the mutation includes every affected caller in one transaction.
 Bus group copy uses the same selection and dependency rules as scalar copy,
-preserving ordered members, mappings, selector bindings and captured artwork.
-Member NoConnect authoring remains unsupported.
+preserving ordered members, mappings, selector bindings, member No Connects
+and captured artwork.
+
+`expand-net-labels` pairs an expression with explicit `routeIds` in order;
+choose distinct existing scalar branches, one per expanded name. It applies
+through the same Label authority in one undo unit.
+
+`set-no-connect` marks or clears an explicit endpoint set atomically. A bus
+endpoint requires `memberId`; connected members require `disconnect-pin` with
+that member first. Inspect the current members before choosing the set.
+
+Read-only `snapshot.traceNet` takes a scalar logical Net ID and optional
+concrete hierarchy path. Its frames include parent/child member IDs and names
+for bus boundaries; tracing does not change Project revisions or exports.
 
 ## Wiring
 

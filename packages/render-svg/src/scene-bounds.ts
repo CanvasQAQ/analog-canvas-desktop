@@ -25,7 +25,11 @@ import {
 import type { ResolvedSvgAnnotation } from "./annotation-render.js";
 import { signalFlowFormulaLocalBounds } from "./signal-flow-formula.js";
 import { inductorCouplingBounds } from "./inductor-coupling-render.js";
-import { busStrokeProfile, busTapMarks } from "./route-render.js";
+import {
+  busStrokeProfile,
+  busTapMarks,
+  noConnectMarkerLayouts,
+} from "./route-render.js";
 
 function symbolBounds(
   definition: SymbolDefinition,
@@ -276,6 +280,23 @@ export function deriveBounds(
   bounds.push(
     ...inductorCouplingBounds(document, resolver, profile, objectIds),
   );
+  // Member declarations extend beyond their shared pin. Measure the same
+  // upright names that the formal renderer paints, including cropped exports.
+  for (const mark of noConnectMarkerLayouts(
+    document,
+    resolver,
+    profile,
+    objectIds,
+  )) {
+    if (!mark.label) continue;
+    const radius = mark.halfExtent + mark.profile.strokes.normal / 2;
+    bounds.push(mark.label.bounds, {
+      x: mark.point.x - radius,
+      y: mark.point.y - radius,
+      width: 2 * radius,
+      height: 2 * radius,
+    });
+  }
   if (bounds.length === 0) {
     if (objectIds) throw new Error("Select visible objects before copying");
     return { x: 0, y: 0, width: 960, height: 640 };

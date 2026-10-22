@@ -72,7 +72,11 @@ export function createEndpointConnectivityClassifier(
     const formalBoundary = Boolean(
       logicalGroup &&
       document.netlist?.terminals.some((terminal) =>
-        logicalGroup.baseNetIds.includes(terminal.netId),
+        (
+          terminal.signal?.members.map((member) => member.netId) ?? [
+            terminal.netId,
+          ]
+        ).some((netId) => logicalGroup.baseNetIds.includes(netId)),
       ),
     );
     const globalSupply = Boolean(

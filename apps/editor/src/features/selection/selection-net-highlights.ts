@@ -28,7 +28,10 @@ export function selectionNetIds(
   const netIds = [
     ...document.routes
       .filter((route) => selection.routeIds.includes(route.id))
-      .map((route) => route.netId),
+      .flatMap(
+        (route) =>
+          route.members?.map((member) => member.netId) ?? [route.netId],
+      ),
     ...(instanceId
       ? document.nets
           .filter((net) =>
@@ -46,7 +49,10 @@ export function selectionNetIds(
       ),
     ...document.junctions
       .filter((junction) => selection.junctionIds.includes(junction.id))
-      .map((junction) => junction.netId),
+      .flatMap(
+        (junction) =>
+          junction.members?.map((member) => member.netId) ?? [junction.netId],
+      ),
     ...(selectedEndpoint
       ? [endpointNetId(document, selectedEndpoint.endpoint) ?? []].flat()
       : []),

@@ -186,6 +186,10 @@ One canonical reducer owns the canvas: `Idle`, `SymbolPlacement`,
   Repeated marks do nothing; connected pins require explicit disconnection.
 - Tool exit, Document change, leaving the canvas and camera changes clear the
   hover preview. Endpoint Properties retains its existing mark/clear actions.
+- Clicking an aggregate pin opens member Properties. The member picker displays
+  Connected, Unconnected or No Connect; explicit expressions mark/clear a set.
+  A member mark draws its full name beside the shared pin, without declaring
+  other members unused. Trace member uses the existing hierarchy trace panel.
 
 ## Selection alignment
 

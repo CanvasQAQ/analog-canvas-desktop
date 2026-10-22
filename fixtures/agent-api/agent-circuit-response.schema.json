@@ -2243,6 +2243,18 @@
                               },
                               "childNetId": {
                                 "$ref": "#/$defs/__schema1"
+                              },
+                              "parentMemberId": {
+                                "$ref": "#/$defs/__schema1"
+                              },
+                              "parentMemberName": {
+                                "type": "string"
+                              },
+                              "childMemberId": {
+                                "$ref": "#/$defs/__schema1"
+                              },
+                              "childMemberName": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -4976,6 +4988,9 @@
             "pinName": {
               "type": "string",
               "minLength": 1
+            },
+            "memberId": {
+              "$ref": "#/$defs/__schema1"
             }
           },
           "required": [

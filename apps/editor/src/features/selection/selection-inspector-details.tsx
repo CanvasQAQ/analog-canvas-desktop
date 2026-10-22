@@ -165,7 +165,7 @@ type NetTraceHop = HierarchyNetTraceHop | GlobalNetTraceHop;
 function netTraceHopDetail(hop: NetTraceHop): string {
   return hop.direction === "global"
     ? hop.foldedName
-    : `${hop.frame.instanceId}.${hop.frame.parentPinName}`;
+    : `${hop.frame.instanceId}.${hop.frame.parentMemberName ?? hop.frame.parentPinName}${hop.frame.childMemberName ? ` → ${hop.frame.childMemberName}` : ""}`;
 }
 
 function netTraceHopAction(hop: NetTraceHop): string {

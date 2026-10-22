@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   createEmptyProject,
+  createEmptyDocument,
   flattenRichText,
   semanticTextDocument,
   type CircuitProject,
@@ -11,8 +12,13 @@ import {
   resolveDocumentLogicalNets,
 } from "@icm/derived";
 import { analyzeDesignNetlist } from "@icm/netlist";
-import { builtInSymbols, createProjectSymbolResolver } from "@icm/symbols";
+import {
+  builtInSymbols,
+  createProjectSymbolResolver,
+  hierarchicalSymbolId,
+} from "@icm/symbols";
 import { planCreateCellPin } from "./cell-pin-planner.js";
+import { proposeWireIntent } from "./wire-intent-planner.js";
 import {
   executeProjectTransaction,
   type ProjectStructureEdit,
@@ -498,3 +504,193 @@ it.each([
 ])("rejects malformed or unbounded Cell Pin %s atomically", (expression) => {
   expect(() => fixture(expression)).toThrow();
 });
+
+it.each([
+  [false, 1],
+  [true, 1],
+  [false, 3],
+  [true, 3],
+] as const)(
+  "draws a scalar tap from a completely unconnected hierarchical bus member, reverse=%s high=%s",
+  (reverse, high) => {
+    let project = fixture(`DATA<${high}:0>`);
+    const child = project.documents[0]!;
+    const parent = createEmptyDocument("parent", "Parent");
+    parent.instances.push({
+      id: "caller",
+      symbolId: hierarchicalSymbolId(child.netlist!.name),
+      reference: "X1",
+      placement: { position: { x: 200, y: 0 }, rotation: 0, mirror: "none" },
+      netlist: {
+        parameters: {},
+        binding: { kind: "subcircuit", childDocumentId: child.id },
+      },
+    });
+    project = apply(project, [{ kind: "add_document", document: parent }]);
+    const document = project.documents.find((cell) => cell.id === parent.id)!;
+    const start = {
+      kind: "endpoint",
+      endpoint: {
+        kind: "terminal",
+        instanceId: "caller",
+        pinName: `DATA<${high}:0>`,
+      },
+      selectionExpression: `DATA<${high}>`,
+    } as const;
+    const finish = { kind: "free", point: { x: 0, y: 100 } } as const;
+    const proposal = proposeWireIntent(
+      document,
+      createProjectSymbolResolver(project, builtInSymbols),
+      {
+        id: "first-tap",
+        from: reverse ? finish : start,
+        to: reverse ? start : finish,
+      },
+    );
+    expect(typeof proposal, typeof proposal === "string" ? proposal : "").toBe(
+      "object",
+    );
+    if (typeof proposal === "string") throw new Error(proposal);
+    project = apply(project, [
+      {
+        kind: "transact_document",
+        documentId: parent.id,
+        expectedRevision: document.revision,
+        edits: proposal.edits,
+      },
+    ]);
+    const result = project.documents.find((cell) => cell.id === parent.id)!;
+    const member = child.netlist!.terminals[0]!.signal!.members[0]!;
+    expect(result.nets.flatMap((net) => net.terminals)).toEqual([
+      { instanceId: "caller", pinName: `DATA<${high}:0>`, memberId: member.id },
+    ]);
+    expect(result.routes).toHaveLength(1);
+    expect(
+      result.annotations.map((annotation) =>
+        flattenRichText(
+          resolveAnnotationText(
+            result,
+            annotation,
+            undefined,
+            createProjectSymbolResolver(project, builtInSymbols),
+          ),
+        ),
+      ),
+    ).toEqual([`DATA<${high}>`]);
+    expect(serializeProject(parseProject(serializeProject(project)))).toBe(
+      serializeProject(project),
+    );
+  },
+);
+
+it.each([
+  [1, false],
+  [3, true],
+] as const)(
+  "preserves the selected member when a second fan-out branch shares the first branch path, high=%s preconnected=%s",
+  (high, preconnected) => {
+    let project = fixture(`DATA<${high}:0>`);
+    const child = project.documents[0]!;
+    const parent = createEmptyDocument("parent", "Parent");
+    parent.instances.push({
+      id: "caller",
+      symbolId: hierarchicalSymbolId(child.netlist!.name),
+      reference: "X1",
+      placement: { position: { x: 200, y: 0 }, rotation: 0, mirror: "none" },
+      netlist: {
+        parameters: {},
+        binding: { kind: "subcircuit", childDocumentId: child.id },
+      },
+    });
+    project = apply(project, [{ kind: "add_document", document: parent }]);
+    if (preconnected) {
+      project = apply(project, [
+        {
+          kind: "transact_document",
+          documentId: parent.id,
+          expectedRevision: 0,
+          edits: [
+            {
+              kind: "add_junction",
+              junctionId: "existing-member-contact",
+              netId: "caller-member-net",
+              createNet: true,
+              position: { x: 400, y: 0 },
+            },
+            {
+              kind: "connect_endpoints",
+              from: {
+                kind: "terminal",
+                instanceId: "caller",
+                pinName: `DATA<${high}:0>`,
+                memberId: child.netlist!.terminals[0]!.signal!.members[0]!.id,
+              },
+              to: { kind: "junction", junctionId: "existing-member-contact" },
+            },
+          ],
+        },
+      ]);
+    }
+    for (const [index, x] of [0, 100].entries()) {
+      const document = project.documents.find((cell) => cell.id === parent.id)!;
+      const proposal = proposeWireIntent(
+        document,
+        createProjectSymbolResolver(project, builtInSymbols),
+        {
+          id: `fanout-${index}`,
+          from: {
+            kind: "endpoint",
+            endpoint: {
+              kind: "terminal",
+              instanceId: "caller",
+              pinName: `DATA<${high}:0>`,
+            },
+            selectionExpression: `DATA<${high}>`,
+          },
+          to: { kind: "free", point: { x, y: 100 } },
+        },
+      );
+      if (typeof proposal === "string") throw new Error(proposal);
+      project = apply(project, [
+        {
+          kind: "transact_document",
+          documentId: parent.id,
+          expectedRevision: document.revision,
+          edits: proposal.edits,
+        },
+      ]);
+    }
+    const result = project.documents.find((cell) => cell.id === parent.id)!;
+    const member = child.netlist!.terminals[0]!.signal!.members[0]!;
+    expect(result.nets.flatMap((net) => net.terminals)).toEqual([
+      { instanceId: "caller", pinName: `DATA<${high}:0>`, memberId: member.id },
+    ]);
+    expect(result.annotations).toHaveLength(2);
+    expect(
+      result.annotations.map((annotation) =>
+        flattenRichText(
+          resolveAnnotationText(
+            result,
+            annotation,
+            undefined,
+            createProjectSymbolResolver(project, builtInSymbols),
+          ),
+        ),
+      ),
+    ).toEqual([`DATA<${high}>`, `DATA<${high}>`]);
+    expect(
+      result.junctions.some(
+        (junction) => junction.position.x === 0 && junction.position.y === 100,
+      ),
+    ).toBe(true);
+    expect(
+      result.junctions.some(
+        (junction) =>
+          junction.position.x === 100 && junction.position.y === 100,
+      ),
+    ).toBe(true);
+    expect(serializeProject(parseProject(serializeProject(project)))).toBe(
+      serializeProject(project),
+    );
+  },
+);

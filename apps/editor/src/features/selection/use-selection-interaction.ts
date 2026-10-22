@@ -23,6 +23,8 @@ import {
   gateRoutingOperationPlan,
   planCellSelectionDeletion,
   planRoutingDeletion,
+  planSetNoConnect,
+  planDisconnectPinMember,
   planRoutingTransform,
   type RoutingOperationIntent,
   type SchematicEdit,
@@ -1066,68 +1068,51 @@ export function useSelectionInteraction(
     endpoint: Extract<WireSource["endpoint"], { kind: "terminal" }>,
     preserveInteraction = false,
   ): void => {
-    if (
-      options.document.noConnects.some(
-        (item) => endpointKey(item.endpoint) === endpointKey(endpoint),
-      )
-    ) {
-      options.setStatus(
-        `${options.endpointTestId(endpoint)} is already No Connect`,
+    try {
+      const edits = planSetNoConnect(
+        options.document,
+        options.resolver,
+        [endpoint],
+        true,
       );
-      return;
-    }
-    if (
-      options.document.nets.some((net) =>
-        net.terminals.some(
-          (pin) =>
-            pin.instanceId === endpoint.instanceId &&
-            pin.pinName === endpoint.pinName,
-        ),
-      )
-    ) {
+      if (!edits.length) return;
+      const result = options.transact(edits, { preserveInteraction });
+      if (result.ok)
+        options.setStatus(
+          `Marked ${options.endpointTestId(endpoint)} No Connect`,
+        );
+    } catch (error) {
       options.setStatus(
-        "Disconnect this endpoint before marking it No Connect",
-      );
-      return;
-    }
-    const result = options.transact(
-      [
-        {
-          kind: "add_no_connect",
-          noConnect: { id: nextNoConnectId(), endpoint },
-        },
-      ],
-      { preserveInteraction },
-    );
-    if (result.ok) {
-      options.setStatus(
-        `Marked ${options.endpointTestId(endpoint)} No Connect`,
+        error instanceof Error ? error.message : "Cannot mark No Connect",
       );
     }
-  };
-
-  const nextNoConnectId = (): string => {
-    const occupied = new Set([
-      ...options.document.instances.map((instance) => instance.id),
-      ...options.document.nets.map((net) => net.id),
-      ...options.document.routes.map((route) => route.id),
-      ...options.document.junctions.map((junction) => junction.id),
-      ...options.document.noConnects.map((noConnect) => noConnect.id),
-      ...options.document.annotations.map((annotation) => annotation.id),
-      ...options.document.layoutGroups.map((group) => group.id),
-      ...options.document.constraints.map((constraint) => constraint.id),
-      ...(options.document.drafting?.objects ?? []).map((object) => object.id),
-    ]);
-    let id: string;
-    do {
-      id = `no-connect-ui-${options.nextUniqueSuffix()}`;
-    } while (occupied.has(id));
-    return id;
   };
 
   const disconnectSelectedEndpoint = (removeRoutes: boolean): void => {
     const endpoint = options.selectedEndpoint?.endpoint;
     if (!endpoint || endpoint.kind === "junction") return;
+    if (endpoint.memberId) {
+      try {
+        const edits = planDisconnectPinMember(
+          options.document,
+          options.resolver,
+          endpoint,
+        );
+        if (!edits.length) return;
+        const result = options.transact(edits);
+        if (result.ok)
+          options.setStatus("Disconnected member; other lanes retained");
+      } catch (error) {
+        options.setStatus(
+          error instanceof Error ? error.message : "Cannot disconnect member",
+        );
+      }
+      return;
+    }
+    if (options.selectedEndpoint?.members) {
+      options.setStatus("Choose an explicit member to disconnect");
+      return;
+    }
     const routeEdits = removeRoutes
       ? options.document.routes
           .filter((route) =>

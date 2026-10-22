@@ -58,6 +58,7 @@ import {
   rejectKeptDocumentStyle,
   rejectSignalMembers,
   rejectOrderedSignals,
+  rejectMemberNoConnect,
 } from "./owned-project-file.js";
 
 /**
@@ -253,6 +254,7 @@ export function tryParseProjectWithMetadata(
   try {
     if (sourceSchemaVersion < 75) rejectSignalMembers(parsed);
     if (sourceSchemaVersion < 76) rejectOrderedSignals(parsed);
+    if (sourceSchemaVersion < 77) rejectMemberNoConnect(parsed);
     if (sourceSchemaVersion < 74 && hasExplicitCellBody(parsed))
       throw new ProjectFormatError([
         {

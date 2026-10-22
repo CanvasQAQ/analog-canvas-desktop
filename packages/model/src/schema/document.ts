@@ -803,7 +803,7 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
           path: ["noConnects", noConnectIndex, "endpoint", "instanceId"],
         });
       }
-      key = `${endpoint.instanceId}\u0000${endpoint.pinName}\u0000`;
+      key = `${endpoint.instanceId}\u0000${endpoint.pinName}\u0000${endpoint.memberId ?? ""}`;
       netOwner = terminalNetByKey.get(key);
       if (netOwner) {
         context.addIssue({

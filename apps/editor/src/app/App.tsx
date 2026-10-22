@@ -1,3 +1,4 @@
+import { useSignalMemberInspection } from "../features/selection/use-signal-member-inspection";
 import { editorSnapshotDerived } from "./editor-snapshot-derived-cache";
 import {
   holdWorkspaceWindow,
@@ -1427,6 +1428,7 @@ function WorkspaceEditor({
     setWireRoutingMode,
     setWireCornerOrder,
     completeWire,
+    setWireRepeat,
     editWireLabel,
     acceptWireLabel,
     setDraftingSource,
@@ -1446,6 +1448,7 @@ function WorkspaceEditor({
           steps: current.steps,
           routingMode: current.routingMode,
           cornerOrder: current.cornerOrder,
+          ...(current.repeat ? { repeat: current.repeat } : {}),
           ...(current.label ? { label: current.label } : {}),
           ...(current.labelEditing
             ? { labelEditing: current.labelEditing }
@@ -2432,6 +2435,7 @@ function WorkspaceEditor({
     commitInstancePropertyDraft,
     commitNetLabelScope,
     commitNetLabelEditing,
+    expandNetLabelSelection,
     commitPendingNetLabelDraft,
     commitTextEditing,
     escapeTextEditing,
@@ -2730,6 +2734,8 @@ function WorkspaceEditor({
 
   const {
     memberChoice,
+    beginContinuousTaps,
+    wireRepeat,
     beginWireLabelEditing,
     commitWireLabelEditing,
     cancelWireLabelEditing,
@@ -2778,6 +2784,7 @@ function WorkspaceEditor({
       setWirePreview,
       setWireDraftSteps,
       completeWire,
+      setWireRepeat,
       editWireLabel,
       acceptWireLabel,
       clearTransientCanvasState,
@@ -3775,6 +3782,17 @@ function WorkspaceEditor({
     selectedInstance,
     setStatus,
   });
+  const { endpointSignalInspection, routeSignalInspection } =
+    useSignalMemberInspection({
+      model: {
+        document,
+        resolver,
+        selectedEndpoint,
+        visibleEndpoints,
+        selectedRoute,
+      },
+      actions: { setSelectedEndpoint, highlightNet, transact, setStatus },
+    });
   if (!import.meta.env?.ICM_DESKTOP && agentRuntime)
     agentSemanticIntentRef.current =
       agentRuntime.createAgentSemanticIntentHandler({
@@ -4683,7 +4701,16 @@ function WorkspaceEditor({
     document,
     viewBox,
     endpoints: visibleEndpoints,
-    mark: markEndpointNoConnect,
+    mark: (endpoint, preserveInteraction) => {
+      const source = visibleEndpoints.find(
+        (item) => endpointKey(item.endpoint) === endpointKey(endpoint),
+      );
+      if (source?.members) {
+        setSelectedEndpoint(source);
+        setSelectionOpen(true);
+        setStatus("Choose explicit bus members in Properties for No Connect");
+      } else markEndpointNoConnect(endpoint, preserveInteraction);
+    },
     report: setStatus,
   });
   const canvasEventHandlers = createEditorCanvasEventHandlers({
@@ -6676,6 +6703,7 @@ function WorkspaceEditor({
                 onPlace: beginRetainedInstancePlacementFromHook,
               }}
               routeActions={{
+                signalMembers: routeSignalInspection,
                 active: selectedRouteId !== null,
                 document,
                 resolver,
@@ -6697,6 +6725,7 @@ function WorkspaceEditor({
                 },
               }}
               endpointActions={{
+                signalMembers: endpointSignalInspection,
                 item: selectedEndpoint,
                 color: styleProfile.foreground,
                 kind: selectedEndpoint
@@ -7025,6 +7054,10 @@ function WorkspaceEditor({
             onNetLabelTextChange: wireLabelEditing
               ? (change) => editWireLabel({ ...wireLabelEditing, ...change })
               : updateNetLabelPlacementText,
+            onExpandNetLabels:
+              !wireLabelEditing && visualSelection.routeIds.length > 1
+                ? expandNetLabelSelection
+                : undefined,
             onNetLabelSubmit: wireLabelEditing
               ? commitWireLabelEditing
               : commitNetLabelEditing,
@@ -7037,6 +7070,8 @@ function WorkspaceEditor({
             onFlightlineClick: handleFlightline,
             wireDraftPreview,
             memberChoice: wireLabelEditing ? null : memberChoice,
+            onContinuousTaps: beginContinuousTaps,
+            wireRepeat: wireLabelEditing ? undefined : wireRepeat,
             onWireMemberChoose: chooseWireMember,
             onWireExpressionPreview: previewWireExpression,
             onWireExpressionChoose: chooseWireExpression,

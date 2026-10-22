@@ -691,7 +691,8 @@ export function applyRouteTopologyEdit(
       owner.terminals = owner.terminals.filter(
         (terminal) =>
           terminal.instanceId !== endpoint.instanceId ||
-          terminal.pinName !== endpoint.pinName,
+          terminal.pinName !== endpoint.pinName ||
+          terminal.memberId !== endpoint.memberId,
       );
       if (endpoint.pinName === "B") {
         const instance = draft.instances.find(

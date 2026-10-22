@@ -188,6 +188,14 @@ export interface CellSymbolLayoutInteraction {
   } | null;
 }
 
+export interface WireRepeat {
+  source: WireSource;
+  members: readonly { id: string; label: string }[];
+  index: number;
+  fanout: boolean;
+  revision: number;
+}
+
 export type InteractionState<TClipboard = never> =
   | CellSymbolLayoutInteraction
   | { kind: "idle" }
@@ -218,6 +226,7 @@ export type InteractionState<TClipboard = never> =
       steps: WireDraftStep[];
       routingMode: WireRoutingMode;
       cornerOrder: WireCornerOrder;
+      repeat?: WireRepeat;
       label?: WireLabelDraft;
       labelEditing?: WireLabelDraft;
     }
@@ -264,7 +273,8 @@ export type InteractionAction<TClipboard = never> =
   | { type: "set-wire-waypoints"; update: SetStateAction<Point[]> }
   | { type: "set-wire-routing-mode"; mode: WireRoutingMode }
   | { type: "set-wire-corner-order"; cornerOrder: WireCornerOrder }
-  | { type: "complete-wire" }
+  | { type: "set-wire-repeat"; repeat: WireRepeat | null }
+  | { type: "complete-wire"; revision?: number }
   | { type: "edit-wire-label"; draft: WireLabelDraft | null }
   | { type: "accept-wire-label"; draft: WireLabelDraft; source: WireSource }
   | { type: "set-drawing-source"; point: Point | null }
@@ -519,6 +529,11 @@ export function interactionReducer<TClipboard>(
       return state.kind === "wire"
         ? { ...state, cornerOrder: action.cornerOrder }
         : state;
+    case "set-wire-repeat": {
+      if (state.kind !== "wire") return state;
+      const { repeat: _repeat, ...wire } = state;
+      return action.repeat ? { ...wire, repeat: action.repeat } : wire;
+    }
     case "complete-wire":
       return state.kind === "wire"
         ? {
@@ -529,6 +544,15 @@ export function interactionReducer<TClipboard>(
             steps: [],
             routingMode: state.routingMode,
             cornerOrder: state.cornerOrder,
+            ...(state.repeat && action.revision !== undefined
+              ? {
+                  repeat: {
+                    ...state.repeat,
+                    index: state.repeat.index + (state.repeat.fanout ? 0 : 1),
+                    revision: action.revision,
+                  },
+                }
+              : {}),
           }
         : state;
     case "edit-wire-label": {
@@ -685,7 +709,13 @@ export function useInteractionState<TClipboard>() {
       dispatch({ type: "set-wire-routing-mode", mode }),
     setWireCornerOrder: (cornerOrder: WireCornerOrder) =>
       dispatch({ type: "set-wire-corner-order", cornerOrder }),
-    completeWire: () => dispatch({ type: "complete-wire" }),
+    completeWire: (revision?: number) =>
+      dispatch({
+        type: "complete-wire",
+        ...(revision !== undefined ? { revision } : {}),
+      }),
+    setWireRepeat: (repeat: WireRepeat | null) =>
+      dispatch({ type: "set-wire-repeat", repeat }),
     editWireLabel: (draft: WireLabelDraft | null) =>
       dispatch({ type: "edit-wire-label", draft }),
     acceptWireLabel: (draft: WireLabelDraft, source: WireSource) =>

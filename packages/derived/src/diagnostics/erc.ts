@@ -567,6 +567,54 @@ export function runErcChecks(
       if (!resolved) continue;
       const hidden = new Set(resolved.variant?.hiddenPinNames ?? []);
       for (const pin of resolved.definition.pins) {
+        const members =
+          document.netlist?.terminals.find(
+            (terminal) =>
+              pin.name === "P" &&
+              terminal.interfaceInstanceIds.includes(instance.id),
+          )?.signal?.members ?? pin.signalMembers;
+        if (members && members.length > 1) {
+          if (hidden.has(pin.name)) continue;
+          for (const member of members) {
+            const endpoint = {
+              kind: "terminal" as const,
+              instanceId: instance.id,
+              pinName: pin.name,
+              memberId: member.id,
+            };
+            const assessment = endpointConnectivity.assess(endpoint);
+            if (assessment.electricallySatisfied) continue;
+            diagnostics.push({
+              id: `erc:unconnected-pin:${document.id}:${instance.id}:${pin.name}:${member.id}`,
+              domain: "erc",
+              code: "ERC_UNCONNECTED_PIN",
+              severity: "warning",
+              confidence: "high",
+              gateEligible: false,
+              message: `Member ${instance.reference ?? instance.id}.${member.name} is not connected and has no No Connect`,
+              primary: {
+                ...terminalLocator(document.id, instance.id, pin.name),
+                endpoint,
+              },
+              related: assessment.baseNetId
+                ? [
+                    directObjectLocator(
+                      document.id,
+                      "net",
+                      assessment.baseNetId,
+                    ),
+                  ]
+                : [],
+              parameters: {
+                instanceId: instance.id,
+                pinName: pin.name,
+                memberId: member.id,
+                memberName: member.name,
+              },
+            });
+          }
+          continue;
+        }
         const endpoint = {
           kind: "terminal" as const,
           instanceId: instance.id,

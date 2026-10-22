@@ -17,7 +17,9 @@ export function migrateSignalContacts(
   target: { instanceId: string; pinName: string; nextName: string },
   previous: readonly SignalMemberIdentity[],
   next: readonly SignalMemberIdentity[],
+  keepAggregate = false,
 ) {
+  const nextIsAggregate = keepAggregate || next.length > 1;
   const surviving = new Set(next.map((member) => member.id));
   const matches = (endpoint: RouteEndpoint) =>
     endpoint.kind === "terminal" &&
@@ -28,13 +30,13 @@ export function migrateSignalContacts(
     if (!matches(endpoint)) return endpoint;
     const id = endpoint.memberId ?? previous[0]!.id;
     const replacement = detached.get(`${routeId}/${id}`);
-    if ((!surviving.has(id) || next.length === 1) && replacement)
+    if ((!surviving.has(id) || !nextIsAggregate) && replacement)
       return replacement;
     const { memberId: _memberId, ...rest } = endpoint;
     return {
       ...rest,
       pinName: target.nextName,
-      ...(next.length > 1 && (endpoint.memberId || previous.length === 1)
+      ...(nextIsAggregate && (endpoint.memberId || previous.length === 1)
         ? { memberId: id }
         : {}),
     } as RouteEndpoint;
@@ -53,7 +55,7 @@ export function migrateSignalContacts(
       })) ?? [{ id: endpoint.memberId ?? previous[0]!.id, netId: route.netId }];
       const needsStub =
         lanes.some((member) => !surviving.has(member.id)) ||
-        ((route.members || endpoint.memberId) && next.length === 1);
+        ((route.members || endpoint.memberId) && !nextIsAggregate);
       if (!needsStub) {
         const updated = route.members
           ? ({ ...endpoint, pinName: target.nextName } as RouteEndpoint)
@@ -78,6 +80,19 @@ export function migrateSignalContacts(
         String(document.revision),
       );
       const outward = connection.outward ?? { x: 1, y: 0 };
+      let distance = document.presentation.grid;
+      const other = resolveEndpointConnection(
+        document,
+        resolver,
+        side === "start" ? routeEnd(route) : route.start,
+      )?.gridLanding;
+      if (
+        keepAggregate &&
+        other &&
+        other.x === connection.gridLanding.x + outward.x * distance &&
+        other.y === connection.gridLanding.y + outward.y * distance
+      )
+        distance *= 2;
       const stub = { kind: "junction" as const, junctionId };
       const stubMembers =
         lanes.length === 1 && endpoint.memberId
@@ -107,8 +122,8 @@ export function migrateSignalContacts(
         id: junctionId,
         netId: stubMembers[0]!.netId,
         position: {
-          x: connection.gridLanding.x + outward.x * document.presentation.grid,
-          y: connection.gridLanding.y + outward.y * document.presentation.grid,
+          x: connection.gridLanding.x + outward.x * distance,
+          y: connection.gridLanding.y + outward.y * distance,
         },
         ...(stubMembers.length > 1 ? { members: stubMembers } : {}),
       });
@@ -132,7 +147,7 @@ export function migrateSignalContacts(
               kind: "terminal",
               instanceId: target.instanceId,
               pinName: target.nextName,
-              ...(retained.length === 1 && next.length > 1
+              ...(retained.length === 1 && nextIsAggregate
                 ? { memberId: retained[0]!.id }
                 : {}),
             },

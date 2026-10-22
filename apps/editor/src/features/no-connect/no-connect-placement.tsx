@@ -52,7 +52,13 @@ export function useNoConnectPlacement({
   const label = endpoint
     ? `${document.instances.find((item) => item.id === endpoint.instanceId)?.reference ?? endpoint.instanceId}.${endpoint.pinName}`
     : "";
-  const state = marked ? "marked" : source?.netId ? "connected" : "available";
+  const state = source?.members
+    ? "choose-members"
+    : marked
+      ? "marked"
+      : source?.netId
+        ? "connected"
+        : "available";
   const targetAt = (point: { x: number; y: number }, canvas: SVGSVGElement) => {
     const matrix = canvas.getScreenCTM();
     if (!matrix) return null;
@@ -100,9 +106,11 @@ export function useNoConnectPlacement({
         const pin = target.source.endpoint;
         const name = `${document.instances.find((item) => item.id === pin.instanceId)?.reference ?? pin.instanceId}.${pin.pinName}`;
         report(
-          target.source.netId
-            ? `${name}: connected — disconnect it before marking No Connect`
-            : `${name}: No Connect — click to mark · Esc exits`,
+          target.source.members
+            ? `${name}: click to choose explicit No Connect members`
+            : target.source.netId
+              ? `${name}: connected — disconnect it before marking No Connect`
+              : `${name}: No Connect — click to mark · Esc exits`,
         );
       } else
         report(
@@ -146,11 +154,13 @@ export function NoConnectPlacementPreview({
       />
       <text x="12" y="-10" fontSize="12" fill={color}>
         {label} —{" "}
-        {state === "connected"
-          ? "Connected"
-          : state === "marked"
-            ? "Already NoConn"
-            : "NoConn"}
+        {state === "choose-members"
+          ? "Choose members"
+          : state === "connected"
+            ? "Connected"
+            : state === "marked"
+              ? "Already NoConn"
+              : "NoConn"}
       </text>
     </g>
   );

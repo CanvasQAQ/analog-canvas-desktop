@@ -656,12 +656,28 @@ it("deliberately converts a legacy scalar contact to one chosen member without f
     endpoint: { kind: "terminal", instanceId: "X1", pinName: "DATA<3:0>" },
   });
   const marked = apply(legacy, [{ kind: "add_document", document: caller }]);
-  expect(() =>
+  const convertedMark = apply(
+    marked,
     planSetCellTerminalSignal(marked, "child", "legacy-port", "DATA<3:0>", {
       convertLegacy: true,
       memberMap: { "legacy-port": "DATA<1>" },
     }),
-  ).toThrow(/NoConnect/);
+  );
+  expect(
+    parseProject(serializeProject(convertedMark)).documents.find(
+      (document) => document.id === "legacy-caller",
+    )!.noConnects,
+  ).toEqual([
+    {
+      id: "nc",
+      endpoint: {
+        kind: "terminal",
+        instanceId: "X1",
+        pinName: "DATA<3:0>",
+        memberId: "legacy-port",
+      },
+    },
+  ]);
   const converted = apply(
     legacy,
     planSetCellTerminalSignal(legacy, "child", "legacy-port", "DATA<3:0>", {

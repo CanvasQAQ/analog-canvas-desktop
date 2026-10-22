@@ -2,7 +2,7 @@
 
 Status: `accepted`
 
-Portable file schema: `76`; normalized editor model schema: `58`.
+Portable file schema: `77`; normalized editor model schema: `58`.
 
 Primary owner: `packages/project-protocol` (portable source and codec);
 `packages/model` validates the decoded editor model.
@@ -17,14 +17,15 @@ preserves.
 ## Read and write
 
 ```text
-import text -> parse JSON -> require Project file schema 24 through 76
--> migrate old files or decode 59–76 -> strict runtime model validation -> install unbound
-export -> validate -> encode file schema 76 -> readable canonical JSON -> download
+import text -> parse JSON -> require Project file schema 24 through 77
+-> migrate old files or decode 59–77 -> strict runtime model validation -> install unbound
+export -> validate -> encode file schema 77 -> readable canonical JSON -> download
 ```
 
-- `parseProject` reads schemas 24–76; writers always emit 76. Envelope
+- `parseProject` reads schemas 24–77; writers always emit 77. Envelope
   metadata uses `CURRENT_PROJECT_FILE_VERSION`, never the model version.
   Optional additions keep model 58; older envelopes cannot carry them.
+  Member No Connect endpoints require file schema 77.
 - The reader rejects mixed legacy/current field names, conflicting endpoints,
   unknown fields and missing used component definitions; it never deletes
   unplaced or overlapping instances. An invalid candidate never replaces the
@@ -44,7 +45,7 @@ export -> validate -> encode file schema 76 -> readable canonical JSON -> downlo
   existing endpoint contact); parsing, Cloud open and recovery stay exact.
 - Canonical serialization ends with one newline and is byte-stable across
   serialize/parse/serialize. `fixtures/projects/compatibility-corpus.json`:
-  `current` entries are already canonical 76; `migrated` witnesses keep source
+  `current` entries are already canonical 77; `migrated` witnesses keep source
   bytes and version and load/save byte-stable; the rejected corpus names
   expected failures.
 - A migrated imported file is dirty; the browser-selected source is never
@@ -138,6 +139,9 @@ Cloud or recovery data.
   the branch's resolved member endpoints, with no additional name claim.
   Earlier envelopes refuse the new expressions and plural binding; legacy
   comma or bracket spelling without a declaration remains scalar.
+
+- 77: No Connect endpoints may select one stable bus member; older files retain
+  scalar No Connect meaning and reject member-qualified marks.
 
 ## One connection source
 

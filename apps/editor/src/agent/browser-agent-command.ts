@@ -17,6 +17,9 @@ import {
   planCellReset,
   pinAnchoredPlacement,
   planRouteNet,
+  planSetNoConnect,
+  planExpandedNetLabels,
+  planDisconnectPinMember,
   planCreateCell,
   planSetVddConnectionMode,
   planUpdateCellTerminalDirection,
@@ -429,7 +432,34 @@ export function planBrowserAgentCommand(
         ]),
       };
     }
+    case "expand-net-labels":
+      return {
+        edits: planExpandedNetLabels(
+          document,
+          resolver,
+          command.expression,
+          command.routeIds,
+        ),
+      };
+    case "set-no-connect":
+      return {
+        edits: planSetNoConnect(
+          document,
+          resolver,
+          command.endpoints,
+          command.marked,
+        ),
+      };
     case "disconnect-pin": {
+      if (command.memberId)
+        return {
+          edits: planDisconnectPinMember(document, resolver, {
+            kind: "terminal",
+            instanceId: command.instanceId,
+            pinName: command.pinName,
+            memberId: command.memberId,
+          }),
+        };
       const instance = document.instances.find(
         (item) => item.id === command.instanceId,
       );

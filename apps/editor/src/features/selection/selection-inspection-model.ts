@@ -209,7 +209,7 @@ export function deriveSelectionInspectionModel({
     ? endpointNetId(document, selectedEndpoint.endpoint)
     : null;
   const selectedHighlightNetId =
-    selectedRoute?.netId ??
+    (selectedRoute?.members ? null : selectedRoute?.netId) ??
     selectedEndpointNetId ??
     selectedNetLabelBinding?.netId ??
     null;

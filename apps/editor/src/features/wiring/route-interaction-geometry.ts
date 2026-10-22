@@ -206,23 +206,29 @@ export function endpointNetId(
   endpoint: RouteEndpoint,
   index?: EndpointObjectIndex,
 ): string | null {
-  if (index) {
+  if (index && !endpoint.memberId) {
     return endpoint.kind === "junction"
       ? (index.netIdByJunctionId.get(endpoint.junctionId) ?? null)
       : (index.netIdByTerminalKey.get(endpointKey(endpoint)) ?? null);
   }
   if (endpoint.kind === "junction") {
-    return (
-      document.junctions.find((junction) => junction.id === endpoint.junctionId)
-        ?.netId ?? null
+    const junction = document.junctions.find(
+      (junction) => junction.id === endpoint.junctionId,
     );
+    return endpoint.memberId
+      ? (junction?.members?.find((member) => member.id === endpoint.memberId)
+          ?.netId ?? null)
+      : junction?.members
+        ? null
+        : (junction?.netId ?? null);
   }
   return (
     document.nets.find((net) =>
       net.terminals.some(
         (terminal) =>
           terminal.instanceId === endpoint.instanceId &&
-          terminal.pinName === endpoint.pinName,
+          terminal.pinName === endpoint.pinName &&
+          terminal.memberId === endpoint.memberId,
       ),
     )?.id ?? null
   );

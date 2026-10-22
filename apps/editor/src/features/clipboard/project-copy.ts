@@ -970,6 +970,8 @@ export function prepareProjectCopy(
           remapMember(annotation.binding.memberEndpoint);
         annotation.binding.memberEndpoints?.forEach(remapMember);
       }
+    for (const noConnect of clipboard.noConnects)
+      remapMember(noConnect.endpoint);
     childMap.set(clipboard.sourceDocumentId, document.id);
     Object.assign(dependencyMapping.cells, Object.fromEntries(childMap));
     for (const sourceFolder of context.simulationFolders ?? []) {

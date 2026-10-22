@@ -88,6 +88,102 @@ function fixture() {
   ]);
 }
 
+it("copies member No Connect declarations with callers and remaps imported formals on reopen", () => {
+  let source = fixture();
+  const child = source.documents[0]!;
+  const memberId = child.netlist!.terminals[0]!.signal!.members[1]!.id;
+  const parent = createEmptyDocument("nc-parent", "No Connect parent");
+  parent.instances.push({
+    id: "caller",
+    symbolId: hierarchicalSymbolId(child.netlist!.name),
+    reference: "X1",
+    placement: {
+      position: { x: 400, y: 0 },
+      rotation: 90,
+      mirror: "horizontal",
+    },
+    netlist: {
+      binding: { kind: "subcircuit", childDocumentId: child.id },
+      parameters: {},
+    },
+  });
+  source = transact(source, [{ kind: "add_document", document: parent }]);
+  source = transact(source, [
+    {
+      kind: "transact_document",
+      documentId: parent.id,
+      expectedRevision: 0,
+      edits: [
+        {
+          kind: "add_no_connect",
+          noConnect: {
+            id: "member-nc",
+            endpoint: {
+              kind: "terminal",
+              instanceId: "caller",
+              pinName: "DATA<3:0>",
+              memberId,
+            },
+          },
+        },
+      ],
+    },
+  ]);
+  const clipboard = decodeCircuitClipboard(
+    encodeCircuitClipboard(source, source.documents[1]!, {
+      instanceIds: ["caller"],
+      routeIds: [],
+      junctionIds: [],
+      annotationIds: [],
+      draftingIds: [],
+    })!,
+  )!;
+  for (const destination of [
+    source,
+    createEmptyProject("nc-target", "Target"),
+  ]) {
+    const target =
+      destination === source
+        ? destination.documents[1]!
+        : destination.documents[0]!;
+    const copied = applyProjectCopyPlacement(
+      planProjectCopyPlacement(
+        destination,
+        target,
+        clipboard,
+        { x: 600, y: 200 },
+        1,
+      ),
+    );
+    const reopened = parseProject(serializeProject(copied));
+    const document = reopened.documents.find((item) => item.id === target.id)!;
+    const mark = document.noConnects.find((item) => item.id !== "member-nc")!;
+    expect(mark).toBeDefined();
+    const caller = document.instances.find(
+      (item) => item.id === mark.endpoint.instanceId,
+    )!;
+    const binding = caller.netlist!.binding;
+    if (binding?.kind !== "subcircuit") throw new Error("Missing child");
+    const imported = reopened.documents.find(
+      (item) => item.id === binding.childDocumentId,
+    )!;
+    expect(mark.endpoint.memberId).toBe(
+      imported.netlist!.terminals[0]!.signal!.members[1]!.id,
+    );
+    expect(mark.endpoint.instanceId).not.toBe("caller");
+    expect(
+      document.nets.some((net) =>
+        net.terminals.some(
+          (item) => item.instanceId === mark.endpoint.instanceId,
+        ),
+      ),
+    ).toBe(false);
+    expect(serializeProject(parseProject(serializeProject(reopened)))).toBe(
+      serializeProject(reopened),
+    );
+  }
+});
+
 it("copies unwired selections of vector Pins without carrying their invisible source joins", () => {
   let source = fixture();
   const id = source.documents[0]!.id;

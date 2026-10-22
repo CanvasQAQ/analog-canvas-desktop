@@ -355,7 +355,11 @@ export function copySelection(
       junctionIds.has(junction.id),
     ),
     annotations,
-    noConnects: [],
+    noConnects: document.noConnects.filter(
+      (item) =>
+        item.endpoint.memberId !== undefined &&
+        selectedIds.has(item.endpoint.instanceId),
+    ),
     connectivityEvidence: document.connectivityEvidence.filter((evidence) => {
       if (!netIds.has(evidence.netId)) return false;
       if (evidence.kind !== "name-claim") return false;

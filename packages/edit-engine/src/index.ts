@@ -65,6 +65,7 @@ export * from "./hierarchy-planner.js";
 export * from "./cell-pin-planner.js";
 export * from "./signal-wire-planner.js";
 export * from "./signal-endpoint.js";
+export * from "./no-connect-planner.js";
 export * from "./cell-interface-change-planner.js";
 export * from "./device-model-target-planner.js";
 export * from "./netlist-planning-projection.js";
@@ -83,3 +84,5 @@ export {
   copyCallerArtwork,
   type CopiedMemberIds,
 } from "./project-copy-members.js";
+
+export * from "./expanded-label-planner.js";
