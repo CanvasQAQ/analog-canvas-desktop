@@ -283,25 +283,31 @@ information). Hidden bulk needs no decorative wire.
 
 ## Ordered bus members
 
-Explicit Cell Pin and Net Label names accept `NAME<index>` and inclusive
-`NAME<first:last>` in either order (at most 256 members). Older bracketed
+Explicit Cell Pin and Net Label names accept `NAME<index>`, inclusive
+`NAME<first:last>`, ordered lists such as `DATA<7,3,0>`, and comma-separated
+bundles such as `CLK,RESET,DATA<3:0>` (at most 256 members). Older bracketed
 scalar names keep their meaning. A parent Label may name its bus independently
 of the child's formal pin.
 
 Inspect before wiring: an aggregate pin reports `netId:null` and ordered
 `members:[{id,name,netId}]`; Route and Junction member records expose their
-scalar logical Net IDs. Select a member with `memberId` on a terminal or
-Junction endpoint, or on a `wireIntent` `route-segment` target. Omitting it
+scalar logical Net IDs. Semantic pin, Junction and route-segment targets accept
+one of `memberId`, ordered `memberIds`, or `selectionExpression`. For
+`wireIntent`, `memberIds` and `selectionExpression` belong to the endpoint or
+route-segment target; a single `memberId` remains on its endpoint. A shorthand
+such as `<7:4>` requires one explicit indexed source context; mixed bundles
+require full member names. Selections resolve to stable IDs, preserve order,
+and may tap a slice again. Omitting a selection
 continues the whole bus; connecting to a fixed scalar requires an explicit
 member or a unique authoritative name match in the current Document. Geometry
 and child formal spelling never guess a member. Whole-bus connections map
 equal-width ordered lists positionally. The shared planner rejects wrong
 widths, unknown members and ambiguous selections without mutation.
 
-A scalar branch and its bound selector are one transaction. Its `net-name`
-binding's `memberEndpoint` is a display reference: unnamed parent members
-display the current formal name without creating a parent name claim. Slices, bundles,
-connected member/name migration, legacy scalar conversion, bus group copy and
+A branch and its bound selector are one transaction. Its `net-name` binding's
+`memberEndpoint` or ordered `memberEndpoints` are display references: unnamed
+parent members display the current formal name without creating a parent name
+claim. Connected member/name migration, legacy scalar conversion, bus group copy and
 member NoConnect authoring are not yet supported; use the reported refusal.
 
 ## Wiring

@@ -3,6 +3,8 @@ import {
   flattenRichText,
   labelTextDocument,
   richTextPresentsIdentifier,
+  formatSignalMembers,
+  routeElectricalConnections,
 } from "@icm/model";
 import type {
   Annotation,
@@ -91,7 +93,9 @@ export function resolveAnnotationText(
   if (
     annotation.formatOverride &&
     (binding.kind === "instance-reference" ||
-      (binding.kind === "net-name" && !binding.memberEndpoint) ||
+      (binding.kind === "net-name" &&
+        !binding.memberEndpoint &&
+        !binding.memberEndpoints) ||
       binding.kind === "cell-terminal-name")
   ) {
     return annotation.formatOverride;
@@ -125,6 +129,31 @@ export function resolveAnnotationText(
         : display.content;
     }
     case "net-name": {
+      if (binding.memberEndpoints) {
+        const route =
+          annotation.anchor.kind === "route"
+            ? document.routes.find(
+                (item) =>
+                  annotation.anchor.kind === "route" &&
+                  item.id === annotation.anchor.routeId,
+              )
+            : undefined;
+        const edges = route ? routeElectricalConnections(route) : [];
+        const logical = logicalNets ?? resolveDocumentLogicalNets(document);
+        const name = formatSignalMembers(
+          binding.memberEndpoints.map((endpoint, index) => {
+            const netId = edges[index]?.netId ?? binding.netId;
+            return (
+              logical.byBaseNetId.get(netId)?.name ??
+              selectedMemberName(document, endpoint, netId, resolver)
+            );
+          }),
+        );
+        return annotation.formatOverride &&
+          richTextPresentsIdentifier(annotation.formatOverride, name)
+          ? annotation.formatOverride
+          : semanticLabel(name);
+      }
       const ownerClaim = document.connectivityEvidence.find(
         (evidence) =>
           evidence.kind === "name-claim" &&

@@ -353,7 +353,7 @@ function deriveLabelVirtualEdges(
     )!;
     if (
       annotation.binding?.kind === "net-name" &&
-      annotation.binding.memberEndpoint
+      (annotation.binding.memberEndpoint || annotation.binding.memberEndpoints)
     )
       continue;
     const label = resolveAnnotationName(

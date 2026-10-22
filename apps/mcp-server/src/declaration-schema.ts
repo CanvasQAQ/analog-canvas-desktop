@@ -79,6 +79,21 @@ export function declarationSchema(input: Schema, tool?: string): Schema {
       "propertyNames",
     ])
       if (schema[key] !== undefined) schema[key] = visit(schema[key]);
+    // Both required endpoints use the same full target contract. Pattern
+    // validation applies it once to both declared fields, without references
+    // or dropping any member/shape bound to meet the host's 5,000-byte budget.
+    if (tool === "circuit_wire" && schema.properties) {
+      const properties = schema.properties as Record<string, unknown>;
+      const kind = properties.kind as Schema | undefined;
+      if (
+        kind?.const === "connect" &&
+        properties.from &&
+        JSON.stringify(properties.from) === JSON.stringify(properties.to)
+      ) {
+        schema.patternProperties = { "^(from|to)$": properties.from };
+        schema.properties = { ...properties, from: true, to: true };
+      }
+    }
     return schema;
   };
   const result = visit(inlineSchema(input)) as Schema;

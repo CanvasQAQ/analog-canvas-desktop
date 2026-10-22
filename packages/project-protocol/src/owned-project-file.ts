@@ -18,8 +18,62 @@ import {
   materializeSourceConnectivity,
   type SourceConnectivity,
 } from "./source-connectivity.js";
-export const CURRENT_PROJECT_FILE_VERSION = 75;
+export const CURRENT_PROJECT_FILE_VERSION = 76;
 type Value = Record<string, any>;
+
+/** Schema 75 understood ranges, but not ordered expressions or slice selectors. */
+export function rejectOrderedSignals(raw: Value): void {
+  const records = (value: unknown): Value[] =>
+    Array.isArray(value)
+      ? value.filter(
+          (item) => item && typeof item === "object" && !Array.isArray(item),
+        )
+      : [];
+  const reject = (path: (string | number)[], message: string): never => {
+    throw new ProjectFormatError([{ code: "INVALID_PROJECT", path, message }]);
+  };
+  const checkBinding = (annotation: Value, path: (string | number)[]) => {
+    for (const field of ["bind", "binding"]) {
+      const binding = annotation[field];
+      if (
+        binding &&
+        typeof binding === "object" &&
+        Object.hasOwn(binding, "memberEndpoints")
+      )
+        reject(
+          [...path, field, "memberEndpoints"],
+          "Slice selectors require Project schema 76",
+        );
+    }
+  };
+  records(raw.documents).forEach((document, index) => {
+    const path = ["documents", index];
+    const checkExpression = (owner: Value, ownerPath: (string | number)[]) => {
+      if (
+        typeof owner.signal?.expression === "string" &&
+        owner.signal.expression.includes(",")
+      )
+        reject(
+          [...ownerPath, "signal", "expression"],
+          "Ordered signal expressions require Project schema 76",
+        );
+    };
+    records(document.netlist?.terminals).forEach((terminal, i) =>
+      checkExpression(terminal, [...path, "netlist", "terminals", i]),
+    );
+    records(document.connectivityEvidence).forEach((evidence, i) =>
+      checkExpression(evidence, [...path, "connectivityEvidence", i]),
+    );
+    records(document.annotations).forEach((annotation, i) =>
+      checkBinding(annotation, [...path, "annotations", i]),
+    );
+    records(document.instances).forEach((instance, i) =>
+      records(instance.labels).forEach((annotation, j) =>
+        checkBinding(annotation, [...path, "instances", i, "labels", j]),
+      ),
+    );
+  });
+}
 
 /** Old envelopes never infer or accept new member-qualified connectivity. */
 export function rejectSignalMembers(raw: Value): void {
@@ -84,11 +138,23 @@ export function rejectSignalMembers(raw: Value): void {
     records(document.connectivityEvidence).forEach((evidence, i) =>
       check(evidence, ["signal"], [...path, "connectivityEvidence", i]),
     );
+    const checkAnnotation = (
+      annotation: Value,
+      annotationPath: (string | number)[],
+    ) => {
+      for (const field of ["bind", "binding"])
+        check(
+          annotation[field],
+          ["memberEndpoint", "memberEndpoints"],
+          [...annotationPath, field],
+        );
+    };
     records(document.annotations).forEach((annotation, i) =>
-      check(
-        annotation.binding,
-        ["memberEndpoint"],
-        [...path, "annotations", i, "binding"],
+      checkAnnotation(annotation, [...path, "annotations", i]),
+    );
+    records(document.instances).forEach((instance, i) =>
+      records(instance.labels).forEach((annotation, j) =>
+        checkAnnotation(annotation, [...path, "instances", i, "labels", j]),
       ),
     );
     records(document.routes).forEach((route, i) => {

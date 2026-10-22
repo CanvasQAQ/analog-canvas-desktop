@@ -1,6 +1,10 @@
 import { resolveDocumentLogicalNets } from "@icm/derived";
 import { isFreeWireAnchor, type WireSource } from "./wire-commit-planner.js";
-import type { SchematicDocument } from "@icm/model";
+import {
+  foldNetName,
+  parseSignalExpression,
+  type SchematicDocument,
+} from "@icm/model";
 
 export interface WireMemberOption {
   id: string;
@@ -10,6 +14,7 @@ export interface WireMemberChoice {
   source: WireSource;
   options: readonly WireMemberOption[];
   allowWhole: boolean;
+  expectedWidth?: number;
 }
 export type WireMemberEvaluation =
   | { kind: "ready"; from: WireSource; to: WireSource }
@@ -30,6 +35,69 @@ export function selectWireMember(
     netId: member.netId,
     connection: { ...source.connection, endpoint },
   };
+}
+
+/** Resolve explicit ordered identities without changing the source's split/geometry prelude. */
+export function selectWireMembers(
+  source: WireSource,
+  memberIds: readonly string[],
+): WireSource {
+  if (!memberIds.length || memberIds.length > 256)
+    throw new Error("Select between 1 and 256 available bus members");
+  if (new Set(memberIds).size !== memberIds.length)
+    throw new Error("A selection must contain unique member identities");
+  if (memberIds.length === 1) return selectWireMember(source, memberIds[0]!);
+  const members = memberIds.map((id) => {
+    const member = source.members?.find((item) => item.id === id);
+    if (!member) throw new Error("That bus member is no longer available");
+    return member;
+  });
+  return {
+    ...source,
+    members,
+    netId: members[0]!.netId,
+    memberSelection:
+      source.memberSelection ||
+      members.length !== source.members!.length ||
+      members.some((member, index) => member.id !== source.members![index]!.id),
+  };
+}
+
+/** An expression selects within this concrete source; it never names or joins its Nets. */
+export function selectWireExpression(
+  document: SchematicDocument,
+  source: WireSource,
+  expression: string,
+): WireSource {
+  const options = wireMemberChoice(document, source, true).options;
+  let text = expression.trim();
+  if (text.startsWith("<")) {
+    const bases = new Set(
+      options.map((option) => {
+        const base = /^([^<>]+)<\d+>$/u.exec(option.label)?.[1];
+        return base === undefined ? undefined : foldNetName(base);
+      }),
+    );
+    if (bases.size !== 1 || bases.has(undefined))
+      throw new Error(
+        "A shorthand selection requires one explicit indexed source context",
+      );
+    text = `${[...bases][0]}${text}`;
+  }
+  const names = parseSignalExpression(text);
+  return selectWireMembers(
+    source,
+    names.map((name) => {
+      const matches = options.filter(
+        (option) => foldNetName(option.label) === foldNetName(name),
+      );
+      if (matches.length !== 1)
+        throw new Error(
+          `Member ${name} is ${matches.length ? "ambiguous" : "not available"} in this source`,
+        );
+      return matches[0]!.id;
+    }),
+  );
 }
 
 export function wireMemberChoice(
@@ -57,27 +125,35 @@ export function evaluateWireMembers(
   from: WireSource,
   to: WireSource,
 ): WireMemberEvaluation {
-  if (from.members && to.members)
-    return from.members.length === to.members.length
-      ? { kind: "ready", from, to }
-      : {
-          kind: "invalid",
-          message: `Bus widths differ: ${from.members.length} and ${to.members.length}`,
-        };
+  if (from.members && to.members) {
+    if (from.members.length === to.members.length)
+      return { kind: "ready", from, to };
+    const side = from.members.length > to.members.length ? "from" : "to";
+    return {
+      kind: "choose",
+      side,
+      choice: {
+        ...wireMemberChoice(document, side === "from" ? from : to, false),
+        expectedWidth: Math.min(from.members.length, to.members.length),
+      },
+    };
+  }
   if (!from.members && !to.members) return { kind: "ready", from, to };
   const side = from.members ? "from" : "to";
   const aggregate = from.members ? from : to;
   const scalar = from.members ? to : from;
-  if (isFreeWireAnchor(scalar)) return { kind: "ready", from, to };
+  if (isFreeWireAnchor(scalar) && scalar.declaredScalarName === undefined)
+    return { kind: "ready", from, to };
   const logical = resolveDocumentLogicalNets(document);
-  const scalarName = scalar.netId
-    ? logical.byBaseNetId.get(scalar.netId)?.name
-    : undefined;
+  const scalarName =
+    scalar.declaredScalarName ??
+    (scalar.netId ? logical.byBaseNetId.get(scalar.netId)?.name : undefined);
   const matches = aggregate.members!.filter(
     (member) =>
       member.netId === scalar.netId ||
       (scalarName !== undefined &&
-        scalarName === logical.byBaseNetId.get(member.netId)?.name),
+        foldNetName(scalarName) ===
+          foldNetName(logical.byBaseNetId.get(member.netId)?.name ?? "")),
   );
   if (matches.length === 1) {
     const selected = selectWireMember(aggregate, matches[0]!.id);
@@ -90,6 +166,9 @@ export function evaluateWireMembers(
   return {
     kind: "choose",
     side,
-    choice: wireMemberChoice(document, aggregate, false),
+    choice: {
+      ...wireMemberChoice(document, aggregate, false),
+      expectedWidth: 1,
+    },
   };
 }

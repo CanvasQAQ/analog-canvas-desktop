@@ -33,6 +33,10 @@ export interface WireSource extends WireEndpointGeometry {
   preludeEdits: SchematicEdit[];
   routePresentation?: RoutePresentation;
   members?: ReadonlyArray<{ id: string; netId: string; name?: string }>;
+  /** An explicit ordered subset/reversal needs its own bound selector display. */
+  memberSelection?: boolean;
+  /** A transient inline name fixes a loose endpoint at one member until renamed. */
+  declaredScalarName?: string;
 }
 
 export interface WireCommitProposal {
@@ -293,9 +297,11 @@ export function proposeWireCommit(
     }),
   });
   if (
-    !from.members &&
-    !to.members &&
-    (from.endpoint.memberId || to.endpoint.memberId)
+    (!from.members &&
+      !to.members &&
+      (from.endpoint.memberId || to.endpoint.memberId)) ||
+    from.memberSelection ||
+    to.memberSelection
   ) {
     const routeEdit = edits.at(-1)!;
     if (routeEdit.kind === "set_route_path")
@@ -308,9 +314,21 @@ export function proposeWireCommit(
           binding: {
             kind: "net-name",
             netId,
-            memberEndpoint: from.endpoint.memberId
-              ? from.endpoint
-              : to.endpoint,
+            ...(from.members && to.members
+              ? {
+                  memberEndpoints: (from.memberSelection
+                    ? from
+                    : to
+                  ).members!.map((member) => ({
+                    ...(from.memberSelection ? from : to).endpoint,
+                    memberId: member.id,
+                  })),
+                }
+              : {
+                  memberEndpoint: from.endpoint.memberId
+                    ? from.endpoint
+                    : to.endpoint,
+                }),
           },
           anchor: {
             kind: "route",
@@ -349,7 +367,11 @@ function promoteFreeBusAnchor(
   members: NonNullable<WireSource["members"]>,
 ): WireSource {
   const endpoint = source.endpoint;
-  if (endpoint.kind !== "junction" || !isFreeWireAnchor(source))
+  if (
+    endpoint.kind !== "junction" ||
+    !isFreeWireAnchor(source) ||
+    source.declaredScalarName !== undefined
+  )
     throw new Error(
       "Select one bus member before connecting a scalar endpoint",
     );

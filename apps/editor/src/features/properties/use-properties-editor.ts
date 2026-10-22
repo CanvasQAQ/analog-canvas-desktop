@@ -1,10 +1,4 @@
-import {
-  hasRichTextOverbar,
-  rewriteRichTextIdentifier,
-  labelTypography,
-  labelTextDocument,
-  richTextIdentifier,
-} from "@icm/model";
+import { labelTextDocument, richTextIdentifier } from "@icm/model";
 import { resolveAnnotationName, resolveAnnotationText } from "@icm/derived";
 import type { NetLabelDirection } from "@icm/derived";
 import { referenceDeviceLetter } from "@icm/devices";
@@ -51,6 +45,7 @@ import {
   updateTextEditingSession,
 } from "../text-editing/text-editing";
 import type { TextEditingSession } from "../text-editing/text-editing";
+import { prepareNetLabelDraft } from "../text-editing/net-label-draft";
 import { planElectricalMarkerName } from "./electrical-marker-name";
 import type { NetLabelPlacementTarget } from "../wiring/route-interaction-geometry";
 import {
@@ -853,42 +848,6 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
     options.setStatus("Format the Net Label, then Apply to place it");
   };
 
-  const preparedNetLabelPlacement = (
-    placement: NonNullable<typeof netLabelPlacement>,
-  ): {
-    name: string;
-    content: RichTextDocument;
-    formatOverride?: RichTextDocument;
-  } => {
-    // Like editing a signal label, adding an overbar names its complement.
-    // Other styling preserves the characters typed.
-    const plainText = flattenRichText(placement.content);
-    const typography = labelTypography(options.document.presentation);
-    const typedName = plainText.trim();
-    const name =
-      hasRichTextOverbar(placement.content) && !typedName.endsWith("_bar")
-        ? `${typedName}_bar`
-        : typedName;
-    const content =
-      plainText === typedName && !plainText.includes("_")
-        ? placement.content
-        : rewriteRichTextIdentifier(placement.content, name, {
-            underscoreSubscript:
-              typography.subscriptAfterFirst || typography.underscoreSubscript,
-          });
-    const semanticContent = labelTextDocument(
-      name,
-      options.document.presentation,
-    );
-    if (JSON.stringify(content) !== JSON.stringify(semanticContent))
-      return { name, content, formatOverride: content };
-    // Typed without styling: a V-led name takes its voltage-node look.
-    const standard = roleLabelFormat("voltage-node", name);
-    return standard
-      ? { name, content: standard, formatOverride: standard }
-      : { name, content };
-  };
-
   const commitNetLabelAtTarget = (
     placement: NonNullable<typeof netLabelPlacement>,
     target: NetLabelPlacementTarget,
@@ -900,7 +859,10 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
       options.setStatus("The target wire is no longer available");
       return false;
     }
-    const prepared = preparedNetLabelPlacement(placement);
+    const prepared = prepareNetLabelDraft(
+      placement.content,
+      options.document.presentation,
+    );
     const existingLabel = options.netLabelForRoute(route);
     const edits = options.netLabelEditsForRoute(route, prepared.name, {
       alignment: target.alignment ?? placement.alignment,
@@ -922,7 +884,10 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
 
   const commitNetLabelEditing = (): void => {
     if (!netLabelPlacement) return;
-    const prepared = preparedNetLabelPlacement(netLabelPlacement);
+    const prepared = prepareNetLabelDraft(
+      netLabelPlacement.content,
+      options.document.presentation,
+    );
     if (!prepared.name) {
       options.setStatus("Net Label name cannot be empty");
       return;
@@ -1086,7 +1051,8 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
     ) {
       const currentName = (
         boundAnnotation.binding.kind === "net-name" &&
-        boundAnnotation.binding.memberEndpoint
+        (boundAnnotation.binding.memberEndpoint ||
+          boundAnnotation.binding.memberEndpoints)
           ? richTextIdentifier(
               resolveAnnotationText(
                 options.document,
@@ -1148,7 +1114,8 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
         name === currentName &&
         (!formatOverrideChanged ||
           (boundAnnotation.binding.kind === "net-name" &&
-            boundAnnotation.binding.memberEndpoint))
+            (boundAnnotation.binding.memberEndpoint ||
+              boundAnnotation.binding.memberEndpoints)))
       ) {
         if (
           (presentationChanged || formatOverrideChanged) &&

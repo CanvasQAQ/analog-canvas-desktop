@@ -36,10 +36,13 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
 ## Ordered signals and buses
 
 - Explicit Cell Pin and Net Label authoring accepts a scalar, `NAME<index>`,
-  or inclusive `NAME<first:last>` in either direction. Expressions are bounded
-  to 256 characters and 256 members; indices are 0–65535. Expansion order is
+  inclusive `NAME<first:last>` in either direction, ordered lists such as
+  `DATA<7,3,0>`, and comma-separated bundles such as `CLK,RESET,DATA<3:0>`.
+  Members must be unique under logical Net name case folding; selection uses
+  the same comparison and preserves the authored spelling. Expressions are
+  bounded to 256 characters and 256 members; indices are 0–65535. Expansion order is
   electrical order. Text editing previews that order and width; invalid Enter
-  keeps the draft, Escape discards it. Old bracketed names without a signal
+  keeps the draft, Escape discards it. Old names without a signal
   declaration remain scalar.
 - A vector formal terminal owns ordered stable member IDs, each on a scalar
   Base Net. Its generated parent Symbol has one aggregate pin. A Route's
@@ -48,15 +51,26 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   child formal names. Initial equal-width connections map the two declared
   lists positionally, including opposite orders.
 - Wire uses the existing routing modes, corners, snapping and cancellation.
+  `L` edits the unfinished Wire's name in place: Enter resumes routing,
+  Escape restores its previous name and path; Escape while routing cancels
+  the whole draft. Text focus owns typing and Backspace. The completed path,
+  naming owner and mapping commit together in one undoable transaction.
   A vector source supplies width; a loose unnamed conductor can acquire width
-  from a vector Label. Scalar contacts require a selected member. A unique
+  from a vector Label. An accepted scalar Label fixes a loose draft to one
+  member; landing on a bus resolves or asks for that member. Scalar contacts
+  require a selected member. A unique
   authoritative name in the parent Document may select it; otherwise the
   inline chooser remains editable. Hover and commit evaluate the same landing.
-- Whole-bus continuation preserves every member. A scalar branch and its
-  bound selector commit together; the selector follows that scalar Net and
-  is removed with the branch. Member endpoints never acquire connections from
-  passive crossings or aggregate pin coincidence.
-- A selector's display binding identifies the selected endpoint/member. It
+- Whole-bus continuation preserves every member and is the default. The
+  contextual selector accepts a scalar, slice or ordered list; shorthand
+  `<3>`, `<7:4>` or `<7,3,0>` requires one explicit indexed source context.
+  Selections resolve to ordered stable member IDs and can be tapped again.
+  Landings require equal widths and map those lists positionally in either
+  drawing direction. Invalid choices retain the draft with a reason.
+- A branch and its bound selector commit together; the selector follows its
+  ordered scalar members and is removed with the branch. Member endpoints
+  never acquire connections from passive crossings or aggregate pin coincidence.
+- A selector's display binding identifies the selected endpoints/members. It
   reads the parent Net name, falling back to the current formal member name
   when unnamed. This fallback is display-only: it creates no name claim or
   virtual label connection. Stale text formatting cannot hide a changed name.
@@ -64,9 +78,10 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   never membership. Aggregate Junctions have no scalar junction dot. Formal
   SVG, PNG and PDF share this geometry and exclude editing controls.
 - Unknown members, unequal widths and malformed expressions refuse atomically.
-  Slices, bundles, connected interface/name/mapping migration, legacy scalar
-  conversion, bus group copy and member NoConnect authoring require subsequent
-  support and are refused without changing the circuit.
+  Fixed scalar sources cannot acquire vector or bundle width from a Label.
+  Connected interface/name/mapping migration, legacy scalar conversion, bus
+  group copy and member NoConnect authoring require subsequent support and
+  are refused without changing the circuit.
 
 ## Completed-edit connectivity
 

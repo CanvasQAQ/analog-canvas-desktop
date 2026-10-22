@@ -124,6 +124,7 @@ interface EditorShortcutDependencies {
   selectedHighlightNetId: SelectionInspection["selectedHighlightNetId"];
   setSimulationPickMode: SimulationPickCommands["setSimulationPickMode"];
   beginNetLabelEditing: PropertiesEditor["beginNetLabelEditing"];
+  beginWireLabelEditing: (position: Point) => boolean;
   cancelNetLabelEditing: PropertiesEditor["cancelNetLabelEditing"];
   commitInstancePropertyDraft: PropertiesEditor["commitInstancePropertyDraft"];
   commitPendingNetLabelDraft: PropertiesEditor["commitPendingNetLabelDraft"];
@@ -284,6 +285,7 @@ function createEditorShortcutHandler({
   selectedHighlightNetId,
   setSimulationPickMode,
   beginNetLabelEditing,
+  beginWireLabelEditing,
   cancelNetLabelEditing,
   commitInstancePropertyDraft,
   commitPendingNetLabelDraft,
@@ -523,7 +525,6 @@ function createEditorShortcutHandler({
         turnNetLabels();
         return;
       case "edit-net-label":
-        activateTool("pointer");
         {
           const pointer = lastCanvasPointRef.current;
           const position = pointer
@@ -535,6 +536,8 @@ function createEditorShortcutHandler({
                 x: viewBox.x + viewBox.width / 2,
                 y: viewBox.y + viewBox.height / 2,
               };
+          if (beginWireLabelEditing(position)) return;
+          activateTool("pointer");
           beginNetLabelEditing(
             position,
             selectedRoute

@@ -2,7 +2,7 @@
 
 Status: `accepted`
 
-Portable file schema: `75`; normalized editor model schema: `58`.
+Portable file schema: `76`; normalized editor model schema: `58`.
 
 Primary owner: `packages/project-protocol` (portable source and codec);
 `packages/model` validates the decoded editor model.
@@ -17,12 +17,12 @@ preserves.
 ## Read and write
 
 ```text
-import text -> parse JSON -> require Project file schema 24 through 75
--> migrate old files or decode 59–75 -> strict runtime model validation -> install unbound
-export -> validate -> encode file schema 75 -> readable canonical JSON -> download
+import text -> parse JSON -> require Project file schema 24 through 76
+-> migrate old files or decode 59–76 -> strict runtime model validation -> install unbound
+export -> validate -> encode file schema 76 -> readable canonical JSON -> download
 ```
 
-- `parseProject` reads schemas 24–75; writers always emit 75. Envelope
+- `parseProject` reads schemas 24–76; writers always emit 76. Envelope
   metadata uses `CURRENT_PROJECT_FILE_VERSION`, never the model version.
   Optional additions keep model 58; older envelopes cannot carry them.
 - The reader rejects mixed legacy/current field names, conflicting endpoints,
@@ -44,7 +44,7 @@ export -> validate -> encode file schema 75 -> readable canonical JSON -> downlo
   existing endpoint contact); parsing, Cloud open and recovery stay exact.
 - Canonical serialization ends with one newline and is byte-stable across
   serialize/parse/serialize. `fixtures/projects/compatibility-corpus.json`:
-  `current` entries are already canonical 75; `migrated` witnesses keep source
+  `current` entries are already canonical 76; `migrated` witnesses keep source
   bytes and version and load/save byte-stable; the rejected corpus names
   expected failures.
 - A migrated imported file is dirty; the browser-selected source is never
@@ -131,6 +131,13 @@ Cloud or recovery data.
   derives route/junction member `netId` from the same connection graph as
   scalar conductors. Older envelopes refuse these fields; bracket spelling
   alone never creates a signal declaration.
+
+- 76: explicit signal expressions support ordered lists and mixed-name
+  bundles. A slice selector's `net-name` binding stores ordered
+  `memberEndpoints`; a scalar selector keeps `memberEndpoint`. Both reference
+  the branch's resolved member endpoints, with no additional name claim.
+  Earlier envelopes refuse the new expressions and plural binding; legacy
+  comma or bracket spelling without a declaration remains scalar.
 
 ## One connection source
 

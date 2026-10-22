@@ -129,6 +129,55 @@ it("draws a declared Cell Pin as one four-member Wire and reads every member bac
   }
 });
 
+it("keeps an explicitly reordered subset and its nested slice in Agent snapshots", () => {
+  const f = fixture();
+  const members = f.document.netlist!.terminals[0]!.signal!.members;
+  const receipt = f.wire(
+    "subset",
+    {
+      kind: "endpoint",
+      endpoint: { kind: "terminal", instanceId: "input", pinName: "P" },
+      memberIds: [members[3]!.id, members[1]!.id, members[0]!.id],
+    },
+    { kind: "free", point: { x: 100, y: 0 } },
+  );
+  expect(receipt, JSON.stringify(receipt)).toMatchObject({
+    ok: true,
+    applied: true,
+  });
+  const subset = f
+    .snapshot()
+    .routes.find((route) => route.id === "subset-route")!;
+  expect(subset.members?.map((member) => member.startMemberId)).toEqual([
+    members[3]!.id,
+    members[1]!.id,
+    members[0]!.id,
+  ]);
+  const nested = f.wire(
+    "nested",
+    {
+      kind: "route-segment",
+      routeId: subset.id,
+      legId: subset.legs[0]!.id,
+      point: { x: 50, y: 0 },
+      memberIds: [subset.members![2]!.id, subset.members![0]!.id],
+    },
+    { kind: "free", point: { x: 50, y: 100 } },
+  );
+  expect(nested, JSON.stringify(nested)).toMatchObject({
+    ok: true,
+    applied: true,
+  });
+  const snapshot = f.snapshot();
+  const route = snapshot.routes.find((route) => route.id === "nested-route")!;
+  expect(
+    route.members?.map(
+      (member) => snapshot.nets.find((net) => net.id === member.netId)?.name,
+    ),
+  ).toEqual(["DATA<3>", "DATA<0>"]);
+  expect(snapshot.nets).toHaveLength(4);
+});
+
 it("takes the selected member from a bus endpoint without naming or joining another bit", () => {
   const f = fixture();
   const members = f.document.netlist!.terminals[0]!.signal!.members;
@@ -352,6 +401,133 @@ it("keeps two selected bits when one Agent batch splits their original trunk at 
   }
 });
 
+it("preserves ordered subsets when a wire batch rebases a second tap onto the first split", () => {
+  const f = fixture();
+  expect(
+    f.wire(
+      "trunk",
+      {
+        kind: "endpoint",
+        endpoint: { kind: "terminal", instanceId: "input", pinName: "P" },
+      },
+      { kind: "free", point: { x: 100, y: 0 } },
+    ),
+  ).toMatchObject({ ok: true });
+  const trunk = f.snapshot().routes[0]!;
+  const receipt = f.service.handle({
+    apiVersion: "3.0",
+    operation: "transact",
+    requestId: "subset-batch",
+    transactionId: "subset-batch",
+    documentId: "child",
+    expectedRevision: f.document.revision,
+    wireIntent: [
+      [3, 1],
+      [0, 2],
+    ].map((indices, branch) => ({
+      id: `subset-${branch}`,
+      from: {
+        kind: "route-segment",
+        routeId: trunk.id,
+        legId: trunk.legs[0]!.id,
+        memberIds: indices.map((index) => trunk.members![index]!.id),
+        point: { x: 50, y: 0 },
+      },
+      to: { kind: "free", point: { x: 50, y: branch ? -100 : 100 } },
+    })),
+  });
+  expect(receipt, JSON.stringify(receipt)).toMatchObject({
+    ok: true,
+    applied: true,
+  });
+  const snapshot = f.snapshot();
+  expect(
+    ["subset-0-route", "subset-1-route"].map((id) =>
+      snapshot.routes
+        .find((route) => route.id === id)!
+        .members?.map(
+          (member) =>
+            snapshot.nets.find((net) => net.id === member.netId)?.name,
+        ),
+    ),
+  ).toEqual([
+    ["DATA<0>", "DATA<2>"],
+    ["DATA<3>", "DATA<1>"],
+  ]);
+  expect(snapshot.nets).toHaveLength(4);
+});
+
+it.each(["unknown", "duplicate", "empty", "conflict", "expression", "width"])(
+  "refuses a %s subset after a valid tap without committing any part of the batch",
+  (failure) => {
+    const f = fixture();
+    expect(
+      f.wire(
+        "trunk",
+        {
+          kind: "endpoint",
+          endpoint: { kind: "terminal", instanceId: "input", pinName: "P" },
+        },
+        { kind: "free", point: { x: 100, y: 0 } },
+      ),
+    ).toMatchObject({ ok: true });
+    const trunk = f.snapshot().routes[0]!;
+    const before = structuredClone(f.document);
+    const ids = trunk.members!.map((member) => member.id);
+    const selection =
+      failure === "expression"
+        ? { selectionExpression: "UNKNOWN<1:0>" }
+        : {
+            memberIds:
+              failure === "unknown"
+                ? [ids[0], "missing"]
+                : failure === "duplicate"
+                  ? [ids[0], ids[0]]
+                  : failure === "empty"
+                    ? []
+                    : [ids[1], ids[0]],
+            ...(failure === "conflict" ? { memberId: ids[0] } : {}),
+          };
+    const from = {
+      kind: "route-segment",
+      routeId: trunk.id,
+      legId: trunk.legs[0]!.id,
+      point: { x: 50, y: 0 },
+    };
+    const receipt = f.service.handle({
+      apiVersion: "3.0",
+      operation: "transact",
+      requestId: "invalid-subset",
+      transactionId: "invalid-subset",
+      documentId: "child",
+      expectedRevision: before.revision,
+      wireIntent: [
+        {
+          id: "valid",
+          from: { ...from, memberIds: [ids[0], ids[1]] },
+          to: { kind: "free", point: { x: 50, y: 100 } },
+        },
+        {
+          id: "invalid",
+          from: { ...from, ...selection },
+          to:
+            failure === "width"
+              ? {
+                  kind: "endpoint",
+                  endpoint: {
+                    kind: "junction",
+                    junctionId: "trunk-to-junction",
+                  },
+                }
+              : { kind: "free", point: { x: 50, y: -100 } },
+        },
+      ],
+    });
+    expect(receipt.ok, JSON.stringify(receipt)).toBe(false);
+    expect(f.document).toEqual(before);
+  },
+);
+
 it.each(["endpoint", "route-segment", "stale"])(
   "refuses an invalid %s selection without leaving a split, branch or selector",
   (kind) => {
@@ -403,7 +579,7 @@ it.each(["endpoint", "route-segment", "stale"])(
   },
 );
 
-it.each(["scalar", "bus"])(
+it.each(["scalar", "bus", "subset"])(
   "refuses a %s running along another bit after leaving their shared bus endpoint",
   (kind) => {
     const f = fixture();
@@ -422,10 +598,13 @@ it.each(["scalar", "bus"])(
       "first-bit",
       {
         kind: "endpoint",
+        ...(kind === "subset"
+          ? { memberIds: [members[0]!.id, members[1]!.id] }
+          : {}),
         endpoint: {
           kind: "junction",
           junctionId: "trunk-to-junction",
-          memberId: members[0]!.id,
+          ...(kind !== "subset" ? { memberId: members[0]!.id } : {}),
         },
       },
       { kind: "free", point: { x: 100, y: 100 } },
@@ -443,6 +622,9 @@ it.each(["scalar", "bus"])(
         id: "overlap",
         from: {
           kind: "endpoint",
+          ...(kind === "subset"
+            ? { memberIds: [members[2]!.id, members[3]!.id] }
+            : {}),
           endpoint: {
             kind: "junction",
             junctionId: "trunk-to-junction",
@@ -464,6 +646,49 @@ it.each(["scalar", "bus"])(
     expect(f.document).toEqual(before);
   },
 );
+
+it("retains reversed subset order when clearance shortens its overlap with an existing slice", () => {
+  const f = fixture();
+  const members = f.document.netlist!.terminals[0]!.signal!.members;
+  const endpoint = {
+    kind: "endpoint",
+    endpoint: { kind: "terminal", instanceId: "input", pinName: "P" },
+  };
+  expect(
+    f.wire(
+      "slice",
+      { ...endpoint, memberIds: [members[0]!.id, members[1]!.id] },
+      { kind: "free", point: { x: 100, y: 0 } },
+    ),
+  ).toMatchObject({ ok: true });
+  const receipt = f.service.handle({
+    apiVersion: "3.0",
+    operation: "transact",
+    requestId: "reversed",
+    transactionId: "reversed",
+    documentId: "child",
+    expectedRevision: f.document.revision,
+    wireIntent: {
+      id: "reversed",
+      from: { ...endpoint, memberIds: [members[1]!.id, members[0]!.id] },
+      to: { kind: "free", point: { x: 50, y: 100 } },
+      waypoints: [{ x: 50, y: 0 }],
+    },
+  });
+  expect(receipt, JSON.stringify(receipt)).toMatchObject({
+    ok: true,
+    applied: true,
+  });
+  const snapshot = f.snapshot();
+  const branch = snapshot.routes.find(
+    (route) => route.id === "reversed-route",
+  )!;
+  expect(
+    branch.members?.map(
+      (member) => snapshot.nets.find((net) => net.id === member.netId)?.name,
+    ),
+  ).toEqual(["DATA<2>", "DATA<3>"]);
+});
 
 it("connects a selected bus interior member to a real scalar device terminal", () => {
   const f = fixture();

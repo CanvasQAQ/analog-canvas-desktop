@@ -704,7 +704,7 @@ it("establishes loose conductor width from a Label and refuses incompatible rena
   });
   expect(drawn.ok, JSON.stringify(drawn)).toBe(true);
   if (!drawn.ok) return;
-  for (const name of ["A,B", "DATA[3:0]", "DATA:3", "X".repeat(257)]) {
+  for (const name of ["A,,B", "DATA[3:0]", "DATA:3", "X".repeat(257)]) {
     const document = drawn.project.documents[0]!;
     const before = structuredClone(document);
     const invalid = planEnsureNamedRoute(document, "loose-route", {

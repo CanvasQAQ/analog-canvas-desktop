@@ -170,26 +170,58 @@ export const AgentWireAtAnchorSchema = z
   .describe(
     "Resolve a tap on the current draft, including earlier wires. Optional net or member restricts the intended Net; a tap joining a different crossing Net is rejected.",
   );
-const AgentWireIntentAnchorSchema = z.discriminatedUnion("kind", [
-  AgentWireAtAnchorSchema,
-  z
-    .strictObject({ kind: z.literal("net"), net: z.string().min(1) })
+export const AgentWireMemberSelectionShape = {
+  memberIds: z
+    .array(StableIdSchema)
+    .min(1)
+    .max(256)
+    .optional()
     .describe(
-      "Net ID or name; choose its nearest route to the other endpoint on the current draft.",
+      "Ordered stable member IDs of this endpoint or Route. Use only one of memberId, memberIds or selectionExpression.",
     ),
-  z.strictObject({
-    kind: z.literal("endpoint"),
-    endpoint: RouteEndpointSchema,
-  }),
-  z.strictObject({
-    kind: z.literal("route-segment"),
-    routeId: StableIdSchema,
-    legId: StableIdSchema,
-    memberId: StableIdSchema.optional(),
-    point: PointSchema,
-  }),
-  z.strictObject({ kind: z.literal("free"), point: PointSchema }),
-]);
+  selectionExpression: z
+    .string()
+    .min(1)
+    .max(256)
+    .optional()
+    .describe(
+      "Select existing source members by expression, preserving expansion order. Shorthand such as <3,0> requires one explicit indexed source context. This does not name Nets or widen a scalar.",
+    ),
+};
+const AgentWireIntentAnchorSchema = z
+  .discriminatedUnion("kind", [
+    AgentWireAtAnchorSchema,
+    z
+      .strictObject({ kind: z.literal("net"), net: z.string().min(1) })
+      .describe(
+        "Net ID or name; choose its nearest route to the other endpoint on the current draft.",
+      ),
+    z.strictObject({
+      kind: z.literal("endpoint"),
+      endpoint: RouteEndpointSchema,
+      ...AgentWireMemberSelectionShape,
+    }),
+    z.strictObject({
+      kind: z.literal("route-segment"),
+      routeId: StableIdSchema,
+      legId: StableIdSchema,
+      memberId: StableIdSchema.optional(),
+      ...AgentWireMemberSelectionShape,
+      point: PointSchema,
+    }),
+    z.strictObject({ kind: z.literal("free"), point: PointSchema }),
+  ])
+  .refine((anchor) => {
+    if (anchor.kind !== "endpoint" && anchor.kind !== "route-segment")
+      return true;
+    const memberId =
+      anchor.kind === "endpoint" ? anchor.endpoint.memberId : anchor.memberId;
+    return (
+      [memberId, anchor.memberIds, anchor.selectionExpression].filter(
+        (value) => value !== undefined,
+      ).length <= 1
+    );
+  }, "Use only one of memberId, memberIds or selectionExpression");
 export const AgentWireIntentSchema = z.strictObject({
   id: StableIdSchema,
   from: AgentWireIntentAnchorSchema,

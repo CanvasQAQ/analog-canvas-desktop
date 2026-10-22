@@ -451,7 +451,7 @@ export function applyRouteTopologyEdit(
         );
       }
       if (
-        !route.members &&
+        route.members ||
         routeEndpoints(route).some((endpoint) => endpoint.memberId)
       ) {
         draft.annotations = draft.annotations.filter((annotation) => {
@@ -459,6 +459,8 @@ export function applyRouteTopologyEdit(
             !annotation.locked &&
             annotation.kind === "net-label" &&
             annotation.binding?.kind === "net-name" &&
+            (!route.members ||
+              annotation.binding.memberEndpoints !== undefined) &&
             annotation.anchor.kind === "route" &&
             annotation.anchor.routeId === route.id &&
             !draft.connectivityEvidence.some(

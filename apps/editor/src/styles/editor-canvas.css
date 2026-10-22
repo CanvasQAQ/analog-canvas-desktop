@@ -1382,8 +1382,17 @@
   display: grid;
   gap: 4px;
 }
-.wire-member-choice select {
+.wire-member-choice select,
+.wire-member-choice input {
   width: 100%;
+}
+.wire-member-choice form {
+  display: grid;
+  gap: 4px;
+}
+.wire-member-choice [aria-label="Bus selection preview"] {
+  max-height: 36px;
+  overflow: auto;
 }
 .wire-member-choice button {
   justify-self: end;

@@ -410,6 +410,8 @@ export function EditorCanvasSurface({
           <WireMemberChoiceOverlay
             memberChoice={wiring.memberChoice}
             onWireMemberChoose={wiring.onWireMemberChoose}
+            onWireExpressionPreview={wiring.onWireExpressionPreview}
+            onWireExpressionChoose={wiring.onWireExpressionChoose}
             onWireMemberCancel={wiring.onWireMemberCancel}
             viewBox={wiring.viewBox}
           />

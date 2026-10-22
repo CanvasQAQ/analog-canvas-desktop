@@ -65,6 +65,17 @@ export const AnnotationTextBindingSchema = z.discriminatedUnion("kind", [
       (endpoint) => Boolean(endpoint.memberId),
       "A selector requires an explicit member",
     ).optional(),
+    /** A subset selector reads these ordered, stable electrical endpoints. */
+    memberEndpoints: z
+      .array(
+        RouteEndpointSchema.refine(
+          (endpoint) => Boolean(endpoint.memberId),
+          "A selector requires explicit members",
+        ),
+      )
+      .min(2)
+      .max(256)
+      .optional(),
   }),
   z.strictObject({
     kind: z.literal("cell-terminal-name"),

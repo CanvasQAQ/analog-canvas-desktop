@@ -66,10 +66,11 @@ redraws seen drawings), whether the name was typed, connected or generated:
   edit.
 - Styling-only changes never rename; a hidden character left with nothing to
   hide it is shown, not dropped.
-- Adding/removing an overbar in the Net or Cell Pin label editor renames
+- Adding/removing an overbar in a scalar Net or Cell Pin label editor renames
   (`D` ↔ `D_bar`); creating a barred Net Label follows the same rule, without
   doubling `_bar`. This names a separate signal, not an automatic inverter.
-  On a device Reference an overbar is styling. An older bound signal label
+  On a device Reference or a new vector/bundle expression an overbar is
+  styling. An older bound signal label
   barred without `_bar` keeps its name and look; existing ERC reports the
   mismatch and suggests an explicit rename. Loading, copying and Project Code
   format changes never infer a rename from the bar.
@@ -131,7 +132,7 @@ to a name or netlist. `legacyLooks` (pre-standard drawings only) also
 converts looks that merely copy the historical look and straightens scripts
 that inherited italic.
 
-Explicit vector/indexed authoring and legacy bracket compatibility follow
+Explicit signal expressions, inline Wire naming and legacy scalar compatibility follow
 [ordered signals](connectivity-and-routing.md#ordered-signals-and-buses).
 
 ## Netlist

@@ -8,9 +8,10 @@ import {
   routeEnd,
   type Point,
   type RouteBranch,
+  type RouteEndpoint,
   type SchematicDocument,
 } from "@icm/model";
-import type { SymbolResolver } from "@icm/symbols";
+import { resolveInstanceSymbol, type SymbolResolver } from "@icm/symbols";
 
 import { escapeXml, pointList } from "./svg-markup.js";
 
@@ -27,18 +28,59 @@ export function busStrokeProfile(
     : profile;
 }
 
-/** A small slash identifies a scalar takeoff without implying a bus-wide dot. */
+function aggregateMemberIds(
+  document: SchematicDocument,
+  resolver: SymbolResolver,
+  endpoint: RouteEndpoint,
+): readonly string[] | undefined {
+  if (endpoint.kind === "junction")
+    return document.junctions
+      .find((junction) => junction.id === endpoint.junctionId)
+      ?.members?.map((member) => member.id);
+  const local =
+    endpoint.pinName === "P"
+      ? document.netlist?.terminals.find((terminal) =>
+          terminal.interfaceInstanceIds.includes(endpoint.instanceId),
+        )?.signal?.members
+      : undefined;
+  if (local) return local.map((member) => member.id);
+  const instance = document.instances.find(
+    (item) => item.id === endpoint.instanceId,
+  );
+  return instance
+    ? resolveInstanceSymbol(resolver, instance)
+        ?.definition.pins.find((pin) => pin.name === endpoint.pinName)
+        ?.signalMembers?.map((member) => member.id)
+    : undefined;
+}
+
+/** A small slash identifies a member takeoff without implying a bus-wide dot. */
 export function busTapMarks(
+  document: SchematicDocument,
+  resolver: SymbolResolver,
   route: RouteBranch,
   centerline: readonly Point[],
 ): Array<{
-  memberId: string;
+  memberIds: readonly string[];
   from: Point;
   to: Point;
 }> {
-  if (route.members || centerline.length < 2) return [];
+  if (centerline.length < 2) return [];
   return [route.start, routeEnd(route)].flatMap((endpoint, index) => {
-    if (!endpoint.memberId) return [];
+    let memberIds: readonly string[];
+    if (endpoint.memberId) memberIds = [endpoint.memberId];
+    else if (route.members) {
+      memberIds = route.members.map((member) =>
+        index === 0 ? member.startMemberId : member.endMemberId,
+      );
+      const aggregate = aggregateMemberIds(document, resolver, endpoint);
+      if (
+        !aggregate ||
+        (memberIds.length === aggregate.length &&
+          memberIds.every((id, i) => id === aggregate[i]))
+      )
+        return [];
+    } else return [];
     const points = index === 0 ? centerline : [...centerline].reverse();
     const origin = points[0]!;
     const next = points.find(
@@ -53,7 +95,7 @@ export function busTapMarks(
     const center = { x: origin.x + dx * distance, y: origin.y + dy * distance };
     return [
       {
-        memberId: endpoint.memberId,
+        memberIds,
         from: {
           x: center.x - (dx - dy) * half,
           y: center.y - (dy + dx) * half,

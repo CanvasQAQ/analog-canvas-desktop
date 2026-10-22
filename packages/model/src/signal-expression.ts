@@ -1,4 +1,5 @@
 import type { ConnectivityEvidence, SchematicDocument } from "./schema.js";
+import { foldNetName } from "./net-name.js";
 
 /** Read-only scalar names from each owner; no copied editable name claims. */
 export function scalarConnectivityEvidence(
@@ -22,24 +23,71 @@ export function parseSignalExpression(expression: string): readonly string[] {
   const text = expression.trim();
   if (!text || text.length > 256)
     throw new Error("A signal expression needs 1–256 characters");
-  if (text.includes(","))
-    throw new Error("Ordered subsets and mixed bundles are not supported yet");
-  const match = /^([^<>\[\]\s:,]+)<(\d+)(?::(\d+))?>$/u.exec(text);
-  if (!match) {
-    if (/[<>\[\]:]/u.test(text))
-      throw new Error("Use a scalar name, NAME<index>, or NAME<first:last>");
-    if (/\s/u.test(text))
-      throw new Error("A signal name cannot contain whitespace");
-    return [text];
+  const terms: string[] = [];
+  let start = 0;
+  let indexed = false;
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
+    if (character === "<") {
+      if (indexed) throw new Error("Nested signal brackets are not supported");
+      indexed = true;
+    } else if (character === ">") {
+      if (!indexed) throw new Error("Signal brackets must be paired");
+      indexed = false;
+    } else if (character === "," && !indexed) {
+      terms.push(text.slice(start, index).trim());
+      start = index + 1;
+    }
   }
-  const first = Number(match[2]);
-  const last = Number(match[3] ?? match[2]);
-  if (first > 65535 || last > 65535)
-    throw new Error("Signal indices must be between 0 and 65535");
-  const width = Math.abs(last - first) + 1;
-  if (width > 256) throw new Error("A signal may contain at most 256 members");
-  return Array.from(
-    { length: width },
-    (_, index) => `${match[1]}<${first + index * (last < first ? -1 : 1)}>`,
-  );
+  if (indexed) throw new Error("Signal brackets must be paired");
+  terms.push(text.slice(start).trim());
+  const members: string[] = [];
+  for (const term of terms) {
+    const match = /^([^<>\[\]\s:,]+)<([^<>]+)>$/u.exec(term);
+    if (!match) {
+      if (!term || /[<>\[\]\s:,]/u.test(term))
+        throw new Error(
+          "Use scalar names, NAME<index>, ranges or ordered index lists",
+        );
+      members.push(term);
+    } else {
+      for (const selection of match[2]!.split(",")) {
+        const indices = /^(\d+)(?::(\d+))?$/u.exec(selection);
+        if (!indices)
+          throw new Error(
+            "Signal indices must be integers or inclusive ranges",
+          );
+        const first = Number(indices[1]);
+        const last = Number(indices[2] ?? indices[1]);
+        if (first > 65535 || last > 65535)
+          throw new Error("Signal indices must be between 0 and 65535");
+        const width = Math.abs(last - first) + 1;
+        if (members.length + width > 256)
+          throw new Error("A signal may contain at most 256 members");
+        for (let index = 0; index < width; index++)
+          members.push(
+            `${match[1]}<${first + index * (last < first ? -1 : 1)}>`,
+          );
+      }
+    }
+    if (members.length > 256)
+      throw new Error("A signal may contain at most 256 members");
+  }
+  if (new Set(members.map(foldNetName)).size !== members.length)
+    throw new Error("Signal members must be unique");
+  return members;
+}
+
+/** Display only: the ordered identities remain the binding, not this short text. */
+export function formatSignalMembers(names: readonly string[]): string {
+  const indexed = names.map((name) => /^([^<>]+)<(\d+)>$/u.exec(name));
+  const first = indexed[0];
+  if (!first || indexed.some((member) => !member || member[1] !== first[1]))
+    return names.join(",");
+  const indices = indexed.map((member) => Number(member![2]));
+  const step = indices.length > 1 ? indices[1]! - indices[0]! : 0;
+  const contiguous =
+    Math.abs(step) === 1 &&
+    indices.every((value, index) => value === indices[0]! + index * step);
+  return `${first[1]}<${contiguous ? `${indices[0]}:${indices.at(-1)}` : indices.join(",")}>`;
 }

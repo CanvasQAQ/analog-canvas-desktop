@@ -1,5 +1,9 @@
 import { createEmptyDocument, createRoutePath } from "@icm/model";
-import { InMemorySymbolResolver } from "@icm/symbols";
+import {
+  builtInSymbols,
+  createBlockSymbol,
+  InMemorySymbolResolver,
+} from "@icm/symbols";
 import { expect, it } from "vitest";
 import { buildSvgScene, renderDocumentSvg } from "./render.js";
 
@@ -105,3 +109,125 @@ it("keeps a member mark inside a cropped export when a scalar is thicker than it
   expect(cropped.formalBody).toContain('data-role="bus-tap"');
   expect(cropped.formalBody).not.toContain('data-object-id="west"');
 });
+
+it.each([{ indices: [3, 1] }, { indices: [3, 2, 1, 0] }])(
+  "marks an ordered bus takeoff $indices without relying on a selector Label",
+  ({ indices }) => {
+    const document = busDrawing();
+    const members = indices.map(
+      (index) => document.junctions[1]!.members![index]!,
+    );
+    document.junctions[3]!.members = members;
+    document.junctions[3]!.netId = members[0]!.netId;
+    document.routes[2] = createRoutePath({
+      id: "branch",
+      netId: members[0]!.netId,
+      start: { kind: "junction", junctionId: "tap" },
+      end: { kind: "junction", junctionId: "branch-end" },
+      bends: [],
+      modes: ["manual"],
+      members: members.map((member) => ({
+        ...member,
+        id: `branch-${member.id}`,
+        startMemberId: member.id,
+        endMemberId: member.id,
+      })),
+    });
+    expect(document.annotations).toHaveLength(0);
+    const scene = buildSvgScene(document, resolver);
+    expect(scene.formalBody.match(/data-role="bus-tap"/gu)).toHaveLength(1);
+    expect(scene.formalBody).toContain('data-route-id="branch"');
+    const cropped = buildSvgScene(document, resolver, {
+      objectIds: new Set(["branch"]),
+      margin: 0,
+    });
+    expect(cropped.formalBody).toContain('data-role="bus-tap"');
+    expect(cropped.viewBox.x).toBeCloseTo(95.8);
+    expect(cropped.viewBox.x + cropped.viewBox.width).toBeCloseTo(104.2);
+    expect(
+      renderDocumentSvg(document, resolver, {
+        objectIds: new Set(["branch"]),
+        margin: 0,
+      }),
+    ).toContain(cropped.formalBody);
+  },
+);
+
+it("leaves an identity whole-bus continuation unmarked", () => {
+  const document = busDrawing();
+  document.routes.pop();
+  const scene = buildSvgScene(document, resolver);
+  expect(scene.formalBody).not.toContain('data-role="bus-tap"');
+});
+
+it.each(["Cell Pin", "hierarchical pin"])(
+  "marks a slice landing on a %s from its ordered declaration",
+  (kind) => {
+    const document = busDrawing();
+    const members = document.junctions[1]!.members!;
+    const terminal = {
+      id: "formal",
+      name: "DATA<3:0>",
+      netId: "net-0",
+      direction: "input" as const,
+      interfaceInstanceIds: ["P1"],
+      signal: {
+        expression: "DATA<3:0>",
+        members: members.map((member, index) => ({
+          ...member,
+          name: `DATA<${3 - index}>`,
+        })),
+      },
+    };
+    const block = createBlockSymbol({
+      id: "child",
+      name: "Child",
+      terminals: [
+        {
+          ...terminal,
+          signalMembers: terminal.signal.members.map(({ id, name }) => ({
+            id,
+            name,
+          })),
+        },
+      ],
+    });
+    const sourceResolver = new InMemorySymbolResolver([
+      ...builtInSymbols,
+      block,
+    ]);
+    document.instances.push({
+      id: "P1",
+      symbolId: kind === "Cell Pin" ? "port" : "child",
+      placement: { position: { x: 100, y: 0 }, rotation: 0, mirror: "none" },
+    });
+    if (kind === "Cell Pin") document.netlist!.terminals.push(terminal);
+    const pinName = kind === "Cell Pin" ? "P" : "DATA<3:0>";
+    for (const [index, member] of members.entries())
+      document.nets[index]!.terminals.push({
+        instanceId: "P1",
+        pinName,
+        memberId: member.id,
+      });
+    const selected = [members[3]!, members[1]!];
+    document.junctions[3]!.members = selected;
+    document.junctions[3]!.netId = selected[0]!.netId;
+    document.routes[2] = createRoutePath({
+      id: "branch",
+      netId: selected[0]!.netId,
+      start: { kind: "junction", junctionId: "branch-end" },
+      end: { kind: "terminal", instanceId: "P1", pinName },
+      bends: [],
+      modes: ["manual"],
+      members: selected.map((member) => ({
+        ...member,
+        id: `branch-${member.id}`,
+        startMemberId: member.id,
+        endMemberId: member.id,
+      })),
+    });
+    const scene = buildSvgScene(document, sourceResolver);
+    expect(scene.formalBody.match(/data-role="bus-tap"/gu)).toHaveLength(1);
+    expect(scene.formalBody).toContain('data-member-ids="bit-3 bit-1"');
+  },
+);
