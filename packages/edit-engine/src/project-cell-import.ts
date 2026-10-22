@@ -13,6 +13,12 @@ import {
 
 import type { ProjectStructureEdit } from "./project-transaction.js";
 import { planExternalCopyDependencies } from "./project-copy-dependencies.js";
+import {
+  allocateCopiedMemberIds,
+  remapImportedMembers,
+  copyCallerArtwork,
+  type CopiedMemberIds,
+} from "./project-copy-members.js";
 
 export type ProjectCellImportFailureCode =
   | "SOURCE_CELL_NOT_FOUND"
@@ -26,6 +32,8 @@ export type ProjectCellImportPlan =
   | {
       ok: true;
       status: "ready";
+      documentIds: Readonly<Record<string, string>>;
+      memberIds: CopiedMemberIds;
       rootDocumentId: string;
       importedDocumentIds: readonly string[];
       edits: readonly ProjectStructureEdit[];
@@ -53,6 +61,9 @@ const ID_VALUE_KEYS = new Set([
   "instanceId",
   "junctionId",
   "legId",
+  "memberId",
+  "startMemberId",
+  "endMemberId",
   "netId",
   "nmosNetId",
   "objectId",
@@ -302,6 +313,9 @@ export function planProjectCellImport(
     identifierMap.set(sourceId, targetId);
 
   const names = importedCellNames(destination, source, closure);
+  const memberIds = allocateCopiedMemberIds(closure, (id) =>
+    identifierMap.get(id)!,
+  );
   if (options.sharedSnapshot)
     for (const document of closure) {
       const existing = destination.documents.find(
@@ -310,11 +324,15 @@ export function planProjectCellImport(
       if (existing)
         names.set(document.id, existing.netlist?.name ?? existing.name);
     }
+  const artworkEdits: ProjectStructureEdit[] = [];
   const importedDocuments = closure.map((document) => {
     const remapped = remapImportedIdentifierValues(
       document,
       identifierMap,
     ) as SchematicDocument;
+    remapImportedMembers(document, remapped, source, memberIds, (id) =>
+      identifierMap.get(id)!,
+    );
     const name = names.get(document.id)!;
     remapped.name = name;
     if (remapped.netlist) remapped.netlist.name = name;
@@ -332,8 +350,29 @@ export function planProjectCellImport(
         );
         // A Library gate or flip-flop bound to the Cell keeps its symbol
         // (#1450, #1689).
-        if (child && !bindsProjectCell(instance.symbolId))
-          instance.symbolId = hierarchicalSymbolId(names.get(child.id)!);
+        if (child && !bindsProjectCell(instance.symbolId)) {
+          const captured = source.componentDefinitions?.find(
+            (component) =>
+              component.symbol.id === instance.symbolId &&
+              !component.generatedFrom &&
+              !component.circuitBinding,
+          );
+          if (captured) {
+            const copy = copyCallerArtwork(captured, child, memberIds);
+            instance.symbolId = copy.symbol.id;
+            if (
+              !artworkEdits.some(
+                (edit) =>
+                  edit.kind === "capture_component_definition" &&
+                  edit.definition.symbol.id === copy.symbol.id,
+              )
+            )
+              artworkEdits.push({
+                kind: "capture_component_definition",
+                definition: copy,
+              });
+          } else instance.symbolId = hierarchicalSymbolId(names.get(child.id)!);
+        }
       } else if (binding?.kind === "external-subcircuit") {
         const definition = [
           ...destination.externalSubcircuitDefinitions,
@@ -379,6 +418,7 @@ export function planProjectCellImport(
     }
   const edits: ProjectStructureEdit[] = [
     ...dependencies.edits,
+    ...artworkEdits,
     ...importedDocuments
       .filter(
         (document) =>
@@ -399,6 +439,10 @@ export function planProjectCellImport(
   return {
     ok: true,
     status: "ready",
+    documentIds: Object.fromEntries(
+      closure.map((document) => [document.id, identifierMap.get(document.id)!]),
+    ),
+    memberIds,
     rootDocumentId,
     importedDocumentIds: importedDocuments.map((document) => document.id),
     edits,

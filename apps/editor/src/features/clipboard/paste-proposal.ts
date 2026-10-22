@@ -24,7 +24,6 @@ import type {
 import type { SymbolResolver } from "@icm/symbols";
 import {
   createRoutePath,
-  deriveStableId,
   controlledSourceExpressionDocument,
   controlledSourceExpressionSource,
   defaultControlledSourceExpression,
@@ -38,12 +37,12 @@ import { uniqueInductorCouplingName } from "@icm/derived";
 
 import { createNewInstance } from "../netlist-export/netlist-authoring";
 import type { SchematicClipboard } from "./clipboard";
+import { pastedMembers } from "./paste-members";
 import {
   nextUnconstrainedReference,
   pastedIdentities,
 } from "./paste-identities";
 import {
-  mapEndpoint,
   movePoint,
   remapPastedDraftingAnchors,
   remapPastedVisualAnchor,
@@ -322,6 +321,13 @@ export function proposePaste(
     ...annotationIds,
     ...draftingIds,
   ]);
+  const members = pastedMembers(
+    clipboard,
+    pasted,
+    netIds,
+    instanceIds,
+    junctionIds,
+  );
   const interfaceEdits: SchematicEdit[] = [];
   const sourceNeedsCellInterface =
     clipboard.cellTerminals.length > 0 || clipboard.formalParameters.length > 0;
@@ -456,22 +462,9 @@ export function proposePaste(
         ...terminal,
         id: terminalIds.get(terminal.id)!,
         netId: netIds.get(terminal.netId) ?? terminal.netId,
-        ...(terminal.signal?.members.length === 1
+        ...(terminal.signal
           ? {
-              signal: {
-                ...terminal.signal,
-                members: [
-                  {
-                    ...terminal.signal.members[0]!,
-                    id: deriveStableId(
-                      "signal-member",
-                      terminalIds.get(terminal.id)!,
-                      "0",
-                    ),
-                    netId: netIds.get(terminal.netId) ?? terminal.netId,
-                  },
-                ],
-              },
+              signal: members.signal("formal", terminal.id, terminal.signal),
             }
           : {}),
         interfaceInstanceIds: copiedMarkerIds,
@@ -514,7 +507,7 @@ export function proposePaste(
           });
           return [];
         }
-        return [{ kind: "terminal", instanceId, pinName: terminal.pinName }];
+        return [members.endpoint({ kind: "terminal", ...terminal })];
       },
     );
     if (mappedTerminals[0]) {
@@ -610,9 +603,8 @@ export function proposePaste(
           ...structuredClone(noConnect),
           id: noConnectIds.get(noConnect.id)!,
           endpoint: {
-            kind: "terminal",
+            ...noConnect.endpoint,
             instanceId: instanceIds.get(noConnect.endpoint.instanceId)!,
-            pinName: noConnect.endpoint.pinName,
           },
         },
       };
@@ -625,6 +617,15 @@ export function proposePaste(
         kind: "add_junction",
         junctionId: junctionIds.get(junction.id)!,
         netId,
+        ...(junction.members
+          ? {
+              members: junction.members.map((item) => ({
+                ...item,
+                id: members.member("junction", junction.id, item.id),
+                netId: netIds.get(item.netId)!,
+              })),
+            }
+          : {}),
         position: movePoint(junction.position, offset),
         ...(junction.role ? { role: junction.role } : {}),
         ...(junction.contactAnchor &&
@@ -633,6 +634,14 @@ export function proposePaste(
               contactAnchor: {
                 ...junction.contactAnchor,
                 instanceId: instanceIds.get(junction.contactAnchor.instanceId)!,
+                ...(junction.contactAnchor.memberId
+                  ? {
+                      memberId: members.endpoint({
+                        kind: "terminal",
+                        ...junction.contactAnchor,
+                      }).memberId!,
+                    }
+                  : {}),
               },
             }
           : {}),
@@ -654,14 +663,8 @@ export function proposePaste(
       clone.id = evidenceIds.get(evidence.id)!;
       clone.netId = netIds.get(clone.netId) ?? clone.netId;
       if (clone.kind === "name-claim") {
-        if (clone.signal?.members.length === 1) {
-          clone.signal.members[0]!.id = deriveStableId(
-            "signal-member",
-            clone.id,
-            "0",
-          );
-          clone.signal.members[0]!.netId = clone.netId;
-        }
+        if (clone.signal)
+          clone.signal = members.signal("claim", evidence.id, clone.signal);
         switch (clone.owner.kind) {
           case "net-label":
             clone.owner.annotationId =
@@ -687,8 +690,9 @@ export function proposePaste(
       createRoutePath({
         id: routeIds.get(source.id)!,
         netId: netIds.get(source.netId)!,
-        start: mapEndpoint(source.start, instanceIds, junctionIds),
-        end: mapEndpoint(routeEnd(source), instanceIds, junctionIds),
+        start: members.endpoint(source.start),
+        end: members.endpoint(routeEnd(source)),
+        ...(source.members ? { members: members.route(source)! } : {}),
         bends: routeBends(source).map((point) => movePoint(point, offset)),
         modes: source.legs.map((leg) => leg.mode),
         ...(source.presentation ? { presentation: source.presentation } : {}),
@@ -795,8 +799,22 @@ export function proposePaste(
           ...(clone.binding?.kind === "net-name"
             ? {
                 binding: {
-                  kind: "net-name" as const,
+                  ...clone.binding,
                   netId: netIds.get(clone.binding.netId) ?? clone.binding.netId,
+                  ...(clone.binding.memberEndpoint
+                    ? {
+                        memberEndpoint: members.endpoint(
+                          clone.binding.memberEndpoint,
+                        ),
+                      }
+                    : {}),
+                  ...(clone.binding.memberEndpoints
+                    ? {
+                        memberEndpoints: clone.binding.memberEndpoints.map(
+                          members.endpoint,
+                        ),
+                      }
+                    : {}),
                 },
               }
             : clone.binding?.kind === "cell-terminal-name"

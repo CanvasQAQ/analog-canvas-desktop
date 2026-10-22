@@ -98,7 +98,7 @@ it.each(["IN", "DATA<2>"])(
     expect(created.project).toEqual(original);
   },
 );
-it("refuses bus copy before remapping any member identities", () => {
+it("copies a vector Cell Pin with independent ordered members across Projects", () => {
   const source = createEmptyProject("bus-copy", "Bus copy");
   const document = source.documents[0]!;
   const created = executeProjectTransaction(source, {
@@ -134,9 +134,35 @@ it("refuses bus copy before remapping any member identities", () => {
   );
   if (!clipboard)
     throw new Error("Bus pin copy capture unexpectedly returned nothing");
-  expect(() => prepareProjectCopy(created.project, cell, clipboard)).toThrow(
-    /bus groups.*not supported/u,
+  const copied = place(
+    createEmptyProject("bus-destination", "Destination"),
+    clipboard,
   );
+  const terminal = copied.documents[0]!.netlist!.terminals[0]!;
+  expect(terminal.signal!.members.map((member) => member.name)).toEqual([
+    "DATA<3>",
+    "DATA<2>",
+    "DATA<1>",
+    "DATA<0>",
+  ]);
+  expect(
+    new Set(terminal.signal!.members.map((member) => member.netId)).size,
+  ).toBe(4);
+  for (const member of terminal.signal!.members) {
+    expect(
+      cell.netlist!.terminals[0]!.signal!.members.some(
+        (source) => source.id === member.id,
+      ),
+    ).toBe(false);
+    expect(
+      copied.documents[0]!.nets.find((net) => net.id === member.netId)!
+        .terminals,
+    ).toContainEqual({
+      instanceId: terminal.interfaceInstanceIds[0],
+      pinName: "P",
+      memberId: member.id,
+    });
+  }
   expect(created.project).toEqual(before);
 });
 function place(
@@ -153,110 +179,125 @@ function place(
   );
   return applyProjectCopyPlacement(plan);
 }
-it("copies an explicitly indexed scalar Label with its independent claim", () => {
-  let source = createEmptyProject("scalar-label-copy", "Scalar Label copy");
-  const commit = (edits: ProjectStructureEdit[]) => {
-    const result = executeProjectTransaction(source, {
-      transactionId: `edit-${source.structureRevision}`,
-      projectId: source.id,
-      expectedStructureRevision: source.structureRevision,
-      actor: { kind: "human", id: "test" },
-      edits,
+it.each([
+  ["DATA<2>", ["DATA<2>"]],
+  ["DATA<3,1>,CLK", ["DATA<3>", "DATA<1>", "CLK"]],
+] as const)(
+  "copies Label %s with its independent ordered claim",
+  (expression, names) => {
+    let source = createEmptyProject("scalar-label-copy", "Scalar Label copy");
+    const commit = (edits: ProjectStructureEdit[]) => {
+      const result = executeProjectTransaction(source, {
+        transactionId: `edit-${source.structureRevision}`,
+        projectId: source.id,
+        expectedStructureRevision: source.structureRevision,
+        actor: { kind: "human", id: "test" },
+        edits,
+      });
+      expect(result.ok, JSON.stringify(result)).toBe(true);
+      if (!result.ok) throw new Error(result.error.message);
+      source = result.project;
+    };
+    const document = source.documents[0]!;
+    const wire = proposeWireIntent(
+      document,
+      createProjectSymbolResolver(source, builtInSymbols),
+      {
+        id: "scalar",
+        from: { kind: "free", point: { x: 0, y: 0 } },
+        to: { kind: "free", point: { x: 100, y: 0 } },
+      },
+    );
+    if (typeof wire === "string") throw new Error(wire);
+    commit([
+      {
+        kind: "transact_document",
+        documentId: document.id,
+        expectedRevision: document.revision,
+        edits: wire.edits,
+      },
+    ]);
+    const wired = source.documents[0]!;
+    const route = wired.routes[0]!;
+    const named = planEnsureNamedRoute(wired, route.id, {
+      name: expression,
+      candidateNetId: route.netId,
+      evidenceId: "label-claim",
+      owner: { kind: "net-label", annotationId: "label" },
     });
-    expect(result.ok, JSON.stringify(result)).toBe(true);
-    if (!result.ok) throw new Error(result.error.message);
-    source = result.project;
-  };
-  const document = source.documents[0]!;
-  const wire = proposeWireIntent(
-    document,
-    createProjectSymbolResolver(source, builtInSymbols),
-    {
-      id: "scalar",
-      from: { kind: "free", point: { x: 0, y: 0 } },
-      to: { kind: "free", point: { x: 100, y: 0 } },
-    },
-  );
-  if (typeof wire === "string") throw new Error(wire);
-  commit([
-    {
-      kind: "transact_document",
-      documentId: document.id,
-      expectedRevision: document.revision,
-      edits: wire.edits,
-    },
-  ]);
-  const wired = source.documents[0]!;
-  const route = wired.routes[0]!;
-  const named = planEnsureNamedRoute(wired, route.id, {
-    name: "DATA<2>",
-    candidateNetId: route.netId,
-    evidenceId: "label-claim",
-    owner: { kind: "net-label", annotationId: "label" },
-  });
-  if (!named.ok) throw new Error(named.message);
-  commit([
-    {
-      kind: "transact_document",
-      documentId: wired.id,
-      expectedRevision: wired.revision,
-      edits: [
-        ...named.edits,
-        {
-          kind: "upsert_schematic_annotation",
-          annotation: {
-            id: "label",
-            kind: "net-label",
-            netId: route.netId,
-            binding: { kind: "net-name", netId: route.netId },
-            anchor: {
-              kind: "route",
-              routeId: route.id,
-              legId: route.legs[0]!.id,
-              t: 0.5,
-              normalOffset: 10,
-              direction: "forward",
-              orientation: "horizontal",
-              fallbackPosition: { x: 50, y: 10 },
+    if (!named.ok) throw new Error(named.message);
+    commit([
+      {
+        kind: "transact_document",
+        documentId: wired.id,
+        expectedRevision: wired.revision,
+        edits: [
+          ...named.edits,
+          {
+            kind: "upsert_schematic_annotation",
+            annotation: {
+              id: "label",
+              kind: "net-label",
+              netId: route.netId,
+              binding: { kind: "net-name", netId: route.netId },
+              anchor: {
+                kind: "route",
+                routeId: route.id,
+                legId: route.legs[0]!.id,
+                t: 0.5,
+                normalOffset: 10,
+                direction: "forward",
+                orientation: "horizontal",
+                fallbackPosition: { x: 50, y: 10 },
+              },
+              alignment: "middle",
+              rotation: 0,
+              locked: false,
             },
-            alignment: "middle",
-            rotation: 0,
-            locked: false,
           },
-        },
-      ],
-    },
-  ]);
-  const authored = source.documents[0]!;
-  const copied = place(
-    createEmptyProject("target-label", "Target Label"),
-    captureProjectCopy(source, authored, {
-      ...selection([], [route.id]),
-      annotationIds: ["label"],
-    })!,
-  ).documents[0]!;
-  const claim = copied.connectivityEvidence.find(
-    (item) => item.kind === "name-claim",
-  )!;
-  if (claim.kind !== "name-claim")
-    throw new Error("Expected copied name claim");
-  const original = authored.connectivityEvidence.find(
-    (item) => item.kind === "name-claim",
-  )!;
-  if (original.kind !== "name-claim")
-    throw new Error("Expected original name claim");
-  expect(claim.signal?.members).toEqual([
-    { id: expect.any(String), name: "DATA<2>", netId: claim.netId },
-  ]);
-  expect(claim.signal!.members[0]!.id).not.toBe(
-    original.signal!.members[0]!.id,
-  );
-  expect(claim.netId).not.toBe(original.netId);
-  expect(
-    resolveDocumentLogicalNets(copied).byBaseNetId.get(claim.netId)?.name,
-  ).toBe("DATA<2>");
-  expect(copied.routes[0]!.netId).toBe(claim.netId);
-});
+        ],
+      },
+    ]);
+    const authored = source.documents[0]!;
+    const copied = place(
+      createEmptyProject("target-label", "Target Label"),
+      captureProjectCopy(source, authored, {
+        ...selection([], [route.id]),
+        annotationIds: ["label"],
+      })!,
+    ).documents[0]!;
+    const claim = copied.connectivityEvidence.find(
+      (item) => item.kind === "name-claim",
+    )!;
+    if (claim.kind !== "name-claim")
+      throw new Error("Expected copied name claim");
+    const original = authored.connectivityEvidence.find(
+      (item) => item.kind === "name-claim",
+    )!;
+    if (original.kind !== "name-claim")
+      throw new Error("Expected original name claim");
+    expect(claim.signal?.members.map((member) => member.name)).toEqual(names);
+    expect(claim.signal!.members[0]!.id).not.toBe(
+      original.signal!.members[0]!.id,
+    );
+    expect(claim.netId).not.toBe(original.netId);
+    expect(
+      resolveDocumentLogicalNets(copied).byBaseNetId.get(claim.netId)?.name,
+    ).toBe(names[0]);
+    expect(copied.routes[0]!.netId).toBe(claim.netId);
+    if (names.length > 1) {
+      expect(copied.routes[0]!.members!.map((member) => member.id)).toEqual(
+        claim.signal!.members.map((member) => member.id),
+      );
+      expect(copied.routes[0]!.members!.map((member) => member.netId)).toEqual(
+        claim.signal!.members.map((member) => member.netId),
+      );
+      expect(
+        new Set(claim.signal!.members.map((member) => member.netId)).size,
+      ).toBe(3);
+    }
+  },
+);
 /** A styled drawing with a branch, a label and a note. */
 function keptStyleSource(
   style: NonNullable<

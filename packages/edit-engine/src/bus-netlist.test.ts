@@ -37,6 +37,13 @@ import {
 } from "./wire-commit-planner.js";
 import { selectWireExpression } from "./wire-member-choice.js";
 import { signalEndpointMembers } from "./signal-endpoint.js";
+import { proposeGroupMoveEdits } from "./routing-planner.js";
+import {
+  applyProjectCopyPlacement,
+  captureProjectCopy,
+  planProjectCopyPlacement,
+} from "../../../apps/editor/src/features/clipboard/project-copy";
+import { orientClipboard } from "../../../apps/editor/src/features/clipboard/copy-placement";
 
 const values = [0.1, 0.2, 0.3, 0.4];
 let sequence = 0;
@@ -365,6 +372,96 @@ it("preserves physical hierarchy channels after connected reorder, rename and re
   ).toBe("INPUT<0:3>");
 });
 
+function copiedBusDcFixture() {
+  let source = busDcFixture(true).project;
+  const originalTop = source.documents.find((cell) => cell.id === "top")!;
+  const move = proposeGroupMoveEdits(
+    originalTop,
+    createProjectSymbolResolver(source, builtInSymbols),
+    originalTop.instances.flatMap((instance) =>
+      instance.placement
+        ? [
+            {
+              instanceId: instance.id,
+              position: {
+                x: instance.placement.position.x + 80,
+                y: instance.placement.position.y + 40,
+              },
+            },
+          ]
+        : [],
+    ),
+    originalTop.junctions.map((junction) => junction.id),
+    { x: 80, y: 40 },
+  );
+  source = documentEdit(source, "top", move.edits);
+  const before = serializeProject(source);
+  const top = source.documents.find((cell) => cell.id === "top")!;
+  const clipboard = captureProjectCopy(source, top)!;
+  const transformed = orientClipboard(clipboard, [
+    { kind: "rotate", deltaDegrees: 90 },
+    { kind: "reflect", direction: "left-right" },
+  ]);
+  const destination = createEmptyProject(
+    "copied-dc",
+    "Copied DC oracle",
+    "copied-top",
+  );
+  const plan = planProjectCopyPlacement(
+    destination,
+    destination.documents[0]!,
+    transformed,
+    { x: 500, y: 300 },
+    1,
+  );
+  let project = applyProjectCopyPlacement(plan);
+  expect(serializeProject(source)).toBe(before);
+  const saved = serializeProject(project);
+  project = parseProject(saved);
+  expect(serializeProject(project)).toBe(saved);
+  for (const format of ["spice", "spectre"] as const) {
+    const exported = createDesignNetlistExport(project, { format });
+    expect(exported.status, JSON.stringify(exported.diagnostics)).toBe("ready");
+  }
+  const analysis = analyzeDesignNetlist(project);
+  expect(analysis.ir, JSON.stringify(analysis.diagnostics)).not.toBeNull();
+  const topIR = analysis.ir!.cells.find((cell) => cell.id === "copied-top")!;
+  const measured = ["identity", "reverse"].flatMap((variant) => {
+    const id = plan.mapping.objects.instances[variant]!;
+    const call = topIR.instances.find((instance) => instance.id === id)!;
+    expect(new Set(call.nodes.map((node) => node.netName)).size).toBe(8);
+    return values.map((_, index) => ({
+      node: call.nodes[index + 4]!.netName,
+      expected:
+        (values[variant === "identity" ? index : 3 - index]! * 1e9) /
+        (1e9 + 1e3),
+      variant: `copied-${variant}`,
+      member: 3 - index,
+    }));
+  });
+  const emitted = generateCircuitSource(
+    project,
+    {
+      id: "copied-oracle",
+      path: "copied.spice",
+      documentId: "copied-top",
+      emission: "top-level",
+    },
+    undefined,
+    "ngspice",
+  );
+  if (!emitted.ok) throw new Error(JSON.stringify(emitted.diagnostics));
+  return {
+    project,
+    measured,
+    deck: `${emitted.source.text}\n.control\nop\n${measured.map((item) => `print v(${item.node})`).join("\n")}\nquit\n.endc\n.end\n`,
+  };
+}
+
+it("copies transformed migrated hierarchy across Projects with independent scalar outputs after reopening", () => {
+  expect(copiedBusDcFixture().measured).toHaveLength(8);
+});
+
 function slicedBusDcFixture() {
   let project = createEmptyProject("slice-dc", "Slice DC oracle", "child");
   project.documents[0]!.netlist!.name = "slice_pass";
@@ -596,6 +693,10 @@ it.skipIf(!available).each([
   ["identity and whole-bus reversal", busDcFixture],
   ["mixed bundles, ordered and nested slices", slicedBusDcFixture],
   ["connected member reorder and explicit rename", () => busDcFixture(true)],
+  [
+    "transformed cross-Project copy after connected migration",
+    copiedBusDcFixture,
+  ],
 ] as const)(
   "ngspice proves four independent DC values through %s",
   (_, fixture) => {

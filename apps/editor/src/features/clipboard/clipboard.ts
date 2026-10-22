@@ -7,6 +7,7 @@ import {
   hasExplicitMosBulkRoute,
   resolveMosBulkConnection,
   strandedMosBulkNet,
+  endpointKey,
 } from "@icm/derived";
 import type {
   Annotation,
@@ -23,7 +24,7 @@ import type {
   SchematicDocument,
 } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
-import { routeEnd } from "@icm/model";
+import { routeElectricalConnections } from "@icm/model";
 
 import type { CopyContext } from "./project-copy";
 
@@ -227,9 +228,13 @@ export function copySelection(
   const copiedTerminalKeys = new Set(
     document.routes
       .filter((route) => routeIds.has(route.id))
-      .flatMap((route) => [route.start, routeEnd(route)])
+      .flatMap((route) =>
+        routeElectricalConnections(route).flatMap(
+          (connection) => connection.endpoints,
+        ),
+      )
       .filter((endpoint) => endpoint.kind === "terminal")
-      .map((endpoint) => `${endpoint.instanceId}\0${endpoint.pinName}`),
+      .map(endpointKey),
   );
   const ownedMarkerIds = new Set([
     ...(document.netlist?.terminals.flatMap(
@@ -325,7 +330,7 @@ export function copySelection(
               selectedIds.has(terminal.instanceId) &&
               (ownedMarkerIds.has(terminal.instanceId) ||
                 copiedTerminalKeys.has(
-                  `${terminal.instanceId}\0${terminal.pinName}`,
+                  endpointKey({ kind: "terminal", ...terminal }),
                 ) ||
                 undrawnPin(terminal.instanceId, terminal.pinName) ||
                 (terminal.pinName === "B" &&
@@ -376,56 +381,63 @@ export function copySelection(
   // Two selected Port markers must not retain a shared invisible source Net.
   // Their selected wires, when present, remain the only reason to share it.
   for (const instance of clipboard.instances) {
-    if (
-      clipboard.routes.some((route) =>
-        [route.start, routeEnd(route)].some(
-          (endpoint) =>
-            endpoint.kind === "terminal" && endpoint.instanceId === instance.id,
-        ),
-      )
-    )
-      continue;
     const terminal = clipboard.cellTerminals.find((candidate) =>
       candidate.interfaceInstanceIds.includes(instance.id),
     );
-    const net = clipboard.nets.find((candidate) =>
-      candidate.terminals.some(
-        (endpoint) => endpoint.instanceId === instance.id,
-      ),
-    );
-    if (!terminal || !net || net.terminals.length < 2) continue;
-    const netId = `${net.id}-insert-${instance.id}`;
-    clipboard.nets.push({
-      id: netId,
-      terminals: net.terminals.filter(
-        (endpoint) => endpoint.instanceId === instance.id,
-      ),
-    });
-    net.terminals = net.terminals.filter(
-      (endpoint) => endpoint.instanceId !== instance.id,
-    );
-    terminal.netId = netId;
-    if (terminal.signal?.members.length === 1)
-      terminal.signal.members[0]!.netId = netId;
-    for (const annotation of clipboard.annotations) {
+    if (!terminal) continue;
+    for (const net of [...clipboard.nets]) {
       if (
-        annotation.anchor.kind !== "object" ||
-        annotation.anchor.objectId !== instance.id
+        net.terminals.length < 2 ||
+        !net.terminals.some((endpoint) => endpoint.instanceId === instance.id)
       )
         continue;
-      if (annotation.netId === net.id) annotation.netId = netId;
-      if (annotation.binding?.kind === "net-name")
-        annotation.binding.netId = netId;
-      if (annotation.binding?.kind === "cell-terminal-name")
-        annotation.binding.terminalId = terminal.id;
-    }
-    for (const evidence of clipboard.connectivityEvidence) {
       if (
-        evidence.kind === "name-claim" &&
-        evidence.owner.kind === "power-marker" &&
-        evidence.owner.objectId === instance.id
+        clipboard.routes.some((route) =>
+          routeElectricalConnections(route).some(
+            (connection) =>
+              connection.netId === net.id &&
+              connection.endpoints.some(
+                (endpoint) =>
+                  endpoint.kind === "terminal" &&
+                  endpoint.instanceId === instance.id,
+              ),
+          ),
+        )
       )
-        evidence.netId = netId;
+        continue;
+      const netId = `${net.id}-insert-${instance.id}`;
+      clipboard.nets.push({
+        id: netId,
+        terminals: net.terminals.filter(
+          (endpoint) => endpoint.instanceId === instance.id,
+        ),
+      });
+      net.terminals = net.terminals.filter(
+        (endpoint) => endpoint.instanceId !== instance.id,
+      );
+      if (terminal.netId === net.id) terminal.netId = netId;
+      for (const member of terminal.signal?.members ?? [])
+        if (member.netId === net.id) member.netId = netId;
+      for (const annotation of clipboard.annotations) {
+        if (
+          annotation.anchor.kind !== "object" ||
+          annotation.anchor.objectId !== instance.id
+        )
+          continue;
+        if (annotation.netId === net.id) annotation.netId = netId;
+        if (annotation.binding?.kind === "net-name")
+          annotation.binding.netId = netId;
+        if (annotation.binding?.kind === "cell-terminal-name")
+          annotation.binding.terminalId = terminal.id;
+      }
+      for (const evidence of clipboard.connectivityEvidence) {
+        if (
+          evidence.kind === "name-claim" &&
+          evidence.owner.kind === "power-marker" &&
+          evidence.owner.objectId === instance.id
+        )
+          evidence.netId = netId;
+      }
     }
   }
   return clipboard;

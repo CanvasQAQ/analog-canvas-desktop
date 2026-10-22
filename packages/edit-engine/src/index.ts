@@ -78,3 +78,8 @@ export { ApplyModelSourceEditSchema } from "./project-transaction.js";
 export * from "./cell-symbol-layout.js";
 
 export * from "./wire-member-choice.js";
+export {
+  copiedEndpointMember,
+  copyCallerArtwork,
+  type CopiedMemberIds,
+} from "./project-copy-members.js";

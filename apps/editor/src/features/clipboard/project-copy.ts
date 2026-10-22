@@ -4,6 +4,7 @@ import {
   ComponentDefinitionSchema,
   deriveStableId,
   routeEnd,
+  routeElectricalConnections,
   type CircuitProject,
   type Point,
   type SchematicDocument,
@@ -15,6 +16,8 @@ import {
   resolveDocumentRoutingGeometry,
   resolveEndpointConnection,
   sameDocumentStyle,
+  endpointKey,
+  resolveAnnotationText,
 } from "@icm/derived";
 import { bindsProjectCell } from "@icm/devices";
 import {
@@ -32,6 +35,10 @@ import {
   planExternalCopyDependencies,
   planProjectCellImport,
   remapCopySourceFiles,
+  copiedEndpointMember,
+  copyCallerArtwork,
+  signalEndpointMembers,
+  type CopiedMemberIds,
   remapExternalCopyInstance,
   referencedSourceFiles,
   type CopyDependencySource,
@@ -128,6 +135,7 @@ export function captureProjectCopy(
   const selectedInstances = new Set(clipboard.instances.map((i) => i.id));
   const geometry = resolveDocumentRoutingGeometry(document, resolver);
   const netIds = new Set(clipboard.nets.map((n) => n.id));
+  const sourceNetIds = new Set(document.nets.map((net) => net.id));
   // Explicit wires can be copied without their connected devices. Materialize their
   // cut endpoints at the resolved pin positions, never carry a foreign terminal ID.
   for (const routeId of selection?.routeIds ?? []) {
@@ -155,6 +163,10 @@ export function captureProjectCopy(
     ].flatMap((anchor) => (anchor.kind === "route" ? [anchor.routeId] : [])),
   );
   const contacts = new Set<string>();
+  const cutEndpoints = new Map<
+    string,
+    Map<string, import("@icm/model").RouteEndpoint>
+  >();
   clipboard.routes = clipboard.routes.flatMap((route) => {
     const centerline = geometry.routes.get(route.id)?.centerline;
     if (!centerline?.length) return [route];
@@ -179,6 +191,7 @@ export function captureProjectCopy(
       createRoutePath({
         id: route.id,
         netId: route.netId,
+        ...(route.members ? { members: route.members } : {}),
         start: route.start,
         end: routeEnd(route),
         bends: normalized.points.slice(1, -1),
@@ -200,16 +213,18 @@ export function captureProjectCopy(
     );
   }
   for (const route of clipboard.routes) {
-    if (!netIds.has(route.netId)) {
-      const net = document.nets.find((n) => n.id === route.netId);
-      if (!net) throw new Error(`Copied Wire ${route.id} has no Net`);
-      clipboard.nets.push({
-        ...structuredClone(net),
-        terminals: net.terminals.filter((t) =>
-          selectedInstances.has(t.instanceId),
-        ),
-      });
-      netIds.add(net.id);
+    for (const { netId } of routeElectricalConnections(route)) {
+      if (!netIds.has(netId)) {
+        const net = document.nets.find((n) => n.id === netId);
+        if (!net) throw new Error(`Copied Wire ${route.id} has no Net`);
+        clipboard.nets.push({
+          ...structuredClone(net),
+          terminals: net.terminals.filter((t) =>
+            selectedInstances.has(t.instanceId),
+          ),
+        });
+        netIds.add(net.id);
+      }
     }
     for (const [index, endpoint] of [route.start, routeEnd(route)].entries()) {
       if (endpoint.kind === "junction") {
@@ -225,13 +240,63 @@ export function captureProjectCopy(
         if (!position)
           throw new Error(`Cannot resolve copied Wire endpoint: ${route.id}`);
         const junctionId = deriveStableId("copy-cut", route.id, String(index));
+        const sourceMembers =
+          route.members ??
+          (endpoint.memberId
+            ? signalEndpointMembers(document, resolver, {
+                ...endpoint,
+                memberId: undefined,
+              })
+            : undefined);
+        const cutMembers = sourceMembers?.map((member) => {
+          // An unconnected caller member has no stored parent Net. Keep that
+          // lane open on this cut, without sharing its synthesized source ID.
+          const netId = sourceNetIds.has(member.netId)
+            ? member.netId
+            : deriveStableId("copy-cut-net", junctionId, member.id);
+          if (!sourceNetIds.has(member.netId) && !netIds.has(netId)) {
+            clipboard.nets.push({ id: netId, terminals: [] });
+            netIds.add(netId);
+          }
+          return {
+            id: deriveStableId("copy-cut-member", junctionId, member.id),
+            netId,
+          };
+        });
         clipboard.junctions.push({
           id: junctionId,
-          netId: route.netId,
+          netId: cutMembers?.[0]?.netId ?? route.netId,
           position: { ...position },
           role: "route-anchor",
+          ...(cutMembers ? { members: cutMembers } : {}),
         });
-        const detached = { kind: "junction" as const, junctionId };
+        const scalarMember =
+          endpoint.memberId && sourceMembers
+            ? cutMembers![
+                sourceMembers.findIndex(
+                  (member) => member.id === endpoint.memberId,
+                )
+              ]?.id
+            : undefined;
+        const detached = {
+          kind: "junction" as const,
+          junctionId,
+          ...(scalarMember ? { memberId: scalarMember } : {}),
+        };
+        const routeCuts = cutEndpoints.get(route.id) ?? new Map();
+        cutEndpoints.set(route.id, routeCuts);
+        if (scalarMember) routeCuts.set(endpointKey(endpoint), detached);
+        route.members?.forEach((member, lane) => {
+          const memberId =
+            index === 0 ? member.startMemberId : member.endMemberId;
+          const newMember = cutMembers![lane]!.id;
+          routeCuts.set(endpointKey({ ...endpoint, memberId }), {
+            ...detached,
+            memberId: newMember,
+          });
+          if (index === 0) member.startMemberId = newMember;
+          else member.endMemberId = newMember;
+        });
         if (index === 0) route.start = detached;
         else
           route.legs[route.legs.length - 1]!.to = {
@@ -246,8 +311,13 @@ export function captureProjectCopy(
   // The record is structure only: names stay with the labels that own them.
   {
     const referencedNets = [
-      ...clipboard.junctions.map((item) => item.netId),
-      ...clipboard.cellTerminals.map((item) => item.netId),
+      ...clipboard.junctions.flatMap(
+        (item) => item.members?.map((member) => member.netId) ?? [item.netId],
+      ),
+      ...clipboard.cellTerminals.flatMap(
+        (item) =>
+          item.signal?.members.map((member) => member.netId) ?? [item.netId],
+      ),
       ...clipboard.annotations.flatMap((item) =>
         item.netId ? [item.netId] : [],
       ),
@@ -277,7 +347,7 @@ export function captureProjectCopy(
     const copiedJunctions = new Set(clipboard.junctions.map((j) => j.id));
     const placed = new Set(
       clipboard.nets.flatMap((net) =>
-        net.terminals.map((t) => `${t.instanceId}\0${t.pinName}`),
+        net.terminals.map((t) => endpointKey({ kind: "terminal", ...t })),
       ),
     );
     const key = (point: Point | undefined) =>
@@ -298,11 +368,20 @@ export function captureProjectCopy(
       const points = [
         ...pinPoints,
         ...document.junctions
-          .filter((j) => j.netId === net.id && copiedJunctions.has(j.id))
+          .filter(
+            (j) =>
+              (j.members?.some((member) => member.netId === net.id) ??
+                j.netId === net.id) &&
+              copiedJunctions.has(j.id),
+          )
           .map((junction) => key(junction.position)),
       ];
       const wires = clipboard.routes
-        .filter((route) => route.netId === net.id)
+        .filter((route) =>
+          routeElectricalConnections(route).some(
+            (connection) => connection.netId === net.id,
+          ),
+        )
         .flatMap((route) => {
           const line = geometry.routes.get(route.id)?.centerline ?? [];
           return line.slice(1).map((end, index) => [line[index]!, end]);
@@ -336,7 +415,7 @@ export function captureProjectCopy(
         netIds.add(net.id);
       }
       for (const terminal of attached) {
-        const pin = `${terminal.instanceId}\0${terminal.pinName}`;
+        const pin = endpointKey({ kind: "terminal", ...terminal });
         // A Port copySelection set apart, for sharing its Net with nothing
         // visible, touches the Net's copied wiring here: it shares it visibly,
         // so it goes back, and whatever was pointed at its own Net with it.
@@ -346,10 +425,9 @@ export function captureProjectCopy(
           clipboard.nets = clipboard.nets.filter((item) => item !== split);
           netIds.delete(splitId);
           for (const cell of clipboard.cellTerminals) {
-            if (cell.netId !== splitId) continue;
-            cell.netId = net.id;
-            if (cell.signal?.members.length === 1)
-              cell.signal.members[0]!.netId = net.id;
+            if (cell.netId === splitId) cell.netId = net.id;
+            for (const member of cell.signal?.members ?? [])
+              if (member.netId === splitId) member.netId = net.id;
           }
           for (const annotation of clipboard.annotations) {
             if (annotation.netId === splitId) annotation.netId = net.id;
@@ -413,8 +491,11 @@ export function captureProjectCopy(
       )
         clipboard.connectivityEvidence.push(structuredClone(evidence));
     }
-    const pin = (terminal: { instanceId: string; pinName: string }) =>
-      `${terminal.instanceId}\0${terminal.pinName}`;
+    const pin = (terminal: {
+      instanceId: string;
+      pinName: string;
+      memberId?: string | undefined;
+    }) => endpointKey({ kind: "terminal", ...terminal });
     const placed = new Set(
       clipboard.nets.flatMap((net) => net.terminals.map(pin)),
     );
@@ -473,6 +554,23 @@ export function captureProjectCopy(
       object.target = detachVisual(object.target);
   }
   for (const annotation of clipboard.annotations) {
+    if (annotation.binding?.kind === "net-name") {
+      const binding = annotation.binding;
+      if (binding.memberEndpoint || binding.memberEndpoints)
+        annotation.formatOverride = structuredClone(
+          resolveAnnotationText(document, annotation, undefined, resolver),
+        );
+      const retarget = (endpoint: import("@icm/model").RouteEndpoint) =>
+        (annotation.anchor.kind === "route"
+          ? cutEndpoints
+              .get(annotation.anchor.routeId)
+              ?.get(endpointKey(endpoint))
+          : undefined) ?? endpoint;
+      if (binding.memberEndpoint)
+        binding.memberEndpoint = retarget(binding.memberEndpoint);
+      if (binding.memberEndpoints)
+        binding.memberEndpoints = binding.memberEndpoints.map(retarget);
+    }
     // Electrical owners must travel with their label; never detach a binding.
     const binding = annotation.binding;
     if (
@@ -584,28 +682,6 @@ export function prepareProjectCopy(
   document: SchematicDocument,
   sourceClipboard: SchematicClipboard,
 ) {
-  if (
-    sourceClipboard.cellTerminals.some(
-      (terminal) => terminal.signal && terminal.signal.members.length > 1,
-    ) ||
-    sourceClipboard.routes.some(
-      (route) =>
-        route.members || route.start.memberId || routeEnd(route).memberId,
-    ) ||
-    sourceClipboard.junctions.some((junction) => junction.members) ||
-    sourceClipboard.nets.some((net) =>
-      net.terminals.some((terminal) => terminal.memberId),
-    ) ||
-    sourceClipboard.context?.documents.some((cell) =>
-      cell.netlist?.terminals.some(
-        (terminal) => terminal.signal && terminal.signal.members.length > 1,
-      ),
-    )
-  ) {
-    throw new Error(
-      "Copying bus groups requires member identity remapping, which is not supported yet; the original circuit is unchanged",
-    );
-  }
   let clipboard = structuredClone(sourceClipboard);
   const dependencyMapping = {
     cells: {} as Record<string, string>,
@@ -730,6 +806,8 @@ export function prepareProjectCopy(
       return remapped;
     });
     const childMap = new Map<string, string>();
+    const childMemberIds: CopiedMemberIds = {};
+    const sourceInstances = structuredClone(clipboard.instances);
     const mapChildClosure = (sourceId: string, targetId: string): void => {
       if (childMap.has(sourceId)) return;
       childMap.set(sourceId, targetId);
@@ -801,6 +879,11 @@ export function prepareProjectCopy(
             sharedSnapshot: true,
           });
           if (!plan.ok) throw new Error(plan.message);
+          if (plan.status === "ready") {
+            for (const [from, to] of Object.entries(plan.documentIds))
+              childMap.set(from, to);
+            Object.assign(childMemberIds, plan.memberIds);
+          }
           install(plan.edits);
           targetId = plan.rootDocumentId;
         }
@@ -810,11 +893,83 @@ export function prepareProjectCopy(
       const child = prepared.documents.find((d) => d.id === targetId)!;
       // A Library gate or flip-flop bound to the Cell keeps its symbol
       // (#1450, #1689).
-      if (!bindsProjectCell(instance.symbolId))
-        instance.symbolId = hierarchicalSymbolId(
-          child.netlist?.name ?? child.name,
+      if (!bindsProjectCell(instance.symbolId)) {
+        const captured = prepared.componentDefinitions?.find(
+          (component) =>
+            component.symbol.id === instance.symbolId &&
+            !component.generatedFrom &&
+            !component.circuitBinding,
         );
+        const sourceChild = context.documents.find(
+          (cell) => cell.id === sourceId,
+        )!;
+        if (captured) {
+          const copy = copyCallerArtwork(captured, sourceChild, childMemberIds);
+          install([{ kind: "capture_component_definition", definition: copy }]);
+          instance.symbolId = copy.symbol.id;
+        } else
+          instance.symbolId = hierarchicalSymbolId(
+            child.netlist?.name ?? child.name,
+          );
+      }
     }
+    const sourceDocument = {
+      ...document,
+      id: clipboard.sourceDocumentId,
+      instances: sourceInstances,
+      netlist: undefined,
+    };
+    const remapMember = (endpoint: import("@icm/model").RouteEndpoint) => {
+      if (endpoint.kind !== "terminal" || !endpoint.memberId) return;
+      endpoint.memberId = copiedEndpointMember(
+        sourceDocument,
+        context.documents,
+        childMemberIds,
+        endpoint,
+      )!;
+    };
+    for (const route of clipboard.routes) {
+      for (const lane of route.members ?? []) {
+        lane.startMemberId = copiedEndpointMember(
+          sourceDocument,
+          context.documents,
+          childMemberIds,
+          { ...route.start, memberId: lane.startMemberId },
+        )!;
+        lane.endMemberId = copiedEndpointMember(
+          sourceDocument,
+          context.documents,
+          childMemberIds,
+          { ...routeEnd(route), memberId: lane.endMemberId },
+        )!;
+      }
+      remapMember(route.start);
+      remapMember(routeEnd(route));
+    }
+    for (const net of clipboard.nets)
+      for (const terminal of net.terminals) {
+        if (terminal.memberId)
+          terminal.memberId = copiedEndpointMember(
+            sourceDocument,
+            context.documents,
+            childMemberIds,
+            { kind: "terminal", ...terminal },
+          )!;
+      }
+    for (const junction of clipboard.junctions)
+      if (junction.contactAnchor?.memberId)
+        junction.contactAnchor.memberId = copiedEndpointMember(
+          sourceDocument,
+          context.documents,
+          childMemberIds,
+          { kind: "terminal", ...junction.contactAnchor },
+        )!;
+    for (const annotation of clipboard.annotations)
+      if (annotation.binding?.kind === "net-name") {
+        if (annotation.binding.memberEndpoint)
+          remapMember(annotation.binding.memberEndpoint);
+        annotation.binding.memberEndpoints?.forEach(remapMember);
+      }
     childMap.set(clipboard.sourceDocumentId, document.id);
     Object.assign(dependencyMapping.cells, Object.fromEntries(childMap));
     for (const sourceFolder of context.simulationFolders ?? []) {

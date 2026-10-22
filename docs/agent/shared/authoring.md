@@ -314,7 +314,9 @@ members require an explicit choice; reordering never remaps by position. Set
 `convertLegacy:true` to deliberately convert a legacy scalar owner, mapping its
 terminal or naming-claim ID to one member or `null`. Inspect the result before
 continuing; the mutation includes every affected caller in one transaction.
-Bus group copy and member NoConnect authoring remain unsupported.
+Bus group copy uses the same selection and dependency rules as scalar copy,
+preserving ordered members, mappings, selector bindings and captured artwork.
+Member NoConnect authoring remains unsupported.
 
 ## Wiring
 

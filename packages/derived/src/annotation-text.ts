@@ -28,6 +28,7 @@ function selectedMemberName(
   endpoint: RouteEndpoint,
   netId: string,
   resolver?: SymbolResolver,
+  fallback = true,
 ): string {
   const terminalName = (selected: RouteEndpoint): string | undefined => {
     if (selected.kind !== "terminal" || !selected.memberId) return undefined;
@@ -64,7 +65,7 @@ function selectedMemberName(
     ),
   ].sort();
   if (names.length) return names.join(" / ");
-  if (endpoint.kind === "junction") {
+  if (fallback && endpoint.kind === "junction") {
     const index = document.junctions
       .find((item) => item.id === endpoint.junctionId)
       ?.members?.findIndex((member) => member.id === endpoint.memberId);
@@ -76,9 +77,8 @@ function selectedMemberName(
 const EMPTY_TEXT: RichTextDocument = { runs: [{ kind: "line-break" }] };
 
 /**
- * Resolve one Annotation's sole text source. Bound annotations intentionally
- * never consult a copied rich-text payload: their visible content is a pure
- * projection of the instance, Net, or Cell interface fact they identify.
+ * Resolve one Annotation's text from its bound fact. A captured selector look
+ * can survive an open copied boundary until a live member name is available.
  */
 export function resolveAnnotationText(
   document: SchematicDocument,
@@ -140,6 +140,17 @@ export function resolveAnnotationText(
             : undefined;
         const edges = route ? routeElectricalConnections(route) : [];
         const logical = logicalNets ?? resolveDocumentLogicalNets(document);
+        const names = binding.memberEndpoints.map((endpoint, index) => {
+          const netId = edges[index]?.netId ?? binding.netId;
+          return (
+            logical.byBaseNetId.get(netId)?.name ??
+            selectedMemberName(document, endpoint, netId, resolver, false)
+          );
+        });
+        // A copied selector can outlive its naming owner. Its captured look is
+        // only a display fallback; any live member name takes precedence.
+        if (annotation.formatOverride && names.every((name) => !name))
+          return annotation.formatOverride;
         const name = formatSignalMembers(
           binding.memberEndpoints.map((endpoint, index) => {
             const netId = edges[index]?.netId ?? binding.netId;
@@ -169,6 +180,20 @@ export function resolveAnnotationText(
       ).byBaseNetId.get(binding.netId)?.name;
       const ownerClaimName =
         ownerClaim?.kind === "name-claim" ? ownerClaim.name : undefined;
+      if (
+        annotation.formatOverride &&
+        binding.memberEndpoint &&
+        !ownerClaimName &&
+        !logicalName &&
+        !selectedMemberName(
+          document,
+          binding.memberEndpoint,
+          binding.netId,
+          resolver,
+          false,
+        )
+      )
+        return annotation.formatOverride;
       const name =
         ownerClaimName ??
         logicalName ??
