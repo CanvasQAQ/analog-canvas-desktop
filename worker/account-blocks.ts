@@ -47,12 +47,43 @@ export type BlockReason = "script" | "two-traps";
 export function ensureAccountBlockTables(sql: SqlStorage): void {
   sql.exec(ACCOUNT_BLOCKS_TABLE);
   sql.exec(TRAP_READS_TABLE);
-  try {
-    // Additive upgrade: blocks recorded before reasons existed.
-    sql.exec("ALTER TABLE account_blocks ADD COLUMN reason TEXT");
-  } catch {
-    // Column already present.
+  // Additive upgrades: blocks recorded before reasons and apologies existed.
+  for (const column of ["reason", "apologized_at"]) {
+    try {
+      sql.exec(`ALTER TABLE account_blocks ADD COLUMN ${column} TEXT`);
+    } catch {
+      // Column already present.
+    }
   }
+}
+
+/**
+ * The block a lifted mistake left, if the account has not yet been told:
+ * its latest record, once unblocked and not yet apologised for.
+ */
+export function apologyOwed(
+  sql: SqlStorage,
+  userId: string,
+): { id: number; email: string } | null {
+  const row = sql
+    .exec<{
+      id: number;
+      email: string | null;
+      unblocked_at: string | null;
+      apologized_at: string | null;
+    }>(
+      `SELECT id, email, unblocked_at, apologized_at FROM account_blocks
+       WHERE user_id = ? ORDER BY id DESC LIMIT 1`,
+      userId,
+    )
+    .toArray()[0];
+  return row?.email && row.unblocked_at && !row.apologized_at
+    ? { id: row.id, email: row.email }
+    : null;
+}
+
+export function markApologized(sql: SqlStorage, id: number, at: string): void {
+  sql.exec("UPDATE account_blocks SET apologized_at = ? WHERE id = ?", at, id);
 }
 
 /**
@@ -97,6 +128,7 @@ export interface AccountBlockRow {
   notified_at: string | null;
   unblocked_at: string | null;
   reason: BlockReason | null;
+  apologized_at: string | null;
 }
 
 export interface BlockEvidence {
@@ -194,6 +226,7 @@ export function listBlocks(sql: SqlStorage) {
       notifiedAt: row.notified_at,
       unblockedAt: row.unblocked_at,
       reason: row.reason,
+      apologizedAt: row.apologized_at,
     }));
 }
 

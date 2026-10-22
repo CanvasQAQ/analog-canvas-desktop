@@ -171,6 +171,61 @@ describe("trap circuits", () => {
     expect(sent[0]!.text).toContain("2 个不同蜜罐");
   });
 
+  it("let the Owner apologise once to an account unblocked after a mistake", async () => {
+    const env = environment();
+    await sevenCircuits(env);
+    const maker = await makerOf(env);
+    await route(
+      env,
+      new Request(`${ORIGIN}/api/gallery/ww5fnfambz`, {
+        headers: cookieHeaders(maker),
+      }),
+    );
+    const owner = await ownerAccountOf(env);
+    const ownerPost = (route: string, body: unknown, cookie = owner) =>
+      env.authDurable.fetch(
+        new Request(`${ORIGIN}/api/auth/blocked/${route}`, {
+          method: "POST",
+          headers: { Origin: ORIGIN, Cookie: cookie },
+          body: JSON.stringify(body),
+        }),
+      );
+    const [record] = (
+      (await (
+        await env.authDurable.fetch(
+          new Request(`${ORIGIN}/api/auth/blocked`, {
+            headers: cookieHeaders(owner),
+          }),
+        )
+      ).json()) as { blocked: { userId: string }[] }
+    ).blocked;
+    const apology = {
+      userId: record!.userId,
+      subject: "Your Analog Canvas Gallery access is restored",
+      text: "Dear user, …",
+    };
+    // Not while the account is still blocked, and never by anyone else.
+    expect((await ownerPost("apology", apology)).status).toBe(409);
+    await ownerPost("unblock", { userId: record!.userId });
+    expect((await ownerPost("apology", apology, maker)).status).toBe(403);
+
+    const sent = outbox(env);
+    expect(await (await ownerPost("apology", apology)).json()).toEqual({
+      sent: true,
+    });
+    expect(sent).toEqual([
+      expect.objectContaining({
+        to: ["maker@example.com"],
+        subject: apology.subject,
+        text: apology.text,
+        reply_to: "zzhishuai@ethz.ch",
+      }),
+    ]);
+    // Once per block.
+    expect((await ownerPost("apology", apology)).status).toBe(409);
+    expect(sent).toHaveLength(1);
+  });
+
   it("answer a curator as a missing circuit and block nobody", async () => {
     const env = environment();
     await sevenCircuits(env);
