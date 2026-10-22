@@ -75,6 +75,25 @@ describe("supported Project compatibility corpus", () => {
     }
   });
 
+  it("retains bracketed and comma-containing scalar interfaces on load and reopen", () => {
+    const text = readProject(
+      "fixtures/projects/legacy-scalar-signals/project.icproj.json",
+    );
+    const project = parseProject(text);
+    expect(
+      project.documents[0]!.netlist!.terminals.map((terminal) => ({
+        name: terminal.name,
+        signal: terminal.signal,
+      })),
+    ).toEqual([
+      { name: "DATA<3:0>", signal: undefined },
+      { name: "CLK,RESET", signal: undefined },
+    ]);
+    expect(serializeProject(parseProject(serializeProject(project)))).toBe(
+      text,
+    );
+  });
+
   it("loads retained migration witnesses and saves canonical current Projects", () => {
     for (const entry of corpus.migrated) {
       const original = readProject(entry.path);

@@ -272,6 +272,10 @@ const BatchItemSchema = z.discriminatedUnion("kind", [
   }),
   z.strictObject({
     kind: z.literal("set-net-label"),
+    memberMap: z
+      .record(StableIdSchema, z.string().min(1).max(256).nullable())
+      .optional(),
+    convertLegacy: z.boolean().optional(),
     annotationId: StableIdSchema,
     netId: StableIdSchema,
     text: TextInputSchema.describe(
@@ -518,6 +522,10 @@ export const AgentAuthoringCommandSchema = z.discriminatedUnion("kind", [
     terminalId: StableIdSchema,
     name: NameSchema,
     mergeExistingPort: z.boolean().optional(),
+    memberMap: z
+      .record(StableIdSchema, z.string().min(1).max(256).nullable())
+      .optional(),
+    convertLegacy: z.boolean().optional(),
   }),
   z
     .strictObject({

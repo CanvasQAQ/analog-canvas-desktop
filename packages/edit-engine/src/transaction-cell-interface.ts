@@ -191,9 +191,19 @@ function mutateCellInterface(
           terminal.netId,
         ],
       );
+      const preservesMembers =
+        terminal.signal &&
+        edit.signal &&
+        terminal.signal.members.length === edit.signal.members.length &&
+        terminal.signal.members.every((member) =>
+          edit.signal!.members.some(
+            (next) => next.id === member.id && next.netId === member.netId,
+          ),
+        );
       if (
         changesSignal &&
         !preservesScalarIdentity &&
+        !preservesMembers &&
         (draft.routes.some(
           (route) =>
             signalNets.has(route.netId) ||

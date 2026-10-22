@@ -1509,6 +1509,7 @@ function WorkspaceEditor({
     setCellSymbolPresentation,
     setCellSymbolPortPlacement,
     editCellTerminalAnnotation,
+    convertCellTerminalSignal,
     removeCellTerminalSelection,
     renameProject,
   } = createProjectStructureCommands({
@@ -2372,6 +2373,7 @@ function WorkspaceEditor({
   });
   const {
     netLabelForRoute,
+    convertLabelSignal,
     netLabelEditsForRoute,
     netLabelScopeEdit,
     netNameEditsForAnnotation,
@@ -2385,6 +2387,13 @@ function WorkspaceEditor({
         resolver,
         routeGeometryRecords,
         setStatus,
+        requestConfirmation: (request) =>
+          setInterfaceConfirmation({ request, snapshot: project }),
+        commitMigration: (edits) => {
+          const result = transact(edits);
+          if (result.ok) clearTextEditing();
+          return result.ok;
+        },
       }),
     [project, document, resolver, routeGeometryRecords, setStatus],
   );
@@ -5095,14 +5104,18 @@ function WorkspaceEditor({
           <CellInterfaceConfirmationDialog
             request={interfaceConfirmation.request}
             onCancel={() => setInterfaceConfirmation(null)}
-            onConfirm={() => {
-              setInterfaceConfirmation(null);
+            onConfirm={(memberMap, expression) => {
               try {
-                applyConfirmedCellInterfaceEdit(
-                  interfaceConfirmation.request,
-                  interfaceConfirmation.snapshot,
-                  project,
-                );
+                if (
+                  applyConfirmedCellInterfaceEdit(
+                    interfaceConfirmation.request,
+                    interfaceConfirmation.snapshot,
+                    project,
+                    memberMap,
+                    expression,
+                  )
+                )
+                  setInterfaceConfirmation(null);
               } catch (error) {
                 setStatus(
                   error instanceof Error
@@ -5720,6 +5733,27 @@ function WorkspaceEditor({
           }
           properties={
             <EditorPropertiesDock
+              onConvertSignal={
+                selectedFormalTerminal &&
+                !selectedFormalTerminal.signal &&
+                /[<>\[\],]/u.test(selectedFormalTerminal.name)
+                  ? () => {
+                      convertCellTerminalSignal(selectedFormalTerminal.id);
+                    }
+                  : selectedAnnotation?.kind === "net-label" &&
+                      document.connectivityEvidence.some(
+                        (item) =>
+                          item.kind === "name-claim" &&
+                          item.owner.kind === "net-label" &&
+                          item.owner.annotationId === selectedAnnotation.id &&
+                          !item.signal &&
+                          /[<>\[\],]/u.test(item.name),
+                      )
+                    ? () => {
+                        convertLabelSignal(selectedAnnotation);
+                      }
+                    : undefined
+              }
               open={selectionOpen}
               shelfRef={selectionShelfRef}
               onToggle={() => {

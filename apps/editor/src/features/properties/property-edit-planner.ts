@@ -12,6 +12,8 @@ import { instanceParameterContract } from "@icm/devices";
 import {
   planEnsureNamedNet,
   planEnsureNamedRoute,
+  resolveNetLabelOwnerRoute,
+  previewLabelSignalMigration,
   type SchematicEdit,
 } from "@icm/edit-engine";
 import {
@@ -29,6 +31,7 @@ import {
   type SchematicDocument,
 } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
+import type { CellInterfaceConfirmation } from "../hierarchy/cell-interface-confirmation-types";
 
 import { snapCoordinate } from "../../snap/engine";
 import { componentParameters } from "../component-insert/component-parameters";
@@ -43,6 +46,8 @@ export interface PropertyEditPlannerDependencies {
     geometry: ResolvedRouteGeometry;
   }[];
   setStatus: (status: string) => void;
+  requestConfirmation?: (request: CellInterfaceConfirmation) => void;
+  commitMigration?: (edits: SchematicEdit[]) => boolean;
 }
 
 export interface InstancePropertyDraft {
@@ -60,7 +65,96 @@ export function createPropertyEditPlanner({
   resolver,
   routeGeometryRecords,
   setStatus,
+  requestConfirmation,
+  commitMigration,
 }: PropertyEditPlannerDependencies) {
+  const requestLabelMigration = (
+    annotationId: string,
+    routeId: string,
+    name: string,
+    convertLegacy = false,
+    presentationAnnotation?: Annotation,
+  ): boolean => {
+    const claim = document.connectivityEvidence.find(
+      (item) =>
+        item.kind === "name-claim" &&
+        item.owner.kind === "net-label" &&
+        item.owner.annotationId === annotationId,
+    );
+    if (
+      claim?.kind !== "name-claim" ||
+      (!convertLegacy && (!claim.signal || claim.name === name)) ||
+      !requestConfirmation ||
+      !commitMigration
+    )
+      return false;
+    try {
+      const preview = (expression: string) =>
+        previewLabelSignalMigration(document, annotationId, expression);
+      requestConfirmation({
+        title: convertLegacy ? "Convert Label to bus" : "Update bus Label",
+        message: "Review member connections before applying this change.",
+        confirmLabel: convertLegacy ? "Convert" : "Apply",
+        ...(convertLegacy
+          ? { conversion: { expression: name, preview } }
+          : { migration: preview(name) }),
+        apply: (memberMap, expression) => {
+          const plan = planEnsureNamedRoute(
+            document,
+            routeId,
+            {
+              candidateNetId: claim.netId,
+              name: convertLegacy ? (expression ?? name) : name,
+              evidenceId: claim.id,
+              owner: claim.owner,
+            },
+            {
+              ...(memberMap ? { memberMap } : {}),
+              ...(convertLegacy ? { convertLegacy: true } : {}),
+            },
+            resolver,
+          );
+          if (!plan.ok) {
+            setStatus(plan.message);
+            return false;
+          }
+          return commitMigration([
+            ...plan.edits,
+            ...(presentationAnnotation
+              ? [
+                  {
+                    kind: "upsert_schematic_annotation" as const,
+                    annotation: {
+                      ...presentationAnnotation,
+                      netId: plan.netId,
+                      binding: { kind: "net-name" as const, netId: plan.netId },
+                    },
+                  },
+                ]
+              : []),
+          ]);
+        },
+      });
+      return true;
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      return true;
+    }
+  };
+  const convertLabelSignal = (annotation: Annotation): boolean => {
+    const claim = document.connectivityEvidence.find(
+      (item) =>
+        item.kind === "name-claim" &&
+        item.owner.kind === "net-label" &&
+        item.owner.annotationId === annotation.id,
+    );
+    if (claim?.kind !== "name-claim" || claim.signal) return false;
+    const route = resolveNetLabelOwnerRoute(document, annotation);
+    return (
+      !!route &&
+      requestLabelMigration(annotation.id, route.id, claim.name, true)
+    );
+  };
   const netLabelForRoute = (
     route: SchematicDocument["routes"][number],
   ): Annotation | undefined => {
@@ -113,25 +207,51 @@ export function createPropertyEditPlanner({
         : null;
     }
     const labelId = existingLabel?.id ?? `net-label-${route.id}`;
-    const namedNetPlan = planEnsureNamedRoute(document, route.id, {
-      candidateNetId: net.id,
-      name,
-      evidenceId:
-        document.connectivityEvidence.find(
-          (evidence) =>
-            evidence.kind === "name-claim" &&
-            evidence.owner.kind === "net-label" &&
-            evidence.owner.annotationId === labelId,
-        )?.id ??
-        deriveStableId(
-          "connectivity-evidence",
-          document.id,
-          "net-label",
-          net.id,
-          labelId,
-        ),
-      owner: { kind: "net-label", annotationId: labelId },
-    });
+    if (
+      requestLabelMigration(
+        labelId,
+        route.id,
+        name,
+        false,
+        existingLabel && presentation
+          ? {
+              ...existingLabel,
+              alignment: presentation.alignment,
+              rotation: presentation.rotation ?? existingLabel.rotation,
+              sizeScale: presentation.sizeScale,
+              ...(presentation.formatOverride
+                ? { formatOverride: presentation.formatOverride }
+                : {}),
+            }
+          : undefined,
+      )
+    )
+      return null;
+    const namedNetPlan = planEnsureNamedRoute(
+      document,
+      route.id,
+      {
+        candidateNetId: net.id,
+        name,
+        evidenceId:
+          document.connectivityEvidence.find(
+            (evidence) =>
+              evidence.kind === "name-claim" &&
+              evidence.owner.kind === "net-label" &&
+              evidence.owner.annotationId === labelId,
+          )?.id ??
+          deriveStableId(
+            "connectivity-evidence",
+            document.id,
+            "net-label",
+            net.id,
+            labelId,
+          ),
+        owner: { kind: "net-label", annotationId: labelId },
+      },
+      {},
+      resolver,
+    );
     // A rejected plan (name collision, power-domain conflict) must reach the
     // status bar: this planner also backs the text editor's Apply, where a
     // silent null leaves the edit box open with no visible reaction.
@@ -216,7 +336,12 @@ export function createPropertyEditPlanner({
       annotation: {
         id: labelId,
         kind: "net-label",
-        binding: { kind: "net-name", netId: targetNetId },
+        binding:
+          existingLabel?.binding?.kind === "net-name" &&
+          (existingLabel.binding.memberEndpoint ||
+            existingLabel.binding.memberEndpoints)
+            ? existingLabel.binding
+            : { kind: "net-name", netId: targetNetId },
         netId: targetNetId,
         anchor: placed
           ? {
@@ -306,14 +431,19 @@ export function createPropertyEditPlanner({
         owner: { kind: "net-label" as const, annotationId: annotation.id },
         ...(labelClaim ? { scope: labelClaim.scope } : {}),
       };
-      const route = document.routes.find((candidate) =>
-        annotation.anchor.kind === "route"
-          ? candidate.id === annotation.anchor.routeId
-          : candidate.netId === net.id,
-      );
+      const route = resolveNetLabelOwnerRoute(document, annotation);
       const namedNetPlan = route
-        ? planEnsureNamedRoute(document, route.id, request)
+        ? requestLabelMigration(
+            annotation.id,
+            route.id,
+            name,
+            false,
+            presentationAnnotation,
+          )
+          ? null
+          : planEnsureNamedRoute(document, route.id, request, {}, resolver)
         : planEnsureNamedNet(document, request);
+      if (!namedNetPlan) return null;
       if (!namedNetPlan.ok) {
         setStatus(namedNetPlan.message);
         return null;
@@ -324,7 +454,11 @@ export function createPropertyEditPlanner({
           ? [
               {
                 kind: "upsert_schematic_annotation" as const,
-                annotation: presentationAnnotation,
+                annotation: {
+                  ...presentationAnnotation,
+                  netId: namedNetPlan.netId,
+                  binding: { ...binding, netId: namedNetPlan.netId },
+                },
               },
             ]
           : []),
@@ -523,6 +657,7 @@ export function createPropertyEditPlanner({
   };
 
   return {
+    convertLabelSignal,
     netLabelForRoute,
     netLabelEditsForRoute,
     netLabelScopeEdit,

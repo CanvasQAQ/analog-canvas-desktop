@@ -7,6 +7,7 @@ import {
   type SchematicDocument,
   type RichTextDocument,
   type Point,
+  type Annotation,
 } from "@icm/model";
 import { isFreeWireAnchor, type WireSource } from "./wire-commit-planner.js";
 import {
@@ -15,6 +16,13 @@ import {
 } from "./routing-operation-plan.js";
 import type { EditExecutionContext } from "./transaction-result.js";
 import type { SchematicEdit } from "./edit-schema.js";
+import {
+  applyLabelSignalMigration,
+  planLabelSignalMigration,
+} from "./label-signal-migration.js";
+import type { SignalMigrationOptions } from "./signal-member-migration.js";
+import type { SymbolResolver } from "@icm/symbols";
+export { previewLabelSignalMigration } from "./label-signal-migration.js";
 import {
   planEnsureNamedNet,
   type EnsureNamedNetPlan,
@@ -26,6 +34,51 @@ import {
   netLabelStandardOffset,
   netLabelBaselineForName,
 } from "@icm/derived";
+
+/** A free Label owns a member set, which may share a first lane with other wires. */
+export function resolveNetLabelOwnerRoute(
+  document: SchematicDocument,
+  annotation: Annotation,
+) {
+  const claim = document.connectivityEvidence.find(
+    (item) =>
+      item.kind === "name-claim" &&
+      item.owner.kind === "net-label" &&
+      item.owner.annotationId === annotation.id,
+  );
+  const members =
+    claim?.kind === "name-claim" ? claim.signal?.members : undefined;
+  if (!claim)
+    return document.routes.find((route) =>
+      annotation.anchor.kind === "route"
+        ? route.id === annotation.anchor.routeId
+        : route.netId ===
+          (annotation.binding?.kind === "net-name"
+            ? annotation.binding.netId
+            : annotation.netId),
+    );
+  return document.routes.find((route) => {
+    if (
+      annotation.anchor.kind === "route" &&
+      route.id !== annotation.anchor.routeId
+    )
+      return false;
+    if (members && members.length > 1)
+      return (
+        route.members?.length === members.length &&
+        members.every((member) =>
+          route.members?.some(
+            (lane) => lane.id === member.id && lane.netId === member.netId,
+          ),
+        )
+      );
+    return (
+      !route.members &&
+      route.netId ===
+        (claim?.kind === "name-claim" ? claim.netId : annotation.netId)
+    );
+  });
+}
 
 /** Naming is transient until the whole Wire gesture commits. */
 export function prepareNamedWireSource(
@@ -198,6 +251,8 @@ export function planEnsureNamedRoute(
   document: SchematicDocument,
   routeId: string,
   request: Parameters<typeof planEnsureNamedNet>[1],
+  migration: SignalMigrationOptions = {},
+  resolver?: SymbolResolver,
 ): EnsureNamedNetPlan {
   const route = document.routes.find((item) => item.id === routeId);
   if (request.owner.kind !== "net-label" || !route)
@@ -221,20 +276,42 @@ export function planEnsureNamedRoute(
     );
     if (!unchangedLiteral) parseSignalExpression(request.name);
     if (
-      unchangedLiteral ||
-      (!route.members && !selector && !/[<>,]/u.test(request.name))
+      (Object.keys(migration.memberMap ?? {}).length === 0 &&
+        unchangedLiteral &&
+        !migration.convertLegacy) ||
+      (!route.members &&
+        Object.keys(migration.memberMap ?? {}).length === 0 &&
+        !selector &&
+        !/[<>,]/u.test(request.name) &&
+        !document.connectivityEvidence.some(
+          (item) =>
+            item.kind === "name-claim" &&
+            item.owner.kind === "net-label" &&
+            item.owner.annotationId === annotationId &&
+            item.signal,
+        ))
     )
       return planEnsureNamedNet(document, request);
+    const edits = planSignalRouteName(
+      document,
+      route.id,
+      request.name,
+      request.owner.annotationId,
+      migration,
+      resolver,
+    );
+    const migrated = edits.find((edit) => edit.kind === "migrate_label_signal");
+    let netId = route.netId;
+    if (migrated?.kind === "migrate_label_signal") {
+      const preview = structuredClone(document);
+      applyLabelSignalMigration(preview, migrated, resolver);
+      netId = preview.routes.find((item) => item.id === route.id)!.netId;
+    }
     return {
       ok: true,
-      netId: route.netId,
+      netId,
       name: request.name.trim(),
-      edits: planSignalRouteName(
-        document,
-        route.id,
-        request.name,
-        request.owner.annotationId,
-      ),
+      edits,
     };
   } catch (error) {
     return {
@@ -251,6 +328,8 @@ function planSignalRouteName(
   routeId: string,
   expression: string,
   annotationId: string,
+  migration: SignalMigrationOptions = {},
+  resolver?: SymbolResolver,
 ): SchematicEdit[] {
   const route = document.routes.find((candidate) => candidate.id === routeId);
   if (!route) throw new Error(`Route does not exist: ${routeId}`);
@@ -262,8 +341,9 @@ function planSignalRouteName(
     (owner.binding.memberEndpoint || owner.binding.memberEndpoints)
   ) {
     if (
+      Object.keys(migration.memberMap ?? {}).length === 0 &&
       foldNetName(flattenRichText(resolveAnnotationText(document, owner))) ===
-      foldNetName(name)
+        foldNetName(name)
     )
       return [];
     throw new Error(
@@ -277,16 +357,31 @@ function planSignalRouteName(
       evidence.owner.annotationId === annotationId,
   );
   if (existing?.kind === "name-claim") {
-    if (existing.name === name) return [];
-    if (existing.signal)
-      throw new Error(
-        "Connected bus rename requires interface migration, which is not supported yet",
+    if (
+      existing.name === name &&
+      !migration.convertLegacy &&
+      Object.keys(migration.memberMap ?? {}).length === 0
+    )
+      return [];
+    if (existing.signal || migration.convertLegacy)
+      return planLabelSignalMigration(
+        document,
+        routeId,
+        annotationId,
+        expression,
+        migration,
+        resolver,
       );
-    if (/[<>]/u.test(existing.name))
+    if (
+      /[<>\[\],]/u.test(existing.name) ||
+      Object.keys(migration.memberMap ?? {}).length > 0
+    )
       throw new Error(
-        "Legacy bracketed labels remain scalar; explicit conversion is not supported yet",
+        "Legacy scalar names require an explicit conversion and member mapping",
       );
   }
+  if (!existing && Object.keys(migration.memberMap ?? {}).length > 0)
+    throw new Error("Member mapping requires an existing signal naming owner");
   const edits: SchematicEdit[] = [];
   let members = route.members?.map((member) => ({
     id: member.id,

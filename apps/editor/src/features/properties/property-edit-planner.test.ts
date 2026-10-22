@@ -1,4 +1,5 @@
 import { createRoutePath } from "@icm/model";
+import { executeProjectTransaction } from "@icm/edit-engine";
 import { resolveDocumentRoutingGeometry } from "@icm/derived";
 import { createEmptyProject, roleLabelFormat } from "@icm/model";
 import type { Annotation, Point } from "@icm/model";
@@ -59,6 +60,115 @@ function routedFixture(
 }
 
 describe("property edit planner", () => {
+  it("formats a route-anchored plural member selector without creating naming authority and refuses electrical rename", () => {
+    const input = routedFixture();
+    const document = input.document;
+    document.nets.push({ id: "reset", terminals: [] });
+    for (const junction of document.junctions)
+      junction.members = [
+        { id: `${junction.id}-clock`, netId: "net" },
+        { id: `${junction.id}-reset`, netId: "reset" },
+      ];
+    const route = document.routes[0]!;
+    route.members = [
+      {
+        id: "clock",
+        netId: "net",
+        startMemberId: "j1-clock",
+        endMemberId: "j2-clock",
+      },
+      {
+        id: "reset-member",
+        netId: "reset",
+        startMemberId: "j1-reset",
+        endMemberId: "j2-reset",
+      },
+    ];
+    const owner: Annotation = {
+      id: "owner",
+      kind: "net-label",
+      netId: "net",
+      binding: { kind: "net-name", netId: "net" },
+      anchor: { kind: "free", position: { x: 50, y: -20 } },
+      alignment: "start",
+      rotation: 0,
+      locked: false,
+    };
+    const selector: Annotation = {
+      ...owner,
+      id: "selector",
+      anchor: {
+        kind: "route",
+        routeId: route.id,
+        legId: route.legs[0]!.id,
+        t: 0.5,
+        normalOffset: -10,
+        direction: "forward",
+        orientation: "horizontal",
+        fallbackPosition: { x: 50, y: -10 },
+      },
+      binding: {
+        kind: "net-name",
+        netId: "net",
+        memberEndpoints: [
+          { kind: "junction", junctionId: "j1", memberId: "j1-clock" },
+          { kind: "junction", junctionId: "j1", memberId: "j1-reset" },
+        ],
+      },
+    };
+    document.annotations.push(owner, selector);
+    document.connectivityEvidence.push({
+      id: "claim",
+      kind: "name-claim",
+      name: "CLK,RESET",
+      netId: "net",
+      scope: "local",
+      owner: { kind: "net-label", annotationId: owner.id },
+      signal: {
+        expression: "CLK,RESET",
+        members: [
+          { id: "clock", name: "CLK", netId: "net" },
+          { id: "reset-member", name: "RESET", netId: "reset" },
+        ],
+      },
+    });
+    const planner = createPropertyEditPlanner(input);
+    const edits = planner.netNameEditsForAnnotation(selector, "CLK,RESET", {
+      ...selector,
+      sizeScale: 1.4,
+    });
+    expect(edits).not.toBeNull();
+    const result = executeProjectTransaction(input.project, {
+      transactionId: "format-selector",
+      projectId: input.project.id,
+      expectedStructureRevision: input.project.structureRevision,
+      actor: { kind: "human", id: "test" },
+      edits: [
+        {
+          kind: "transact_document",
+          documentId: document.id,
+          expectedRevision: document.revision,
+          edits: edits ?? [],
+        },
+      ],
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) return;
+    const changed = result.project.documents[0]!;
+    expect(changed.connectivityEvidence).toEqual(document.connectivityEvidence);
+    expect(changed.routes).toEqual(document.routes);
+    expect(changed.annotations.find((item) => item.id === "selector")).toEqual({
+      ...selector,
+      sizeScale: 1.4,
+    });
+    expect(
+      planner.netNameEditsForAnnotation(selector, "RENAMED,RESET"),
+    ).toBeNull();
+    expect(input.setStatus).toHaveBeenCalledWith(
+      expect.stringMatching(/selector.*migration/i),
+    );
+  });
+
   it.each(["subcircuit", "external-subcircuit"] as const)(
     "projects %s declarations without materializing inherited defaults",
     (kind) => {

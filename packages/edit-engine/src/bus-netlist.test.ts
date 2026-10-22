@@ -27,6 +27,7 @@ import {
   type ProjectStructureEdit,
 } from "./project-transaction.js";
 import { planCreateCellPin } from "./cell-pin-planner.js";
+import { planRenameCellTerminal } from "./cell-interface-change-planner.js";
 import type { SchematicEdit } from "./edit-schema.js";
 import {
   createFreeWireAnchor,
@@ -124,7 +125,7 @@ const resistor = (id: string, value: string) => ({
   },
 });
 
-function busDcFixture() {
+function busDcFixture(migrate = false) {
   let project = createEmptyProject("bus-dc", "Bus DC oracle", "child");
   project.documents[0]!.netlist!.name = "bus_pass";
   project = vector(project, "child", "in", "IN<3:0>", 0);
@@ -235,6 +236,45 @@ function busDcFixture() {
       connect(endpoint(`V${i}`, "-"), endpoint("gnd", "0"), "ground"),
     );
   project = documentEdit(project, top.id, edits);
+  if (migrate) {
+    project = transact(
+      project,
+      planRenameCellTerminal(project, "child", "in-terminal", "IN<0:3>"),
+    );
+    project = transact(
+      project,
+      planRenameCellTerminal(project, "child", "in-terminal", "INPUT<0:3>", {
+        memberMap: Object.fromEntries(
+          ins.map((member) => [member.id, member.name.replace("IN", "INPUT")]),
+        ),
+      }),
+    );
+    project = transact(
+      project,
+      planRenameCellTerminal(project, "child", "in-terminal", "INPUT<0:4>"),
+    );
+    const added = project.documents.find((cell) => cell.id === "child")!
+      .netlist!.terminals[0]!.signal!.members[4]!;
+    expect(
+      project.documents
+        .find((cell) => cell.id === "child")!
+        .nets.find((net) => net.id === added.netId)!.terminals,
+    ).toHaveLength(1);
+    project = transact(
+      project,
+      planRenameCellTerminal(project, "child", "in-terminal", "INPUT<0:3>", {
+        memberMap: { [added.id]: null },
+      }),
+    );
+    const migrated = project.documents.find((cell) => cell.id === "child")!
+      .netlist!.terminals[0]!.signal!.members;
+    expect(migrated.map((member) => member.id)).toEqual([
+      ins[3]!.id,
+      ins[2]!.id,
+      ins[1]!.id,
+      ins[0]!.id,
+    ]);
+  }
   const saved = serializeProject(project);
   project = parseProject(saved);
   expect(serializeProject(project)).toBe(saved);
@@ -253,10 +293,9 @@ function busDcFixture() {
   expect(analysis.ir, JSON.stringify(analysis.diagnostics)).not.toBeNull();
   const childIR = analysis.ir!.cells.find((c) => c.id === child.id)!;
   expect(childIR.ports.map((p) => p.name)).toEqual([
-    "IN_3_",
-    "IN_2_",
-    "IN_1_",
-    "IN_0_",
+    ...(migrate
+      ? ["INPUT_0_", "INPUT_1_", "INPUT_2_", "INPUT_3_"]
+      : ["IN_3_", "IN_2_", "IN_1_", "IN_0_"]),
     "OUT_3_",
     "OUT_2_",
     "OUT_1_",
@@ -272,10 +311,9 @@ function busDcFixture() {
   for (const variant of ["identity", "reverse"]) {
     const call = topIR.instances.find((instance) => instance.id === variant)!;
     expect(call.nodes.map((n) => n.pinName)).toEqual([
-      "IN<3>",
-      "IN<2>",
-      "IN<1>",
-      "IN<0>",
+      ...(migrate
+        ? ["INPUT<0>", "INPUT<1>", "INPUT<2>", "INPUT<3>"]
+        : ["IN<3>", "IN<2>", "IN<1>", "IN<0>"]),
       "OUT<3>",
       "OUT<2>",
       "OUT<1>",
@@ -316,6 +354,15 @@ it("exports distinct bus members through identity and reverse hierarchy after ca
       .find((cell) => cell.id === "child")!
       .netlist!.terminals.map((terminal) => terminal.name),
   ).toEqual(["IN<3:0>", "OUT<3:0>"]);
+});
+
+it("preserves physical hierarchy channels after connected reorder, rename and resize", () => {
+  const { project, measured } = busDcFixture(true);
+  expect(measured).toHaveLength(8);
+  expect(
+    project.documents.find((cell) => cell.id === "child")!.netlist!
+      .terminals[0]!.name,
+  ).toBe("INPUT<0:3>");
 });
 
 function slicedBusDcFixture() {
@@ -548,6 +595,7 @@ const available =
 it.skipIf(!available).each([
   ["identity and whole-bus reversal", busDcFixture],
   ["mixed bundles, ordered and nested slices", slicedBusDcFixture],
+  ["connected member reorder and explicit rename", () => busDcFixture(true)],
 ] as const)(
   "ngspice proves four independent DC values through %s",
   (_, fixture) => {

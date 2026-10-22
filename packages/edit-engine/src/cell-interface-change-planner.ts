@@ -18,6 +18,11 @@ import {
 } from "@icm/model";
 import type { PortLabelFormatOptions } from "@icm/model";
 import {
+  planSignalMemberMigration,
+  type SignalMigrationOptions,
+} from "./signal-member-migration.js";
+import { planCellSignalMigration } from "./cell-signal-migration.js";
+import {
   builtInSymbols,
   createProjectSymbolResolver,
   externalSubcircuitSymbolId,
@@ -439,7 +444,7 @@ export function planRenameCellTerminal(
   childDocumentId: string,
   terminalId: string,
   newName: string,
-  options: { mergeExistingPort?: boolean } = {},
+  options: SignalMigrationOptions & { mergeExistingPort?: boolean } = {},
 ): ProjectStructureEdit[] {
   const terminal = requireDocument(
     project,
@@ -447,8 +452,12 @@ export function planRenameCellTerminal(
   ).netlist?.terminals.find((item) => item.id === terminalId);
   if (
     terminal &&
-    terminal.name !== newName &&
-    (terminal.signal || /[<>\[\],:]/u.test(newName))
+    (terminal.name !== newName ||
+      options.convertLegacy ||
+      Object.keys(options.memberMap ?? {}).length > 0) &&
+    (terminal.signal ||
+      /[<>\[\],:]/u.test(newName) ||
+      Object.keys(options.memberMap ?? {}).length > 0)
   )
     return planSetCellTerminalSignal(
       project,
@@ -466,13 +475,52 @@ export function planRenameCellTerminal(
   );
 }
 
+/** Whether a Cell Pin owns contacts that need an explicit member migration. */
+export function cellTerminalHasSignalContacts(
+  project: CircuitProject,
+  documentId: string,
+  terminalId: string,
+): boolean {
+  const document = requireDocument(project, documentId);
+  const terminal = document.netlist?.terminals.find(
+    (item) => item.id === terminalId,
+  );
+  if (!terminal) throw new Error(`Cell terminal does not exist: ${terminalId}`);
+  const oldMembers = terminal.signal?.members ?? [
+    { id: terminal.id, name: terminal.name, netId: terminal.netId },
+  ];
+  const marker = terminal.interfaceInstanceIds[0];
+  const netIds = new Set(oldMembers.map((member) => member.netId));
+  return (
+    document.nets.some(
+      (net) =>
+        netIds.has(net.id) &&
+        net.terminals.some((item) => item.instanceId !== marker),
+    ) ||
+    document.routes.some((route) =>
+      routeElectricalConnections(route).some((edge) => netIds.has(edge.netId)),
+    ) ||
+    document.connectivityEvidence.some((evidence) =>
+      netIds.has(evidence.netId),
+    ) ||
+    project.documents.some((parent) =>
+      parent.instances.some(
+        (instance) =>
+          instance.netlist?.binding?.kind === "subcircuit" &&
+          instance.netlist.binding.childDocumentId === documentId &&
+          instanceReferencesPin(parent, instance.id, terminal.name),
+      ),
+    )
+  );
+}
+
 /** Explicit authoring; legacy names are never parsed by loading or display. */
 export function planSetCellTerminalSignal(
   project: CircuitProject,
   documentId: string,
   terminalId: string,
   expression: string,
-  options: { mergeExistingPort?: boolean } = {},
+  options: SignalMigrationOptions & { mergeExistingPort?: boolean } = {},
 ): ProjectStructureEdit[] {
   const document = requireDocument(project, documentId);
   const terminal = document.netlist?.terminals.find(
@@ -481,9 +529,31 @@ export function planSetCellTerminalSignal(
   if (!terminal) throw new Error(`Cell terminal does not exist: ${terminalId}`);
   const names = parseSignalExpression(expression);
   const name = expression.trim();
-  if (terminal.signal?.expression === name) return [];
-  if (!terminal.signal && /[<>\[\]]/u.test(terminal.name) && names.length > 1)
-    throw new Error("Legacy bracketed scalar conversion is not supported yet");
+  if (
+    terminal.signal?.expression === name &&
+    Object.keys(options.memberMap ?? {}).length === 0
+  )
+    return [];
+  if (!terminal.signal && options.convertLegacy)
+    return planCellSignalMigration(
+      project,
+      documentId,
+      terminalId,
+      name,
+      options,
+    );
+  if (Object.keys(options.memberMap ?? {}).length > 0)
+    return planCellSignalMigration(
+      project,
+      documentId,
+      terminalId,
+      name,
+      options,
+    );
+  if (!terminal.signal && /[<>\[\],]/u.test(terminal.name) && names.length > 1)
+    throw new Error(
+      "Legacy scalar names require an explicit conversion and member mapping",
+    );
   const scalarRename =
     (terminal.signal?.members.length ?? 1) === 1 && names.length === 1;
   const oldMembers = terminal.signal?.members ?? [
@@ -492,55 +562,57 @@ export function planSetCellTerminalSignal(
   const marker = terminal.interfaceInstanceIds[0];
   if (!marker)
     throw new Error("Native or Power Rail vector interfaces are not supported");
-  if (!scalarRename) {
-    const netIds = new Set(oldMembers.map((member) => member.netId));
-    const connected =
-      document.nets.some(
-        (net) =>
-          netIds.has(net.id) &&
-          net.terminals.some((item) => item.instanceId !== marker),
-      ) ||
-      document.routes.some((route) =>
-        routeElectricalConnections(route).some((edge) =>
-          netIds.has(edge.netId),
-        ),
-      ) ||
-      document.connectivityEvidence.some((evidence) =>
-        netIds.has(evidence.netId),
-      ) ||
-      project.documents.some((parent) =>
-        parent.instances.some(
-          (instance) =>
-            instance.netlist?.binding?.kind === "subcircuit" &&
-            instance.netlist.binding.childDocumentId === documentId &&
-            instanceReferencesPin(parent, instance.id, terminal.name),
-        ),
-      );
+  const migration = planSignalMemberMigration(
+    terminal.id,
+    oldMembers,
+    name,
+    options,
+    String(document.revision),
+  );
+  const preservesMembers =
+    names.length === oldMembers.length && migration.removed.length === 0;
+  if (
+    terminal.signal &&
+    !scalarRename &&
+    (terminal.signal.members.length > 1 || preservesMembers)
+  )
+    return planCellSignalMigration(
+      project,
+      documentId,
+      terminalId,
+      name,
+      options,
+    );
+  if (!scalarRename && !preservesMembers) {
+    const connected = cellTerminalHasSignalContacts(
+      project,
+      documentId,
+      terminalId,
+    );
     if (connected)
-      throw new Error(
-        "Connected signal member edits require interface migration, which is not supported yet",
+      return planCellSignalMigration(
+        project,
+        documentId,
+        terminalId,
+        name,
+        options,
       );
   }
-  const members = names.map((memberName, index) => ({
-    id:
-      oldMembers[index]?.id ??
-      deriveStableId("signal-member", terminal.id, String(index)),
-    name: memberName,
-    netId:
-      oldMembers[index]?.netId ??
-      deriveStableId("signal-net", terminal.id, String(index)),
-  }));
-  const memberEdits: DocumentEdits = scalarRename
-    ? []
-    : oldMembers.map((member) => ({
-        kind: "disconnect_endpoint",
-        endpoint: {
-          kind: "terminal",
-          instanceId: marker,
-          pinName: "P",
-          ...(oldMembers.length > 1 ? { memberId: member.id } : {}),
-        },
-      }));
+  const members = scalarRename
+    ? [{ ...oldMembers[0]!, name: names[0]! }]
+    : migration.members;
+  const memberEdits: DocumentEdits =
+    scalarRename || preservesMembers
+      ? []
+      : oldMembers.map((member) => ({
+          kind: "disconnect_endpoint",
+          endpoint: {
+            kind: "terminal",
+            instanceId: marker,
+            pinName: "P",
+            ...(oldMembers.length > 1 ? { memberId: member.id } : {}),
+          },
+        }));
   const renamed = planRenameScalarCellTerminal(
     project,
     documentId,
@@ -552,10 +624,11 @@ export function planSetCellTerminalSignal(
     {
       kind: "update_cell_terminal",
       terminalId,
+      name,
       signal: { expression: name, members },
     },
   ];
-  if (!scalarRename)
+  if (!scalarRename && !preservesMembers)
     for (const member of members) {
       const endpoint = {
         kind: "terminal" as const,
@@ -575,7 +648,11 @@ export function planSetCellTerminalSignal(
       edit.kind === "transact_document" && edit.documentId === documentId,
   );
   if (childEdit?.kind === "transact_document")
-    childEdit.edits = [...memberEdits, ...childEdit.edits, ...update];
+    childEdit.edits = [
+      ...memberEdits,
+      ...childEdit.edits.filter((edit) => edit.kind !== "update_cell_terminal"),
+      ...update,
+    ];
   else
     renamed.push(
       transactDocument(project, documentId, [...memberEdits, ...update]),
@@ -792,7 +869,7 @@ export function planEditCellTerminalAnnotation(
   terminalId: string,
   annotation: Annotation,
   newName: string,
-  options: { mergeExistingPort?: boolean } = {},
+  options: SignalMigrationOptions & { mergeExistingPort?: boolean } = {},
 ): ProjectStructureEdit[] {
   const renameEdits = planRenameCellTerminal(
     project,
@@ -810,7 +887,14 @@ export function planEditCellTerminalAnnotation(
       edit.kind === "transact_document" && edit.documentId === documentId,
   );
   if (childEditIndex < 0) {
-    return [transactDocument(project, documentId, [annotationEdit])];
+    const edit = transactDocument(project, documentId, [annotationEdit]);
+    if (edit.kind === "transact_document")
+      edit.expectedRevision += renameEdits.filter(
+        (candidate) =>
+          candidate.kind === "migrate_cell_signal" &&
+          candidate.documentId === documentId,
+      ).length;
+    return [...renameEdits, edit];
   }
   return renameEdits.map((edit, index) =>
     index === childEditIndex && edit.kind === "transact_document"

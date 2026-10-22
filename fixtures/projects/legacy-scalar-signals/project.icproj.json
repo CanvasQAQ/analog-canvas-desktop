@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 76,
+  "id": "legacy-scalar-signals",
+  "name": "Legacy scalar signals",
+  "topDocumentId": "main",
+  "defaults": {
+    "instance": { "mirror": "none", "rotation": 0 },
+    "instancesByType": {},
+    "label": { "alignment": "middle", "locked": false, "rotation": 0 },
+    "routeLeg": { "mode": "manual" }
+  },
+  "documents": [
+    {
+      "id": "main",
+      "name": "dut",
+      "netlist": {
+        "formalParameters": [],
+        "name": "dut",
+        "terminals": [
+          {
+            "direction": "input",
+            "id": "range-formal",
+            "interfaceInstanceIds": ["range"],
+            "name": "DATA<3:0>",
+            "netId": "range-net"
+          },
+          {
+            "direction": "input",
+            "id": "bundle-formal",
+            "interfaceInstanceIds": ["bundle"],
+            "name": "CLK,RESET",
+            "netId": "bundle-net"
+          }
+        ]
+      },
+      "presentation": {
+        "compactness": "normal",
+        "grid": 10,
+        "labelSubscriptAfterFirst": false,
+        "labelSubscriptItalic": false,
+        "styleProfileId": "razavi-textbook-v1"
+      },
+      "instances": [
+        {
+          "type": "port",
+          "id": "range",
+          "coordinate": [0, 0]
+        },
+        {
+          "type": "port",
+          "id": "bundle",
+          "coordinate": [0, 100]
+        }
+      ],
+      "routes": [],
+      "connections": { "contacts": [], "unrouted": [] },
+      "nets": [
+        {
+          "at": { "terminal": ["range", "P"] },
+          "id": "range-net"
+        },
+        {
+          "at": { "terminal": ["bundle", "P"] },
+          "id": "bundle-net"
+        }
+      ],
+      "junctions": [],
+      "annotations": [],
+      "drafting": { "objects": [] },
+      "connectivityEvidence": [],
+      "layoutGroups": [],
+      "constraints": [],
+      "sourceStatus": "in-sync",
+      "revision": 0,
+      "noConnects": []
+    }
+  ],
+  "componentDefinitions": [
+    {
+      "symbol": {
+        "id": "port",
+        "name": "Port",
+        "pins": [
+          {
+            "at": { "x": 0, "y": 0 },
+            "direction": "east",
+            "name": "P",
+            "presentation": { "leadLength": 10, "visibility": "visible" },
+            "role": "port"
+          }
+        ],
+        "primitives": [
+          {
+            "center": { "x": -7.086614, "y": 0 },
+            "fill": "none",
+            "kind": "circle",
+            "radius": 2.47907,
+            "stroke": "foreground",
+            "style": { "lineCap": "butt", "lineJoin": "miter", "strokeRole": "normal" }
+          },
+          {
+            "from": { "x": 0, "y": 0 },
+            "kind": "line",
+            "style": { "lineCap": "butt", "lineJoin": "miter", "strokeRole": "normal" },
+            "to": { "x": -4.607544, "y": 0 }
+          }
+        ],
+        "schemaVersion": 1,
+        "variants": [],
+        "viewBox": { "height": 14, "width": 18, "x": -14, "y": -7 }
+      }
+    }
+  ],
+  "externalSubcircuitDefinitions": [],
+  "simulationFolders": [],
+  "source": { "dialect": "none", "entry": null, "files": [], "sourcePolicy": "copy" },
+  "symbolLibrary": { "hash": "razavi-reference-v1", "id": "razavi-symbols", "version": "1" },
+  "structureRevision": 0
+}

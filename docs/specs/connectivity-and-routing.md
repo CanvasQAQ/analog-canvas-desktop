@@ -79,9 +79,21 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   SVG, PNG and PDF share this geometry and exclude editing controls.
 - Unknown members, unequal widths and malformed expressions refuse atomically.
   Fixed scalar sources cannot acquire vector or bundle width from a Label.
-  Connected interface/name/mapping migration, legacy scalar conversion, bus
-  group copy and member NoConnect authoring require subsequent support and
-  are refused without changing the circuit.
+  Bus group copy and member NoConnect authoring are refused without changing
+  the circuit.
+- Editing a bus source Pin or Label, or a connected scalar Pin, previews the affected interface and member
+  mapping. Matching names retain stable identity; other renames and removed
+  members require an explicit target or disconnect. Reordering follows identity,
+  added members start disconnected, and removed contacts remain editable stubs.
+  Affected callers, bound selectors and the edited naming owner change atomically
+  with one Undo; unrelated owners keep their definitions.
+  Cancelling, stale previews and invalid mappings leave the Project unchanged.
+  An unconnected scalar Pin can become a bus directly from inline text; its
+  unused scalar identity is replaced by fresh members without inferred mapping.
+- Legacy scalar names remain literal on load. Convert to bus explicitly maps
+  each existing scalar contact to one new member or disconnects it; it never
+  fans a scalar connection into every member. Native and PDK interfaces retain
+  their refusal with an explanation.
 
 ## Completed-edit connectivity
 
@@ -231,17 +243,17 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   The [diagnostic envelope](../../packages/derived/src/diagnostics/diagnostic.ts)
   keeps domain, confidence, severity and gate eligibility distinct.
 
-| Code | Reports |
-| ---- | ------- |
-| `ERC_TOUCHING_NOT_CONNECTED` | A pin on another Logical Net's Route, or two pins on one point on different Logical Nets (each pair once). Crossings and `NoConnect` pins exempt. |
-| `ERC_DANGLING_WIRE` | A wire end at a Junction nothing else reaches; rail ends, labelled wires and ends with a same-Net label within four grid steps exempt. |
-| `ERC_NET_LABEL_NAMES_NOTHING` | A Net Label whose Net reaches no pin, wire or Junction. |
-| `ERC_LABEL_REFERENCE_MISMATCH` | A name label reading another part's name while that part shows something else. |
-| `ERC_UNDRIVEN_GATE_NET` | Two or more sense-only pins (gate, bulk, block input) with no Cell Pin, global/supply name or other pin (capacitors drive; local names do not). A lone gate is `ERC_FLOATING_GATE`. |
-| `ERC_SHORTED_DEVICE` | A two-pin part with both pins on one Logical Net. |
-| `ERC_NET_JOINED_ONLY_IN_DATA` | A drawn part of a Net no wire or own name joins to the rest (touching counts; unwired pins are `ERC_UNCONNECTED_PIN`; guided imports skipped). |
-| `ERC_OVERLAPPING_NETS` | Error: different Logical Nets' wires along one line over a common span (each pair once, with span). |
-| `ERC_INSTANCE_NOT_DRAWN` | Instances the sheet does not draw. |
+| Code                           | Reports                                                                                                                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ERC_TOUCHING_NOT_CONNECTED`   | A pin on another Logical Net's Route, or two pins on one point on different Logical Nets (each pair once). Crossings and `NoConnect` pins exempt.                                   |
+| `ERC_DANGLING_WIRE`            | A wire end at a Junction nothing else reaches; rail ends, labelled wires and ends with a same-Net label within four grid steps exempt.                                              |
+| `ERC_NET_LABEL_NAMES_NOTHING`  | A Net Label whose Net reaches no pin, wire or Junction.                                                                                                                             |
+| `ERC_LABEL_REFERENCE_MISMATCH` | A name label reading another part's name while that part shows something else.                                                                                                      |
+| `ERC_UNDRIVEN_GATE_NET`        | Two or more sense-only pins (gate, bulk, block input) with no Cell Pin, global/supply name or other pin (capacitors drive; local names do not). A lone gate is `ERC_FLOATING_GATE`. |
+| `ERC_SHORTED_DEVICE`           | A two-pin part with both pins on one Logical Net.                                                                                                                                   |
+| `ERC_NET_JOINED_ONLY_IN_DATA`  | A drawn part of a Net no wire or own name joins to the rest (touching counts; unwired pins are `ERC_UNCONNECTED_PIN`; guided imports skipped).                                      |
+| `ERC_OVERLAPPING_NETS`         | Error: different Logical Nets' wires along one line over a common span (each pair once, with span).                                                                                 |
+| `ERC_INSTANCE_NOT_DRAWN`       | Instances the sheet does not draw.                                                                                                                                                  |
 
 ## Imported routing guidance
 

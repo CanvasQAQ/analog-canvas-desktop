@@ -37,6 +37,62 @@ function dependencies() {
 }
 
 describe("Project structure commands", () => {
+  it("authors a fresh unconnected scalar Pin as a bus inline without assigning its old identity", () => {
+    const input = dependencies();
+    const document = input.activeDocument;
+    document.instances.push({ id: "pin", symbolId: "port", placement: null });
+    document.nets.push({
+      id: "old-net",
+      terminals: [{ instanceId: "pin", pinName: "P" }],
+    });
+    document.netlist!.terminals.push({
+      id: "formal",
+      name: "IN",
+      netId: "old-net",
+      direction: "input",
+      interfaceInstanceIds: ["pin"],
+      signal: {
+        expression: "IN",
+        members: [{ id: "old-member", name: "IN", netId: "old-net" }],
+      },
+    });
+    const requestConfirmation =
+      vi.fn<(request: CellInterfaceConfirmation) => void>();
+    const commands = createProjectStructureCommands({
+      ...input,
+      requestConfirmation,
+    });
+    commands.renameCellTerminal("formal", "IN<3:0>");
+    expect(requestConfirmation).not.toHaveBeenCalled();
+    expect(input.commitStructure).toHaveBeenCalledTimes(1);
+    const result = executeProjectTransaction(input.project, {
+      transactionId: "initial-bus",
+      projectId: input.project.id,
+      expectedStructureRevision: input.project.structureRevision,
+      actor: { kind: "human", id: "test" },
+      edits: input.commitStructure.mock.calls[0]![1],
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    const members =
+      result.project.documents[0]!.netlist!.terminals[0]!.signal!.members;
+    expect(members.map((member) => member.name)).toEqual([
+      "IN<3>",
+      "IN<2>",
+      "IN<1>",
+      "IN<0>",
+    ]);
+    expect(
+      members.every(
+        (member) => member.id !== "old-member" && member.netId !== "old-net",
+      ),
+    ).toBe(true);
+    document.nets[0]!.terminals.push({ instanceId: "load", pinName: "1" });
+    input.commitStructure.mockClear();
+    commands.renameCellTerminal("formal", "IN<3:0>");
+    expect(requestConfirmation).toHaveBeenCalledTimes(1);
+    expect(input.commitStructure).not.toHaveBeenCalled();
+  });
   it("never applies a confirmation against a replaced Project snapshot", () => {
     const project = createEmptyProject("project", "Project");
     const request = {

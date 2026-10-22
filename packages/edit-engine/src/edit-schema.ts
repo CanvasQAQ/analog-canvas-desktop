@@ -31,6 +31,7 @@ import {
   TerminalRefSchema,
 } from "@icm/model";
 import { z } from "zod";
+import { LabelSignalMigrationEditSchema } from "./label-signal-migration.js";
 
 /**
  * Public typed-edit protocol. This module owns payload shape only; execution,
@@ -450,6 +451,7 @@ const UndoEditSchema = z.strictObject({ kind: z.literal("undo") });
 const RedoEditSchema = z.strictObject({ kind: z.literal("redo") });
 
 export const SchematicEditSchema = z.discriminatedUnion("kind", [
+  LabelSignalMigrationEditSchema,
   NoopEditSchema,
   ClearCellDrawingEditSchema,
   ResetCellPlacementEditSchema,

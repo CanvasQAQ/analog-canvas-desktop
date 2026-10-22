@@ -1,5 +1,7 @@
 import { routeEnd, SchematicDocumentSchema } from "@icm/model";
 import type { SchematicDocument } from "@icm/model";
+import { applyLabelSignalMigration } from "./label-signal-migration.js";
+import { diffDocumentObjectIds } from "./history.js";
 import {
   deriveInternalGroupSelection,
   endpointKey,
@@ -353,6 +355,24 @@ export function executeTransaction(
       );
     }
     switch (edit.kind) {
+      case "migrate_label_signal": {
+        const beforeMigration = structuredClone(draft);
+        try {
+          applyLabelSignalMigration(draft, edit, resolver);
+        } catch (error) {
+          return rejectAt(
+            "EDIT_PRECONDITION",
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+        references.invalidate();
+        changedObjectIds.add(edit.routeId);
+        changedObjectIds.add(edit.annotationId);
+        for (const id of diffDocumentObjectIds(beforeMigration, draft))
+          changedObjectIds.add(id);
+        connectivityChanged = true;
+        break;
+      }
       case "noop":
       case "undo":
       case "redo":

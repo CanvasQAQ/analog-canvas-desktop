@@ -52,6 +52,11 @@ import {
   type SchematicEdit,
 } from "./edit-schema.js";
 import { executeTransaction } from "./transaction.js";
+import { diffDocumentObjectIds } from "./history.js";
+import {
+  CellSignalMigrationEditSchema,
+  applyCellSignalMigration,
+} from "./cell-signal-migration.js";
 import {
   parseProjectSnapshot,
   validateProjectResult,
@@ -116,6 +121,7 @@ export const ApplyModelSourceEditSchema = z.strictObject({
 });
 
 export const ProjectStructureEditSchema = z.discriminatedUnion("kind", [
+  CellSignalMigrationEditSchema,
   z.strictObject({
     kind: z.literal("associate_component_library"),
     symbolId: z.string().min(1),
@@ -1212,6 +1218,64 @@ function applyProjectTransaction(
       if (index < 0) continue;
       candidate.simulationFolders.splice(index, 1);
       structuralChange = true;
+      continue;
+    }
+
+    if (edit.kind === "migrate_cell_signal") {
+      const beforeDocuments = new Map(
+        candidate.documents.map((document) => [
+          document.id,
+          structuredClone(document),
+        ]),
+      );
+      try {
+        for (const id of applyCellSignalMigration(candidate, edit)) {
+          changedDocumentIds.add(id);
+          const document = candidate.documents.find((item) => item.id === id)!;
+          const before = beforeDocuments.get(id)!;
+          const interfaceIds =
+            id === edit.documentId
+              ? document.netlist!.terminals.find(
+                  (terminal) => terminal.id === edit.terminalId,
+                )!.interfaceInstanceIds
+              : document.instances
+                  .filter(
+                    (instance) =>
+                      instance.netlist?.binding?.kind === "subcircuit" &&
+                      instance.netlist.binding.childDocumentId ===
+                        edit.documentId,
+                  )
+                  .map((instance) => instance.id);
+          documentResults.push({
+            ok: true,
+            applied: true,
+            revision: document.revision,
+            proposedRevision: document.revision,
+            document: structuredClone(document),
+            diagnostics: [],
+            diff: {
+              documentId: id,
+              fromRevision: before.revision,
+              toRevision: document.revision,
+              editKinds: [],
+              changedObjectIds: [
+                ...new Set([
+                  ...diffDocumentObjectIds(before, document),
+                  ...interfaceIds,
+                ]),
+              ].sort(),
+            },
+          });
+        }
+      } catch (error) {
+        return rejectProjectTransaction(
+          project,
+          "EDIT_PRECONDITION",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+      structuralChange = true;
+      cellSymbolChangedDocumentIds.add(edit.documentId);
       continue;
     }
 
