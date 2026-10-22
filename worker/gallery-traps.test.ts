@@ -117,6 +117,7 @@ describe("trap circuits", () => {
         userAgent: "python-requests/2.32",
         notifiedAt: expect.any(String),
         unblockedAt: null,
+        reason: "script",
       }),
     ]);
     // Nobody else reads or lifts them.
@@ -140,6 +141,34 @@ describe("trap circuits", () => {
     );
     expect(await lifted.json()).toEqual({ unblocked: true });
     expect((await wall(env, cookieHeaders(maker))).status).toBe(200);
+  });
+
+  it("block a browser only once it has read two different traps' circuits in a day, never for a preview", async () => {
+    const env = environment();
+    await sevenCircuits(env);
+    const browser = {
+      Cookie: await makerOf(env),
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+    };
+    const read = (path: string) =>
+      route(env, new Request(`${ORIGIN}${path}`, { headers: browser }));
+    const sent = outbox(env);
+    // A page left open across a deploy shows trap tiles and loads their
+    // previews by itself (2026-10-22); its reader opened one circuit, twice.
+    await read("/api/gallery/ww5fnfambz/preview.svg");
+    await read("/api/gallery/s93tzkszt6/preview.svg");
+    await read("/api/gallery/s93tzkszt6?summary=1");
+    for (let time = 0; time < 2; time += 1)
+      expect((await read("/api/gallery/ww5fnfambz")).status).toBe(200);
+    expect((await wall(env, browser)).status).toBe(200);
+    expect(sent).toHaveLength(0);
+
+    // A second trap's circuit is no accident.
+    await read("/api/gallery/s93tzkszt6");
+    expect((await wall(env, browser)).status).toBe(403);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.text).toContain("2 个不同蜜罐");
   });
 
   it("answer a curator as a missing circuit and block nobody", async () => {

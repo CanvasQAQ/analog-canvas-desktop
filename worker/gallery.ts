@@ -21,7 +21,13 @@ import {
 } from "./gallery-wall-merge";
 import { sameOrigin } from "./same-origin";
 import { BULK_ACCESS_NOTE, llmsUsagePolicy, robotsTxt } from "./usage-policy";
-import { readsTraps, trapOf, trapResponse, withTrap } from "./gallery-traps";
+import {
+  readsTraps,
+  trapOf,
+  trapReadKind,
+  trapResponse,
+  withTrap,
+} from "./gallery-traps";
 import {
   GALLERY_DAILY_OPEN_LIMIT,
   GALLERY_MAX_REJECT_REASON_LENGTH,
@@ -163,12 +169,13 @@ async function galleryReaderOf(
   return user;
 }
 
-/** Asks the AuthDO to block the account that read a trap circuit. */
+/** Tells the AuthDO an account read a trap circuit; it decides on a block. */
 async function blockForTrap(
   env: GalleryEnv,
   request: Request,
   reader: SessionUser,
   entryId: string,
+  kind: "script" | "read",
 ): Promise<void> {
   if (!env.AUTH) return;
   const headers = request.headers;
@@ -178,6 +185,7 @@ async function blockForTrap(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         userId: reader.id,
+        kind,
         entryId,
         path: new URL(request.url).pathname,
         ip: headers.get("cf-connecting-ip"),
@@ -532,8 +540,11 @@ export async function routeGalleryRequest(
         { error: "not-found" },
         { status: 404, headers: { "cache-control": "no-store" } },
       );
-    await blockForTrap(env, request, reader, trap.id);
-    galleryReaders.delete(request.headers.get("Cookie") ?? "");
+    const kind = trapReadKind(request, segments[1]);
+    if (kind) {
+      await blockForTrap(env, request, reader, trap.id, kind);
+      galleryReaders.delete(request.headers.get("Cookie") ?? "");
+    }
     return trapResponse(trap, segments[1]);
   }
 

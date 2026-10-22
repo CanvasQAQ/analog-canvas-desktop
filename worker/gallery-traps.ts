@@ -61,6 +61,30 @@ export function trapOf(id: string | undefined): Trap | null {
 }
 
 /**
+ * What a request under a trap id says about its reader. A program (no
+ * browser's User-Agent) is collecting; a browser only when it reads a
+ * trap's circuit, since a page left open across a deploy shows trap tiles
+ * and loads their previews by itself (2026-10-22).
+ */
+export function trapReadKind(
+  request: Request,
+  resource: string | undefined,
+): "script" | "read" | null {
+  const agent = request.headers.get("user-agent") ?? "";
+  const browser =
+    /^Mozilla\/5\.0 \(/u.test(agent) &&
+    /(?:AppleWebKit|Gecko)\//u.test(agent) &&
+    !/headless|phantomjs|puppeteer|playwright|python|curl|wget|node|axios|go-http|okhttp|java\/|scrapy|bot|spider|crawl/iu.test(
+      agent,
+    );
+  if (!browser) return "script";
+  const summary = new URL(request.url).searchParams.get("summary") === "1";
+  return request.method === "GET" && resource === undefined && !summary
+    ? "read"
+    : null;
+}
+
+/**
  * Whether this reader is shown traps and blocked for opening one: any
  * signed-in member, but not the Owner, a curator, a moderator or an AI
  * seat, whose own tools read the Gallery in bulk.
