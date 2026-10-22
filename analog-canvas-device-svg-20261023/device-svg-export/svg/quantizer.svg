@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -24 68 48" width="68" height="48" data-symbol-id="quantizer" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Quantizer</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-30" y1="0" x2="-20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M -20 -20 L 20 -20 L 20 20 L -20 20 Z" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/><line x1="20" y1="0" x2="30" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polyline points="-14,15 -7,15 -7,5 0,5 0,-5 7,-5 7,-15 14,-15" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+
+</svg>

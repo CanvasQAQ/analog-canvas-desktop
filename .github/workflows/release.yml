@@ -1,0 +1,162 @@
+name: Cross-platform release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish downloaded artifacts as a preview release for the current commit
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build shared packages
+        run: pnpm --filter "@icm/editor^..." --if-present build
+      - name: Build offline renderer
+        run: pnpm --filter @icm/editor exec vite build --config vite.desktop.config.ts
+      - name: Build desktop shell
+        run: pnpm --filter @icm/desktop build:preview
+      - name: Focused desktop and core tests
+        run: >-
+          pnpm exec vitest run
+          apps/desktop/src
+          packages/model
+          packages/netlist
+          packages/exporters
+          packages/project-protocol
+
+  package:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            args: --win --x64
+          - os: macos-latest
+            platform: macos
+            args: --mac --x64 --arm64
+          - os: ubuntu-22.04
+            platform: linux
+            args: --linux --x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.16.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build shared packages
+        run: pnpm --filter "@icm/editor^..." --if-present build
+      - name: Build offline renderer
+        run: pnpm --filter @icm/editor exec vite build --config vite.desktop.config.ts
+      - name: Build desktop shell
+        run: pnpm --filter @icm/desktop build:preview
+      - name: Package ${{ matrix.platform }}
+        working-directory: apps/desktop
+        run: pnpm exec electron-builder ${{ matrix.args }} --config electron-builder.yml --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Archive Linux unpacked application
+        if: matrix.platform == 'linux'
+        run: node scripts/archive-linux.mjs
+      - name: Install virtual display
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Smoke Linux package and reject external requests
+        if: matrix.platform == 'linux'
+        run: |
+          xvfb-run -a node scripts/smoke-desktop-package.mjs
+          xvfb-run -a node scripts/smoke-desktop-ui.mjs release/linux-unpacked/analog-canvas release/linux-smoke.png
+      - name: Generate platform checksums
+        run: node scripts/release-checksums.mjs ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analog-canvas-${{ matrix.platform }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/*.tar.gz
+            release/*-smoke.png
+            release/SHA256SUMS-*.txt
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Combine checksums
+        shell: bash
+        run: |
+          cat release/SHA256SUMS-*.txt | sort -k2 > release/SHA256SUMS.txt
+          rm release/SHA256SUMS-*.txt
+      - name: Add corresponding source archive and checksum
+        shell: bash
+        run: |
+          git archive --format=zip --output=release/Analog-Canvas-source.zip HEAD
+          cd release
+          sha256sum Analog-Canvas-source.zip >> SHA256SUMS.txt
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=preview-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="${{ steps.tag.outputs.value }}"
+          if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "$tag" release/* --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release edit "$tag" --repo "${GITHUB_REPOSITORY}" --prerelease \
+              --title "Analog Canvas ${tag} - Unsigned preview" \
+              --notes-file docs/RELEASE_NOTES.md
+          else
+            gh release create "$tag" release/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${GITHUB_SHA}" \
+              --title "Analog Canvas ${tag} - Unsigned preview" \
+              --prerelease \
+              --notes-file docs/RELEASE_NOTES.md
+          fi

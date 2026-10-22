@@ -1,5 +1,5 @@
 const NEW_BUG_ISSUE_URL =
-  "https://github.com/cascode-ai/analog-canvas/issues/new";
+  "https://github.com/CanvasQAQ/analog-canvas-desktop/issues/new";
 
 export interface BugReportEnvironment {
   pathname: string;

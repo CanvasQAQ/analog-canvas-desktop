@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48" data-symbol-id="battery" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Battery</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="0" y1="-20" x2="0" y2="-3.361068" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="3.361068" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="-15.341072,-4.959888 15.366866,-4.959888 15.366866,-1.762248 -15.341072,-1.762248" fill="#000" stroke="none"/><polygon points="-7.987992,1.762248 8.005849,1.762248 8.005849,4.959888 -7.987992,4.959888" fill="#000" stroke="none"/><line x1="7.918549" y1="-13.416494" x2="15.985905" y2="-13.416494" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="11.952227" y1="-17.450172" x2="11.952227" y2="-9.3848" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="7.918549" y1="13.472049" x2="15.985905" y2="13.472049" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

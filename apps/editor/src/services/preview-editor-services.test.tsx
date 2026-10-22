@@ -29,8 +29,8 @@ describe("desktop preview composition", () => {
     ])
       expect(html).not.toContain(marker);
     expect(html).toContain("Export Project File");
-    expect(html).toContain("Desktop preview");
-    expect(html).toContain('href="https://tokenzhang.com"');
+    expect(html).toContain("Offline desktop");
+    expect(html).toContain('href="https://github.com/CanvasQAQ"');
     expect(html).toContain('data-testid="editor-repository-link"');
     expect(html).toContain("User Components…");
     expect(html.indexOf(">About</button>")).toBeGreaterThan(

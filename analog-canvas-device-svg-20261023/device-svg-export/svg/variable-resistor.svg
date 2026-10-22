@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-16 -24 32 48" width="32" height="48" data-symbol-id="variable-resistor" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Variable Resistor</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><path d="M 0 -20 L 0 -8.72093 L 5.372093 -6.395349 L -4.604651 -4.069767 L 5.372093 -1.162791 L -4.988372 1.744186 L 5.372093 4.651163 L -4.604651 7.55814 L 0 8.72093 L 0 20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="12"/><line x1="-12" y1="12" x2="9" y2="-9" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="12,-12 6,-10 10,-6" fill="#000" stroke="none"/></g>
+
+</svg>

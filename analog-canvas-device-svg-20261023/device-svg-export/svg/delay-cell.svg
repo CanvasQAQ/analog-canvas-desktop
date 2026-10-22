@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-44 -24 88 48" width="88" height="48" data-symbol-id="delay-cell" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Delay Cell</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-40" y1="0" x2="-24" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M -24 -12 L 24 -12 L 24 12 L -24 12 Z" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/><line x1="24" y1="0" x2="40" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="-0.951005,-3.867967 -1.48366,-1.398387 -4.606953,5.332432 -5.551205,6.034567" fill="#000" stroke="none"/><polygon points="-0.951005,-3.867967 3.092327,6.034567 1.300671,5.332432 -1.48366,-1.398387" fill="#000" stroke="none"/><polygon points="-5.551205,6.034567 -4.606953,5.332432 1.300671,5.332432 3.092327,6.034567" fill="#000" stroke="none"/><polygon points="6.610361,4.848793 4.842916,4.848793 6.319823,-2.293621 3.801819,-2.293621 4.116569,-3.722104 10.871599,-3.722104 10.581059,-2.293621 8.087267,-2.293621" fill="#000" stroke="none"/></g>
+
+</svg>

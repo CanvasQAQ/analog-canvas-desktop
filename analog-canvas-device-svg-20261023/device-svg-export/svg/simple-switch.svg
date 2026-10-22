@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -18 68 30" width="68" height="30" data-symbol-id="simple-switch" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Simple Switch</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-20" y1="0" x2="-10" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-10" y1="0" x2="6" y2="-11" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="10" y1="0" x2="20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -24 68 48" width="68" height="48" data-symbol-id="integrator" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Integrator (1/s)</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line data-part="input-a-lead" x1="-30" y1="0" x2="-20" y2="0"/><rect data-role="signal-flow-frame" data-part="body" fill="none" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" x="-20" y="-25" width="40" height="50"/><line data-part="output-y-lead" x1="20" y1="0" x2="30" y2="0"/><g data-role="signal-flow-formula" fill="#000" stroke="none" font-family="'ICM Round Period','Metropolis','DejaVu Sans',Arial,'Helvetica Neue',Helvetica,sans-serif" font-weight="700"><g data-role="signal-flow-fraction"><text data-role="formula-numerator" x="0" y="-6" text-anchor="middle" font-size="12">1</text><line data-role="formula-fraction-bar" x1="-7.32" y1="0" x2="7.32" y2="0" stroke="#000" stroke-width="1.6"/><text data-role="formula-denominator" x="0" y="15" text-anchor="middle" font-size="12">s</text></g></g></g>
+
+</svg>

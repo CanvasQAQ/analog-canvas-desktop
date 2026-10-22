@@ -12,14 +12,14 @@ it("opens fixed product links in the system browser and refuses arbitrary destin
       body: JSON.stringify(body),
     });
   expect((await handle(request({ target: "owner" }))).ok).toBe(true);
-  expect(open).toHaveBeenLastCalledWith("https://tokenzhang.com");
+  expect(open).toHaveBeenLastCalledWith("https://github.com/CanvasQAQ");
   expect((await handle(request({ target: "repository" }))).ok).toBe(true);
   expect(open).toHaveBeenLastCalledWith(
-    "https://github.com/cascode-ai/analog-canvas",
+    "https://github.com/CanvasQAQ/analog-canvas-desktop",
   );
   expect((await handle(request({ target: "source" }))).ok).toBe(true);
   expect(open).toHaveBeenLastCalledWith(
-    `https://github.com/cascode-ai/analog-canvas/commit/${"a".repeat(40)}`,
+    `https://github.com/CanvasQAQ/analog-canvas-desktop/commit/${"a".repeat(40)}`,
   );
   expect((await handle(request({ target: "rnl" }))).ok).toBe(true);
   expect(open).toHaveBeenLastCalledWith(

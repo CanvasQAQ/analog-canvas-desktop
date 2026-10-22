@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-44 -24 88 48" width="88" height="48" data-symbol-id="buffer" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Buffer</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-30" y1="0" x2="-20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M 3.750277 0 L -20 14.998936 L -20 -13.749865 L 3.750277 0" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/><line x1="3.750277" y1="0" x2="10" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

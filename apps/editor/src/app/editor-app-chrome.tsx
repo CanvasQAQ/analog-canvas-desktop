@@ -171,12 +171,12 @@ export function EditorAppChrome({
             aria-label={
               communityEnabled
                 ? "Back to the gallery"
-                : "Analog Canvas desktop preview"
+                : "Analog Canvas offline desktop"
             }
             title={
               communityEnabled
                 ? "Back to the gallery"
-                : "Desktop preview · Save projects to local files"
+                : "Offline desktop · Projects remain on this device"
             }
             onClick={openGallery}
           >
@@ -511,7 +511,7 @@ export function EditorAppChrome({
             </a>
           ) : (
             <span title="Save updates a local Project. Export Project File writes an exchange copy. Online services are unavailable.">
-              Desktop preview
+              Offline desktop
             </span>
           )}
           <div className="tokenzhang-credit">
@@ -523,7 +523,7 @@ export function EditorAppChrome({
               }
               href={
                 externalLinksEnabled || onOpenExternalLink
-                  ? "https://tokenzhang.com"
+                ? "https://github.com/CanvasQAQ"
                   : undefined
               }
               onClick={
@@ -536,17 +536,17 @@ export function EditorAppChrome({
               }
               target="_blank"
               rel="noreferrer"
-              aria-label="TokenZhang"
-              title="TokenZhang"
+              aria-label="CanvasQAQ"
+              title="CanvasQAQ"
             >
               <img
                 className="tokenzhang-link-icon"
-                src="/tokenzhang-favicon.png"
+                src="/icon-192.png"
                 alt=""
                 width={12}
                 height={12}
               />
-              <span className="tokenzhang-link-label">TokenZhang</span>
+              <span className="tokenzhang-link-label">CanvasQAQ</span>
             </a>
           </div>
         </div>

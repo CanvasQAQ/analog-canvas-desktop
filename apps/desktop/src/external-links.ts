@@ -7,9 +7,9 @@ export function createExternalLinkHandler(
   commit: string,
 ) {
   const targets = {
-    owner: "https://tokenzhang.com",
-    repository: "https://github.com/cascode-ai/analog-canvas",
-    source: `https://github.com/cascode-ai/analog-canvas/commit/${commit}`,
+    owner: "https://github.com/CanvasQAQ",
+    repository: "https://github.com/CanvasQAQ/analog-canvas-desktop",
+    source: `https://github.com/CanvasQAQ/analog-canvas-desktop/commit/${commit}`,
     rnl: "https://rich-netlist.github.io/rnl/en/",
   };
   return async (request: Request): Promise<Response> => {

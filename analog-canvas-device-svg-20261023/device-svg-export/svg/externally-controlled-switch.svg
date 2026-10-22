@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48" data-symbol-id="externally-controlled-switch" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Externally Controlled Switch</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="0" y1="-20" x2="0" y2="-12.41417" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><circle cx="0" cy="-9.215286" r="3.198884" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-2.635977" y1="-6.895603" x2="-13.528591" y2="6.997824" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-20" y1="0" x2="-7.427615" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><circle cx="0" cy="11.511074" r="3.198884" fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="14.709958" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

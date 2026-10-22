@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-34 -24 42 48" width="42" height="48" data-symbol-id="pnp" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">PNP Bipolar Transistor</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-30" y1="0" x2="-16.868887" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-16.868887" y1="-13.333557" x2="-16.868887" y2="13.34159" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter"/><polyline points="-8.575018,-9.694413 0,-13.379732 0,-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polyline points="-16.868887,6.401526 0,13.377859 0,20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="-10.233792,-12.987299 -6.916244,-6.401526 -16.868887,-6.401526" fill="#000" stroke="none"/></g>
+
+</svg>

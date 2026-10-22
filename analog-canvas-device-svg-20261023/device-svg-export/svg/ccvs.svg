@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 39 48" width="39" height="48" data-symbol-id="ccvs" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Current-Controlled Voltage Source</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><circle cx="0" cy="0" r="10.755814" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line data-part="upright-polarity-positive-horizontal" x1="-20.058139" y1="-14.534884" x2="-11.918605" y2="-14.534884" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line data-part="upright-polarity-positive-vertical" x1="-15.988372" y1="-18.604651" x2="-15.988372" y2="-10.465117" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line data-part="upright-polarity-negative" x1="-20.058139" y1="13.372093" x2="-11.918605" y2="13.372093" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="-10.755814" x2="0" y2="-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="10.755814" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

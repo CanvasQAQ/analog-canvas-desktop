@@ -1,0 +1,91 @@
+appId: com.canvasqaq.analogcanvas
+productName: Analog Canvas
+executableName: analog-canvas
+copyright: Copyright © 2026 Analog Canvas contributors
+asar: true
+npmRebuild: false
+compression: normal
+directories:
+  output: ../../release
+  buildResources: ../../build
+artifactName: Analog-Canvas-${version}-${os}-${arch}.${ext}
+publish: null
+files:
+  - dist/**/*
+  - package.json
+  - "!node_modules/**/*"
+extraResources:
+  - from: ../editor/dist-desktop
+    to: editor
+  - from: ../../analog-canvas-device-svg-20261023/device-svg-export
+    to: device-svg
+  - from: ../../LICENSE.md
+    to: legal/LICENSE.md
+  - from: ../../THIRD_PARTY_NOTICES.md
+    to: legal/THIRD_PARTY_NOTICES.md
+  - from: ../desktop/SOURCES.md
+    to: legal/SOURCES.md
+  - from: ../desktop/upstream-NOTICE.md
+    to: legal/upstream-NOTICE.md
+win:
+  icon: ../../build/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: Analog-Canvas-${version}-windows-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Analog Canvas
+  artifactName: Analog-Canvas-${version}-windows-${arch}-setup.${ext}
+portable:
+  artifactName: Analog-Canvas-${version}-windows-${arch}-portable.${ext}
+mac:
+  icon: ../../build/icon.png
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+    - target: zip
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  artifactName: Analog-Canvas-${version}-macos-${arch}.${ext}
+  extendInfo:
+    NSHumanReadableCopyright: Copyright © 2026 Analog Canvas contributors
+    CFBundleDocumentTypes:
+      - CFBundleTypeName: Analog Canvas Project
+        CFBundleTypeRole: Editor
+        LSHandlerRank: Alternate
+        LSItemContentTypes:
+          - com.canvasqaq.analogcanvas.project
+    UTExportedTypeDeclarations:
+      - UTTypeIdentifier: com.canvasqaq.analogcanvas.project
+        UTTypeDescription: Analog Canvas schematic project
+        UTTypeConformsTo:
+          - public.json
+        UTTypeTagSpecification:
+          public.filename-extension:
+            - icproj
+linux:
+  icon: ../../build/icon.png
+  category: Development
+  maintainer: Analog Canvas contributors
+  executableName: analog-canvas
+  syncDesktopName: true
+  synopsis: Offline analog schematic editor
+  description: Draw hierarchical analog schematics, import SPICE, and export netlists and vector graphics without network access.
+  artifactName: Analog-Canvas-${version}-linux-${arch}.${ext}
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64

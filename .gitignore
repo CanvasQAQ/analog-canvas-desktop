@@ -8,6 +8,8 @@ coverage/
 playwright-report/
 test-results/
 output/
+release/
+analog-canvas-device-svg-20261023.zip
 tmp/
 .reference-src/
 # Local Claude registration points at the checked-in original skills.

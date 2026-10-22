@@ -1,0 +1,3973 @@
+{
+  "schemaVersion": 1,
+  "generator": "scripts/export-device-svgs.mjs",
+  "sourceRepository": "cascode-ai/analog-canvas",
+  "sourceCommit": "a239991de3d765ad68729a2fc59b87483c7d401c",
+  "sourceCatalog": "packages/components/catalog.json",
+  "styleProfile": "razavi-textbook-v1",
+  "background": "transparent",
+  "definitionCount": 109,
+  "primarySvgCount": 109,
+  "variantSvgCount": 17,
+  "totalSvgCount": 126,
+  "generatedAt": "2026-10-22T16:06:38.282Z",
+  "entries": [
+    {
+      "id": "adc",
+      "name": "Analog-to-Digital Converter",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/adc.json",
+      "primaryFile": "svg/adc.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -54,
+        "y": -24,
+        "width": 98,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "IN",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "ADC"
+    },
+    {
+      "id": "adder",
+      "name": "Adder",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/adder.json",
+      "primaryFile": "svg/adder.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -16,
+        "width": 48,
+        "height": 40
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "south"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "and-gate-3",
+      "name": "AND Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/and-gate-3.json",
+      "primaryFile": "svg/and-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "and-gate-4",
+      "name": "AND Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/and-gate-4.json",
+      "primaryFile": "svg/and-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "and-gate",
+      "name": "AND Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/and-gate.json",
+      "primaryFile": "svg/and-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "battery",
+      "name": "Battery",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/battery.json",
+      "primaryFile": "svg/battery.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "buffer",
+      "name": "Buffer",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/buffer.json",
+      "primaryFile": "svg/buffer.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "capacitor",
+      "name": "Capacitor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/capacitor.json",
+      "primaryFile": "svg/capacitor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -12,
+        "y": -24,
+        "width": 24,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "cccs",
+      "name": "Current-Controlled Current Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/cccs.json",
+      "primaryFile": "svg/cccs.svg",
+      "primaryVariant": "base",
+      "variants": [
+        {
+          "id": "diamond",
+          "file": "svg/variants/cccs--diamond.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -15,
+        "y": -24,
+        "width": 30,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "ccvs",
+      "name": "Current-Controlled Voltage Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/ccvs.json",
+      "primaryFile": "svg/ccvs.svg",
+      "primaryVariant": "base",
+      "variants": [
+        {
+          "id": "diamond",
+          "file": "svg/variants/ccvs--diamond.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 39,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "center-tap-inductor",
+      "name": "Center-Tap Inductor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/center-tap-inductor.json",
+      "primaryFile": "svg/center-tap-inductor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -54,
+        "y": -16,
+        "width": 108,
+        "height": 40
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "3",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "chopper",
+      "name": "Chopper",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/chopper.json",
+      "primaryFile": "svg/chopper.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -34,
+        "width": 48,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "INP",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "INN",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "OUTP",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "OUTN",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "closed-switch",
+      "name": "Closed Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/closed-switch.json",
+      "primaryFile": "svg/closed-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -12,
+        "width": 68,
+        "height": 24
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-differential-inputs-swapped",
+      "name": "Fully Differential Comparator (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-differential-inputs-swapped.json",
+      "primaryFile": "svg/comparator-differential-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-differential-unmarked-inputs-swapped",
+      "name": "Fully Differential Comparator (unmarked) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-differential-unmarked-inputs-swapped.json",
+      "primaryFile": "svg/comparator-differential-unmarked-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-differential-unmarked",
+      "name": "Fully Differential Comparator (unmarked)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-differential-unmarked.json",
+      "primaryFile": "svg/comparator-differential-unmarked.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-differential",
+      "name": "Fully Differential Comparator",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/comparator-differential.json",
+      "primaryFile": "svg/comparator-differential.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-inputs-swapped",
+      "name": "Comparator (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-inputs-swapped.json",
+      "primaryFile": "svg/comparator-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-unmarked-inputs-swapped",
+      "name": "Comparator (unmarked) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-unmarked-inputs-swapped.json",
+      "primaryFile": "svg/comparator-unmarked-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator-unmarked",
+      "name": "Comparator (unmarked)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/comparator-unmarked.json",
+      "primaryFile": "svg/comparator-unmarked.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "comparator",
+      "name": "Comparator",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/comparator.json",
+      "primaryFile": "svg/comparator.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "current-source",
+      "name": "Independent Current Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/current-source.json",
+      "primaryFile": "svg/current-source.svg",
+      "primaryVariant": "base",
+      "variants": [
+        {
+          "id": "diamond",
+          "file": "svg/variants/current-source--diamond.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -15,
+        "y": -24,
+        "width": 30,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "d-flip-flop-q",
+      "name": "D Flip-Flop (Q)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/d-flip-flop-q.json",
+      "primaryFile": "svg/d-flip-flop-q.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -42,
+        "y": -27,
+        "width": 84,
+        "height": 54
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "CK",
+          "role": "clock",
+          "direction": "west"
+        },
+        {
+          "name": "Q",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "d-flip-flop-reset",
+      "name": "D Flip-Flop (Reset)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/d-flip-flop-reset.json",
+      "primaryFile": "svg/d-flip-flop-reset.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -42,
+        "y": -27,
+        "width": 84,
+        "height": 79
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "CK",
+          "role": "clock",
+          "direction": "west"
+        },
+        {
+          "name": "RST",
+          "role": "reset",
+          "direction": "south"
+        },
+        {
+          "name": "Q",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "QBAR",
+          "role": "output-complement",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "d-flip-flop",
+      "name": "D Flip-Flop",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/d-flip-flop.json",
+      "primaryFile": "svg/d-flip-flop.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -42,
+        "y": -27,
+        "width": 84,
+        "height": 54
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "CK",
+          "role": "clock",
+          "direction": "west"
+        },
+        {
+          "name": "Q",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "QBAR",
+          "role": "output-complement",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "dac",
+      "name": "Digital-to-Analog Converter",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/dac.json",
+      "primaryFile": "svg/dac.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 98,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "IN",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "DAC"
+    },
+    {
+      "id": "delay-cell",
+      "name": "Delay Cell",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/delay-cell.json",
+      "primaryFile": "svg/delay-cell.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "depletion-nmos",
+      "category": "Extended Devices",
+      "electricalDevice": true,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/depletion-nmos.json",
+      "primaryFile": "svg/depletion-nmos.svg",
+      "primaryVariant": "textbook-3terminal",
+      "variants": [
+        {
+          "id": "textbook-3terminal",
+          "file": "svg/variants/depletion-nmos--textbook-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/depletion-nmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "north"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "south"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "depletion-pmos",
+      "category": "Extended Devices",
+      "electricalDevice": true,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/depletion-pmos.json",
+      "primaryFile": "svg/depletion-pmos.svg",
+      "primaryVariant": "textbook-3terminal",
+      "variants": [
+        {
+          "id": "textbook-3terminal",
+          "file": "svg/variants/depletion-pmos--textbook-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/depletion-pmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "south"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "north"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "differential-transconductance-inputs-swapped",
+      "name": "Differential Transconductance (gₘ) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/differential-transconductance-inputs-swapped.json",
+      "primaryFile": "svg/differential-transconductance-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -39,
+        "width": 68,
+        "height": 78
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "g_m"
+    },
+    {
+      "id": "differential-transconductance",
+      "name": "Differential Transconductance (gₘ)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/differential-transconductance.json",
+      "primaryFile": "svg/differential-transconductance.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -39,
+        "width": 68,
+        "height": 78
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "g_m"
+    },
+    {
+      "id": "diode",
+      "name": "Diode",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/diode.json",
+      "primaryFile": "svg/diode.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -10,
+        "width": 48,
+        "height": 20
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "anode",
+          "direction": "west"
+        },
+        {
+          "name": "K",
+          "role": "cathode",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "discrete-time-integrator",
+      "name": "Discrete-Time Integrator (z⁻¹/(1−z⁻¹))",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/discrete-time-integrator.json",
+      "primaryFile": "svg/discrete-time-integrator.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "z^-1/(1-z^-1)"
+    },
+    {
+      "id": "externally-controlled-switch",
+      "name": "Externally Controlled Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/externally-controlled-switch.json",
+      "primaryFile": "svg/externally-controlled-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "P",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "N",
+          "role": "passive",
+          "direction": "south"
+        },
+        {
+          "name": "CTRL",
+          "role": "input",
+          "direction": "west"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "ground",
+      "name": "Ground",
+      "category": "power",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/ground.json",
+      "primaryFile": "svg/ground.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -12,
+        "y": -14,
+        "width": 24,
+        "height": 31
+      },
+      "pins": [
+        {
+          "name": "0",
+          "role": "ground",
+          "direction": "north"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "ideal-switch",
+      "name": "Ideal Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/ideal-switch.json",
+      "primaryFile": "svg/ideal-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -18,
+        "width": 68,
+        "height": 30
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "inductor-compact",
+      "name": "Inductor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/inductor-compact.json",
+      "primaryFile": "svg/inductor-compact.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -10,
+        "y": -24,
+        "width": 20,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "inductor",
+      "name": "Large Inductor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/inductor.json",
+      "primaryFile": "svg/inductor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -15,
+        "y": -32,
+        "width": 30,
+        "height": 64
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "integrator",
+      "name": "Integrator (1/s)",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/integrator.json",
+      "primaryFile": "svg/integrator.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -24,
+        "width": 68,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "1/s"
+    },
+    {
+      "id": "inverter",
+      "name": "Inverter",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/inverter.json",
+      "primaryFile": "svg/inverter.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "multiplier",
+      "name": "Multiplier",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/multiplier.json",
+      "primaryFile": "svg/multiplier.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -16,
+        "width": 48,
+        "height": 40
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "south"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nand-gate-3",
+      "name": "NAND Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/nand-gate-3.json",
+      "primaryFile": "svg/nand-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nand-gate-4",
+      "name": "NAND Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/nand-gate-4.json",
+      "primaryFile": "svg/nand-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nand-gate",
+      "name": "NAND Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/nand-gate.json",
+      "primaryFile": "svg/nand-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "ndmos",
+      "category": "Extended Devices",
+      "electricalDevice": true,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/ndmos.json",
+      "primaryFile": "svg/ndmos.svg",
+      "primaryVariant": "standard-3terminal",
+      "variants": [
+        {
+          "id": "standard-3terminal",
+          "file": "svg/variants/ndmos--standard-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/ndmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "north"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "south"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nmos",
+      "name": "NMOS",
+      "category": "transistor",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/nmos.json",
+      "primaryFile": "svg/nmos.svg",
+      "primaryVariant": "textbook-3terminal",
+      "variants": [
+        {
+          "id": "textbook-3terminal",
+          "file": "svg/variants/nmos--textbook-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/nmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "north"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "south"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nor-gate-3",
+      "name": "NOR Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/nor-gate-3.json",
+      "primaryFile": "svg/nor-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nor-gate-4",
+      "name": "NOR Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/nor-gate-4.json",
+      "primaryFile": "svg/nor-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "nor-gate",
+      "name": "NOR Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/nor-gate.json",
+      "primaryFile": "svg/nor-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "npn",
+      "name": "NPN Bipolar Transistor",
+      "category": "transistor",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/npn.json",
+      "primaryFile": "svg/npn.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -24,
+        "width": 42,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "C",
+          "role": "collector",
+          "direction": "north"
+        },
+        {
+          "name": "B",
+          "role": "base",
+          "direction": "west"
+        },
+        {
+          "name": "E",
+          "role": "emitter",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-crossed-inputs-swapped",
+      "name": "Differential Op Amp (crossed outputs) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-crossed-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-crossed-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-crossed-lettered-inputs-swapped",
+      "name": "Differential Op Amp (crossed outputs, lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-crossed-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-crossed-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-crossed-lettered",
+      "name": "Differential Op Amp (crossed outputs, lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-crossed-lettered.json",
+      "primaryFile": "svg/opamp-differential-crossed-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-crossed",
+      "name": "Differential Op Amp (crossed outputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp-differential-crossed.json",
+      "primaryFile": "svg/opamp-differential-crossed.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-inputs-swapped",
+      "name": "Differential Op Amp (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-lettered-inputs-swapped",
+      "name": "Differential Op Amp (lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-lettered",
+      "name": "Differential Op Amp (lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-lettered.json",
+      "primaryFile": "svg/opamp-differential-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-wide-crossed-inputs-swapped",
+      "name": "FD Amp Wide (crossed outputs) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-crossed-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-wide-crossed-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-wide-crossed-lettered-inputs-swapped",
+      "name": "FD Amp Wide (crossed outputs, lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-crossed-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-wide-crossed-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-wide-crossed-lettered",
+      "name": "FD Amp Wide (crossed outputs, lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-crossed-lettered.json",
+      "primaryFile": "svg/opamp-differential-wide-crossed-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-wide-crossed",
+      "name": "FD Amp Wide (crossed outputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp-differential-wide-crossed.json",
+      "primaryFile": "svg/opamp-differential-wide-crossed.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-wide-inputs-swapped",
+      "name": "FD Amp Wide (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-wide-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential-wide-lettered-inputs-swapped",
+      "name": "FD Amp Wide (lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-differential-wide-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-wide-lettered",
+      "name": "FD Amp Wide (lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-differential-wide-lettered.json",
+      "primaryFile": "svg/opamp-differential-wide-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-differential-wide",
+      "name": "FD Amp Wide",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp-differential-wide.json",
+      "primaryFile": "svg/opamp-differential-wide.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-differential",
+      "name": "Differential Op Amp",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp-differential.json",
+      "primaryFile": "svg/opamp-differential.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT+",
+          "role": "output",
+          "direction": "east"
+        },
+        {
+          "name": "OUT-",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-inputs-swapped",
+      "name": "Operational Amplifier (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-inputs-swapped.json",
+      "primaryFile": "svg/opamp-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-lettered-inputs-swapped",
+      "name": "Operational Amplifier (lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-lettered",
+      "name": "Operational Amplifier (lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-lettered.json",
+      "primaryFile": "svg/opamp-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-wide-inputs-swapped",
+      "name": "Op Amp Wide (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-wide-inputs-swapped.json",
+      "primaryFile": "svg/opamp-wide-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp-wide-lettered-inputs-swapped",
+      "name": "Op Amp Wide (lettered) (swapped inputs)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-wide-lettered-inputs-swapped.json",
+      "primaryFile": "svg/opamp-wide-lettered-inputs-swapped.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-wide-lettered",
+      "name": "Op Amp Wide (lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/opamp-wide-lettered.json",
+      "primaryFile": "svg/opamp-wide-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "opamp-wide",
+      "name": "Op Amp Wide",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp-wide.json",
+      "primaryFile": "svg/opamp-wide.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "opamp",
+      "name": "Operational Amplifier",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/opamp.json",
+      "primaryFile": "svg/opamp.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN+",
+          "role": "non-inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "IN-",
+          "role": "inverting-input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "or-gate-3",
+      "name": "OR Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/or-gate-3.json",
+      "primaryFile": "svg/or-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "or-gate-4",
+      "name": "OR Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/or-gate-4.json",
+      "primaryFile": "svg/or-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "or-gate",
+      "name": "OR Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/or-gate.json",
+      "primaryFile": "svg/or-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "pdmos",
+      "category": "Extended Devices",
+      "electricalDevice": true,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/pdmos.json",
+      "primaryFile": "svg/pdmos.svg",
+      "primaryVariant": "standard-3terminal",
+      "variants": [
+        {
+          "id": "standard-3terminal",
+          "file": "svg/variants/pdmos--standard-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/pdmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "south"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "north"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "pmos",
+      "name": "PMOS",
+      "category": "transistor",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/pmos.json",
+      "primaryFile": "svg/pmos.svg",
+      "primaryVariant": "textbook-3terminal",
+      "variants": [
+        {
+          "id": "textbook-3terminal",
+          "file": "svg/variants/pmos--textbook-3terminal.svg",
+          "default": true
+        },
+        {
+          "id": "base",
+          "file": "svg/variants/pmos--base.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "D",
+          "role": "drain",
+          "direction": "south"
+        },
+        {
+          "name": "G",
+          "role": "gate",
+          "direction": "west"
+        },
+        {
+          "name": "S",
+          "role": "source",
+          "direction": "north"
+        },
+        {
+          "name": "B",
+          "role": "bulk",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "pnp",
+      "name": "PNP Bipolar Transistor",
+      "category": "transistor",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/pnp.json",
+      "primaryFile": "svg/pnp.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -24,
+        "width": 42,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "C",
+          "role": "collector",
+          "direction": "south"
+        },
+        {
+          "name": "B",
+          "role": "base",
+          "direction": "west"
+        },
+        {
+          "name": "E",
+          "role": "emitter",
+          "direction": "north"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "port-filled",
+      "name": "Bias Voltage Port",
+      "category": "interface",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/port-filled.json",
+      "primaryFile": "svg/port-filled.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -14,
+        "y": -7,
+        "width": 18,
+        "height": 14
+      },
+      "pins": [
+        {
+          "name": "P",
+          "role": "port",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "port",
+      "name": "Port",
+      "category": "interface",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/port.json",
+      "primaryFile": "svg/port.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -14,
+        "y": -7,
+        "width": 18,
+        "height": 14
+      },
+      "pins": [
+        {
+          "name": "P",
+          "role": "port",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "pulse-voltage-source",
+      "name": "Pulse Voltage Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/pulse-voltage-source.json",
+      "primaryFile": "svg/pulse-voltage-source.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 39,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "quantizer",
+      "name": "Quantizer",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/quantizer.json",
+      "primaryFile": "svg/quantizer.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -24,
+        "width": 68,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "resistor",
+      "name": "Resistor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/resistor.json",
+      "primaryFile": "svg/resistor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -10,
+        "y": -24,
+        "width": 20,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "simple-spdt-switch",
+      "name": "Simple SPDT Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/simple-spdt-switch.json",
+      "primaryFile": "svg/simple-spdt-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -20,
+        "width": 68,
+        "height": 40
+      },
+      "pins": [
+        {
+          "name": "COM",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "A",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "B",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "simple-switch",
+      "name": "Simple Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/simple-switch.json",
+      "primaryFile": "svg/simple-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -18,
+        "width": 68,
+        "height": 30
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "spdt-switch",
+      "name": "SPDT Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/spdt-switch.json",
+      "primaryFile": "svg/spdt-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -20,
+        "width": 68,
+        "height": 40
+      },
+      "pins": [
+        {
+          "name": "COM",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "A",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "B",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "tcoil",
+      "name": "T-Coil",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/tcoil.json",
+      "primaryFile": "svg/tcoil.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -94,
+        "y": -56,
+        "width": 188,
+        "height": 90
+      },
+      "pins": [
+        {
+          "name": "1",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "2",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "3",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "transconductance",
+      "name": "Transconductance (gₘ)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/transconductance.json",
+      "primaryFile": "svg/transconductance.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -39,
+        "width": 68,
+        "height": 78
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "g_m"
+    },
+    {
+      "id": "unit-delay",
+      "name": "Unit Delay (z⁻¹)",
+      "category": "signal-flow",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/unit-delay.json",
+      "primaryFile": "svg/unit-delay.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -24,
+        "width": 68,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "z^-1"
+    },
+    {
+      "id": "variable-capacitor",
+      "name": "Variable Capacitor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/variable-capacitor.json",
+      "primaryFile": "svg/variable-capacitor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -16,
+        "y": -24,
+        "width": 32,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "P1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "P2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "variable-inductor",
+      "name": "Variable Inductor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/variable-inductor.json",
+      "primaryFile": "svg/variable-inductor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -16,
+        "y": -24,
+        "width": 32,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "P1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "P2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "variable-resistor",
+      "name": "Variable Resistor",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/variable-resistor.json",
+      "primaryFile": "svg/variable-resistor.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -16,
+        "y": -24,
+        "width": 32,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "P1",
+          "role": "passive",
+          "direction": "north"
+        },
+        {
+          "name": "P2",
+          "role": "passive",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "vccs",
+      "name": "Voltage-Controlled Current Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/vccs.json",
+      "primaryFile": "svg/vccs.svg",
+      "primaryVariant": "base",
+      "variants": [
+        {
+          "id": "diamond",
+          "file": "svg/variants/vccs--diamond.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -15,
+        "y": -24,
+        "width": 30,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "vcvs",
+      "name": "Voltage-Controlled Voltage Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/vcvs.json",
+      "primaryFile": "svg/vcvs.svg",
+      "primaryVariant": "base",
+      "variants": [
+        {
+          "id": "diamond",
+          "file": "svg/variants/vcvs--diamond.svg",
+          "default": false
+        }
+      ],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 39,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "vdd-port",
+      "name": "VDD Power Port",
+      "category": "power",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/vdd-port.json",
+      "primaryFile": "svg/vdd-port.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -12,
+        "y": -2,
+        "width": 24,
+        "height": 26
+      },
+      "pins": [
+        {
+          "name": "P",
+          "role": "power",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "voltage-amplifier-lettered",
+      "name": "Voltage Amplifier (lettered)",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/voltage-amplifier-lettered.json",
+      "primaryFile": "svg/voltage-amplifier-lettered.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": "A"
+    },
+    {
+      "id": "voltage-amplifier",
+      "name": "Voltage Amplifier",
+      "category": "analog-block",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/voltage-amplifier.json",
+      "primaryFile": "svg/voltage-amplifier.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -34,
+        "width": 88,
+        "height": 68
+      },
+      "pins": [
+        {
+          "name": "IN",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "OUT",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "voltage-controlled-switch",
+      "name": "Voltage-Controlled Switch",
+      "category": "switch",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/voltage-controlled-switch.json",
+      "primaryFile": "svg/voltage-controlled-switch.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -34,
+        "y": -27,
+        "width": 68,
+        "height": 55
+      },
+      "pins": [
+        {
+          "name": "P",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "N",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "CP",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "CN",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "voltage-source",
+      "name": "Independent Voltage Source",
+      "category": "source",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/voltage-source.json",
+      "primaryFile": "svg/voltage-source.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 39,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "+",
+          "role": "positive",
+          "direction": "north"
+        },
+        {
+          "name": "-",
+          "role": "negative",
+          "direction": "south"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xfmr",
+      "name": "XFMR",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/xfmr.json",
+      "primaryFile": "svg/xfmr.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -24,
+        "width": 48,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "P-",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "P+",
+          "role": "passive",
+          "direction": "east"
+        },
+        {
+          "name": "S-",
+          "role": "passive",
+          "direction": "west"
+        },
+        {
+          "name": "S+",
+          "role": "passive",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xnor-gate-3",
+      "name": "XNOR Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/xnor-gate-3.json",
+      "primaryFile": "svg/xnor-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xnor-gate-4",
+      "name": "XNOR Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/xnor-gate-4.json",
+      "primaryFile": "svg/xnor-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xnor-gate",
+      "name": "XNOR Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/xnor-gate.json",
+      "primaryFile": "svg/xnor-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xor-gate-3",
+      "name": "XOR Gate (3 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/xor-gate-3.json",
+      "primaryFile": "svg/xor-gate-3.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xor-gate-4",
+      "name": "XOR Gate (4 inputs)",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": false,
+      "source": "packages/components/definitions/xor-gate-4.json",
+      "primaryFile": "svg/xor-gate-4.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "C",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "D",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "xor-gate",
+      "name": "XOR Gate",
+      "category": "logic",
+      "electricalDevice": false,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/xor-gate.json",
+      "primaryFile": "svg/xor-gate.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -44,
+        "y": -24,
+        "width": 88,
+        "height": 48
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "B",
+          "role": "input",
+          "direction": "west"
+        },
+        {
+          "name": "Y",
+          "role": "output",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    },
+    {
+      "id": "zener-diode",
+      "name": "Zener Diode",
+      "category": "passive",
+      "electricalDevice": true,
+      "paletteEligible": true,
+      "source": "packages/components/definitions/zener-diode.json",
+      "primaryFile": "svg/zener-diode.svg",
+      "primaryVariant": "base",
+      "variants": [],
+      "viewBox": {
+        "x": -24,
+        "y": -10,
+        "width": 48,
+        "height": 20
+      },
+      "pins": [
+        {
+          "name": "A",
+          "role": "anode",
+          "direction": "west"
+        },
+        {
+          "name": "K",
+          "role": "cathode",
+          "direction": "east"
+        }
+      ],
+      "formula": null
+    }
+  ]
+}

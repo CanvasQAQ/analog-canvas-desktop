@@ -39,7 +39,7 @@ declare const __ICM_DESKTOP_BUILD__: {
   dirty: boolean;
 };
 
-const PRODUCT_NAME = "Analog Canvas Preview";
+const PRODUCT_NAME = "Analog Canvas";
 const launchFiles = createLaunchFileQueue();
 launchFiles.enqueue(process.argv);
 // Packaged-executable acceptance attaches both debuggers before creating a
@@ -309,7 +309,8 @@ else {
               projectRoot: (await library.list()).root,
               packaged: app.isPackaged,
               migration: migrationNotice,
-              association: app.isPackaged
+              association:
+                app.isPackaged && process.platform === "win32"
                 ? await windowsAssociation("read", process.execPath)
                 : { enabled: false, otherInstallation: false },
             };
@@ -411,17 +412,20 @@ else {
             async promptSave(name, currentPath) {
               const window = BrowserWindow.getAllWindows()[0];
               if (!window) return null;
+              const suggestedName = /\.icproj(?:\.json)?$/iu.test(name)
+                ? name.replace(/\.icproj$/iu, ".icproj.json")
+                : `${name}.icproj.json`;
               let destination = join(
                 currentPath ? dirname(currentPath) : app.getPath("documents"),
-                name.replace(/\.icproj\.json$/iu, ".icproj"),
+                suggestedName,
               );
               if (
                 currentPath &&
                 destination.toLowerCase() === currentPath.toLowerCase()
               )
                 destination = destination.replace(
-                  /\.icproj$/iu,
-                  "-copy.icproj",
+                  /\.icproj\.json$/iu,
+                  "-copy.icproj.json",
                 );
               const result = await dialog.showSaveDialog(window, {
                 title: "Save Project",
@@ -429,7 +433,7 @@ else {
                 filters: [
                   {
                     name: "Analog Canvas Project",
-                    extensions: ["icproj", "icproj.json"],
+                    extensions: ["icproj.json", "json"],
                   },
                 ],
               });
@@ -447,7 +451,7 @@ else {
       await createWindow();
     })
     .catch((error) => {
-      dialog.showErrorBox("Desktop preview could not start", String(error));
+      dialog.showErrorBox("Analog Canvas could not start", String(error));
       app.exit(1);
     });
   app.on("window-all-closed", () => app.quit());

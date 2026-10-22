@@ -1,264 +1,114 @@
 # Analog Canvas
 
-Analog Canvas is a local-first, connectivity-aware schematic editor for the
-web. Draw and organize hierarchical circuits, import structural SPICE, export
-deterministic SPICE/Spectre netlists and vector SVG/PDF, publish selected work
-to the Community Gallery, and connect authorized Agents through the same typed
-edit model.
+Analog Canvas is a local-first, connectivity-aware schematic editor for analog
+and mixed-signal design. It runs as an offline desktop application on Windows,
+macOS, and Linux and ships with the
+`analog-canvas-device-svg-20261023` device library.
 
-[Browse the Gallery](https://analog-canvas.tokenzhang.com/) ·
-[Open the editor](https://analog-canvas.tokenzhang.com/editor) ·
-[Windows preview (ZIP)](https://github.com/cascode-ai/analog-canvas/releases/download/desktop-preview-9174bd37ff7f-8/analog-canvas-desktop-windows-x64-9174bd37ff7f.zip) ·
-[Documentation](docs/README.md) ·
-[GitHub repository](https://github.com/cascode-ai/analog-canvas)
+Download the latest Preview builds from
+[GitHub Releases](https://github.com/CanvasQAQ/analog-canvas-desktop/releases).
 
-## Highlights
+## Downloads
 
-- **Connectivity-aware editing:** place devices, route wires, distinguish
-  Crossings from Junctions, label Nets, and make undoable multi-object edits
-  deriving physical networks from completed wire edits while keeping logical
-  labels and unrouted import intent explicit.
-- **Reusable hierarchy:** author each schematic as a Cell, define independent
-  Cell Pins, place reusable hierarchical blocks, and navigate between callers
-  and child Cells.
-- **Projects and interchange:** save a private Cloud Project, import/export
-  canonical `.icproj.json`, import structural `.cir`, `.sp`, `.spi`, and `.scs` files, and export
-  deterministic structural SPICE or Spectre. The hosted editor also provides
-  saved simulation source folders and a fixed ngspice/SKY130 environment for qualified
-  OP, DC, AC, TRAN, and Noise runs.
-- **Publication-ready output:** the web editor's SVG and PDF exports remain
-  vector graphics; PNG is rendered at 3× raster scale.
-- **Community publishing:** signed-in users can publish selected circuits with
-  server-rendered previews, tags, likes, moderation, and bounded version
-  history. Publishing is deliberate and is not a backup mechanism.
-- **Agent integration:** the typed Snapshot and transaction API is available
-  through a version-pinned stdio MCP adapter, an HTTP Agent Kit, and the
-  published OpenAPI contract. See the [Agent integration guide](docs/agent/README.md).
+| Platform | Architecture | Recommended asset |
+| --- | --- | --- |
+| Windows | x64 | `Analog-Canvas-0.1.0-windows-x64-setup.exe` or `...-portable.exe` |
+| macOS | x64 | `Analog-Canvas-0.1.0-macos-x64.dmg` |
+| macOS | arm64 | `Analog-Canvas-0.1.0-macos-arm64.dmg` |
+| Linux | x64 | `Analog-Canvas-0.1.0-linux-x86_64.AppImage`, `.deb`, or `.tar.gz` |
 
-## Project ownership and privacy
+Every release includes `SHA256SUMS.txt` and a source archive. Preview builds are
+unsigned. Windows SmartScreen and macOS Gatekeeper may therefore show a warning;
+verify the checksum before deciding whether to run the application.
 
-An explicit **File / Save** updates one private Cloud Project in place. Local
-`.icproj.json` files are portable import/export and backup artifacts; browser
-recovery is an origin-local crash-safety copy. Neither is confused with formal
-Cloud Save, and Community Gallery entries remain separate public publications.
-Shelf cards offer **Version history** for the latest three earlier saves: compare
-component changes, restore with conflict protection, or create an independent
-private branch. Restoring a draft never updates its Gallery publication.
-Refreshing the editor restores that browser window’s open project tabs,
-including unsaved circuit content, the active tab, and view positions. This
-browser-local workspace does not replace Cloud Save or portable file backups;
-undo stacks and unfinished text-field edits are not restored.
-Hosted topology checks run against the clicked snapshot in a private background
-task. Refreshing or closing the page does not cancel it; reopen the editor to
-view progress/results. Results remain available for seven days. Comparisons
-use bounded search and explicitly mark incomplete coverage; the best 20
-results are retained within an 8 MiB result budget. Vite without the hosted
-backend shows a local-only fallback that requires keeping its page open.
-The hosted service keeps its visitor reporting first-party and honors browser
-Do Not Track instead of embedding a third-party analytics tracker.
+## What works
 
-**Check and Save** runs ERC and visual checks on demand, displays findings in
-Issues and the canvas, and saves through that same Cloud Project service.
-Findings do not block saving; editing invalidates the last check without
-automatically rerunning it. File / Save and Ctrl+S remain save-only.
+- Place and edit symbols from the bundled 109-device, Razavi-style SVG catalog.
+- Draw connectivity-aware wires, select and move objects, rotate or mirror
+  instances, and undo or redo edits.
+- Organize a project into hierarchical Cells.
+- Create, open, save, save as, and version local `.icproj.json` projects.
+- Import structural SPICE and Spectre/SCS sources.
+- Export deterministic SPICE/Spectre netlists and SVG, PNG, or PDF drawings.
+- Work without an account, cloud connection, telemetry, or automatic updates.
 
-## Start here
+The desktop renderer has no Node.js, filesystem, shell, or arbitrary IPC access.
+It is served from a private `app://` origin, and the main process rejects remote
+requests, external navigation, pop-up windows, and unapproved permissions.
 
-- **Use the hosted product:** browse the
-  [Community Gallery](https://analog-canvas.tokenzhang.com/) or start a
-  [new circuit](https://analog-canvas.tokenzhang.com/editor).
-- **Try the Windows desktop preview:** [download and run the preview](#windows-desktop-preview).
-- **Learn the editor:** [Getting started](docs/user/getting-started.md),
-  [schematic hierarchy](docs/user/schematic-hierarchy.md),
-  [compatibility](docs/user/project-compatibility.md), and
-  [troubleshooting](docs/user/troubleshooting.md).
-- **Understand the product:** [current architecture](docs/overall-product-plan.md)
-  and [documentation map](docs/README.md).
-- **Develop or contribute:** [development workflow](docs/development-workflow.md),
-  [Agent entry](AGENTS.md),
-  [original skills and setup](references/README.md#development-skill-references),
-  [current development reading set](docs/README.md#contributor-reading-order), and
-  [test system](docs/testing/README.md).
+## Install
 
-For Claude Code, run `pnpm setup:skills` once in each checkout or worktree before
-starting a session. Choose slash commands from the shared
-[workflow stage entries](docs/development-workflow.md). Both clients use the
-same checked-in original skills;
-[setup and conflict recovery](references/README.md#development-skill-references)
-describe how the local registration works.
+### Windows
 
-## Windows desktop preview
+Run the NSIS installer, or extract and run the portable `.exe`. Keep portable
+application resources together with the executable.
 
-[**Download Windows x64 ZIP**](https://github.com/cascode-ai/analog-canvas/releases/download/desktop-preview-9174bd37ff7f-8/analog-canvas-desktop-windows-x64-9174bd37ff7f.zip)
-· [Release details](https://github.com/cascode-ai/analog-canvas/releases/tag/desktop-preview-9174bd37ff7f-8)
+### macOS
 
-1. Download and extract the **whole ZIP**.
-2. Open the extracted `Analog-Canvas-Windows-x64` directory and run
-   `Analog Canvas Preview.exe`. Keep its sibling resources
-   together; the `.exe` alone will not work. No Node.js, pnpm or developer tools
-   are required.
-3. Draw a new project and press **Ctrl+S**. It saves automatically in
-   `%USERPROFILE%\Analog Canvas\Projects`. **Local projects** offers search,
-   filters and New above a compact list. Click a project name to open it; use its
-   star for favorites and **More** for rename, independent copies, history and
-   recoverable deletion. Folder and external-file settings are collapsed.
-4. **File → Open Project…** opens `.icproj.json` or `.icproj` in place; **Save**
-   writes back to that file. **Save As…** creates an independent project and
-   switches to it after success. **Export Project File…** makes a portable copy
-   without changing the Save destination or marking edits saved.
-5. Each tab keeps its own file. Locations are shortened in the interface, with
-   full paths on hover and **Show in folder**. Restart restores tabs and recovery;
-   external changes are checked before writing. Closing offers to save all changed
-   tabs, commits the latest workspace before exit, and stays open if saving or
-   workspace persistence fails.
-6. **User Components** supports local circuit and artwork definitions through
-   the shared authoring editor. Create, edit, import/export, remove and restore
-   definitions without an account. The library persists separately in
-   `%APPDATA%\Analog Canvas\components.json`; placed project instances retain
-   their captured version when the library changes.
-7. **About**, on the right, shows data locations and offers opt-in Windows `.icproj` association.
-   TokenZhang, repository and source links open in the system browser when clicked.
-   Upgrading to a new extracted ZIP preserves stable user data; the previous
-   preview's settings and recovery can be imported without changing originals.
+Open the DMG, drag Analog Canvas to Applications, and launch it. For an unsigned
+Preview that Gatekeeper blocks, open System Settings → Privacy & Security and
+allow the app, or run:
 
-This is an **unsigned, offline preview** with no installer or automatic updates.
-It shares the Web editor's drawing model and exports SVG/PNG/PDF and
-SPICE/Spectre files. Account, Cloud, Gallery, Agent and simulation services are
-unavailable. Local history keeps three prior saves; recovery remains a safety
-copy. See the [full instructions and limitations](apps/desktop/README.md).
+```bash
+xattr -dr com.apple.quarantine "/Applications/Analog Canvas.app"
+```
 
-The linked package passed real Windows EXE acceptance, offline request checks
-and credential/private-file scanning. It includes corresponding source,
-attribution, `ACCEPTANCE.json` and `SECURITY.json` tied to the same source commit.
-See the [security audit and its limitations](docs/desktop-distribution-security.md).
+### Linux
 
-This ZIP is **155.2 MiB** (about **343.5 MiB** extracted). Most is Electron's
-Chromium/runtime, retaining English and Simplified/Traditional Chinese resources.
-The rest is the editor, desktop host, corresponding source, licenses and
-acceptance records. It contains no developer
-`node_modules` or user projects. Keep the bundled runtime and resources together.
+Make the AppImage executable and run it:
 
-## Run locally
+```bash
+chmod +x Analog-Canvas-0.1.0-linux-x86_64.AppImage
+./Analog-Canvas-0.1.0-linux-x86_64.AppImage
+```
 
-Requires Node.js 24 or newer and pnpm 11.16.0 or newer.
+The `.deb` package can be installed with `sudo apt install ./Analog-Canvas-*.deb`.
 
-```powershell
+## Project data
+
+Projects are JSON files with the canonical `.icproj.json` extension. The
+application also opens legacy `.icproj` files. User data, recovery copies, the
+local component library, and recent-project entries remain on the local
+machine. Project data is not encrypted at rest in this Preview.
+
+The application does not contain accounts, cloud projects, a community gallery,
+telemetry, crash reporting, remote help, or automatic updates.
+
+## Build
+
+Requirements: Node.js 24+, pnpm 11.16.0, and Git.
+
+```bash
 pnpm install --frozen-lockfile
-pnpm build
-pnpm dev
+pnpm --filter "@icm/editor^..." --if-present build
+pnpm --filter @icm/editor exec vite build --config vite.desktop.config.ts
+pnpm --filter @icm/desktop build:app
+pnpm --filter @icm/desktop dist:linux
 ```
 
-Run `pnpm build` once after installing, and again after pulling package
-changes: the development server's Vite configuration loads some workspace
-packages from their built `dist/` output.
+The cross-platform GitHub Actions workflow builds all platform artifacts from
+the same tagged source revision. Releases are intentionally unsigned until
+platform signing credentials are configured.
 
-Open the displayed loopback URL and choose **Editor**, or open its
-`/editor` route directly. Create a circuit from the component palette, or
-import one `.cir`, `.sp`, `.spi`, or `.scs` entry together with its local include
-files.
+## Verification
 
-Click **Agent** to open a connection message, then copy it into your Agent
-chat. The development server starts the local Agent relay on first use;
-no separate Worker command or cloud account is needed. Keep the editor open
-while the Agent works. Sessions expire after 30 minutes without Agent operations
-or manual edits; continued activity renews them. Stopping the development server
-also ends local sessions;
-after restarting it, create a new connection. Cloud account, Gallery, and
-hosted simulation services are not started by this local relay.
-
-Development follows the [original-skill workflow](docs/development-workflow.md):
-confirm requirements, implement and review, then deliver through a pull request
-and verify Production. Explicit local-only and branch-trial scopes stop at
-their requested boundary. See [validation timing](docs/testing/README.md#validation-timing)
-and [delivery cadence](docs/deployment.md#development-and-delivery-cadence).
-
-## What the repository contains
-
-- `apps/editor/`: React/SVG editor plus the Gallery, account, moderation, and
-  project surfaces.
-- `apps/editor/analytics/`: the complete first-party analytics module: page,
-  styles, browser reporting, HTTP routes, map data, and Durable Object backend.
-- `apps/local-host/`: loopback-only production host for the installable PWA.
-- `apps/mcp-server/`: packaged stdio MCP adapter for authorized Agent sessions.
-- `packages/model/`, `packages/project-protocol/`, and `packages/edit-engine/`:
-  current persisted circuit model, bounded file compatibility, and atomic
-  mutation boundary.
-- `packages/derived/`: read-only connectivity, diagnostic, and geometry
-  projections over the persisted model.
-- [`packages/components/`](packages/components/README.md): one canonical JSON
-  file per built-in component, containing its symbol, electrical rules and
-  catalog metadata; runtime packages consume generated projections.
-- `packages/spice/`, `packages/devices/`, `packages/symbols/`, and
-  `packages/netlist/`: structural SPICE import, built-in device facts, symbol
-  semantics, and deterministic design-netlist export.
-- `packages/exporters/` and `packages/render-svg/`: formal SVG, PNG, and PDF
-  output.
-- `packages/math-typesetting/`: bounded LaTeX formula typesetting for rich-text
-  annotations.
-- `packages/simulation-service/` and `packages/spice-run/`: shared simulation
-  preparation, run lifecycle, and artifacts, plus simulator request and result
-  contracts.
-- `packages/agent-adapter/`, `packages/agent-client/`, and
-  `packages/agent-routing/`: shared Agent contract, client, and routing logic.
-- `worker/`: Cloudflare Worker host and Durable Objects for static hosting,
-  Gallery, accounts, Cloud Projects, simulation, and Agent relay sessions.
-- `containers/`: simulator images, gateways, and operator-host topologies for
-  ngspice and the historically named VACASK candidate used by Production.
-- `netlists/`: one circuit per directory for the SPICE import corpus,
-  simulation examples and qualification, and Agent layout evaluation.
-- `fixtures/`: Project, SPICE, rawfile, export, Agent API, and visual-reference
-  test inputs and goldens.
-- `scripts/` and `config/`: build, generation, validation-gate, release, and
-  deployment tooling, with the gate catalog and pinned MCP and VACASK
-  declarations.
-- `tools/` and `references/`: manual Razavi calibration and PDF extraction
-  tools, and the pinned external research-source manifest.
-- [`eda/`](docs/eda-import.md): Canvas export and single/batch EDA imports,
-  with PyAether and Virtuoso Bridge adapters.
-- `docs/`: current architecture, user guides, normative contracts, ADRs and
-  the roadmap.
-
-The [Razavi reference manifest](fixtures/visual-reference/razavi-reference-v1/)
-is the sole visual authority. Every non-documentation merge to `main` deploys
-to Production; release tags and explicit dispatches may redeploy a commit that
-is already on `main`.
-See [deployment](docs/deployment.md) for the release and recovery contract.
-
-## Netlist conversion
-
-`POST /api/netlist/convert` accepts `{ "text": "...", "source": "spice", "target": "spectre" }`
-and returns translated text or line-specific diagnostics. The Worker and local
-Vite server expose the same pure converter; SCS import uses it locally too.
-No Python daemon, simulator or account is required. The structural subset adapts
-[netlist-crawler](https://github.com/Arcadia-1/netlist-crawler) under its MIT license.
-See the [conversion contract](docs/specs/netlist-conversion.md) for supported
-syntax and the [attribution](packages/spice/third-party/netlist-crawler/README.md).
-
-## License
-
-Copyright © 2026 Zengchun Chen and Zhishuai Zhang.
-
-Except where otherwise noted, Analog Canvas is licensed under the
-[GNU Affero General Public License v3.0 only](LICENSE.md)
-(`AGPL-3.0-only`). Modified versions that are distributed or made available
-for remote network interaction must provide their Corresponding Source under
-the same license. Third-party dependencies, reference material, and assets
-retain their respective copyright and license terms.
-
-## Citation
-
-If you use Analog Canvas in research, teaching, or another publication, cite:
-
-> Zengchun Chen and Zhishuai Zhang. _Analog Canvas_. 2026.
-> Available at: https://analog-canvas.tokenzhang.com/
-> Source code: https://github.com/cascode-ai/analog-canvas
-
-```bibtex
-@software{chen2026analogcanvas,
-  author = {Chen, Zengchun and Zhang, Zhishuai},
-  title = {Analog Canvas},
-  year = {2026},
-  url = {https://analog-canvas.tokenzhang.com/},
-  note = {Source code: https://github.com/cascode-ai/analog-canvas}
-}
+```bash
+pnpm exec vitest run apps/desktop/src --maxWorkers=2
+pnpm typecheck
 ```
+
+See [`drawic.md`](drawic.md) for the release baseline and acceptance matrix and
+[`apps/desktop/SOURCES.md`](apps/desktop/SOURCES.md) for source attribution.
+
+## Licensing and provenance
+
+This distribution is based on the public
+[`cascode-ai/analog-canvas`](https://github.com/cascode-ai/analog-canvas) project
+and the AGPL-3.0 desktop shell adapted from LXY-freshman's Schematic Draft.
+It is licensed under [AGPL-3.0-only](LICENSE). Corresponding source is available
+in this repository and in each Release source archive.
+
+The bundled device SVG export records source commit
+`a239991de3d765ad68729a2fc59b87483c7d401c`, style profile
+`razavi-textbook-v1`, and per-file SHA-256 values. See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

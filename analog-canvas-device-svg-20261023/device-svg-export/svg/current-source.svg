@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -24 30 48" width="30" height="48" data-symbol-id="current-source" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Independent Current Source</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><circle cx="0" cy="0" r="10.755814" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="-6.976744" x2="0" y2="-2.325581" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="0,6.976744 -4.651163,-2.325581 4.651163,-2.325581" fill="#000" stroke="none"/><line x1="0" y1="-10.755814" x2="0" y2="-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="10.755814" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

@@ -38,7 +38,7 @@ describe("editor statusbar", () => {
     expect(markup).toContain('title="Active tool: Wire"');
     expect(markup).toContain('aria-label="Active tool: Wire"');
     expect(markup).toContain(
-      'href="https://github.com/cascode-ai/analog-canvas/commits/main"',
+      'href="https://github.com/CanvasQAQ/analog-canvas-desktop/commits/main"',
     );
     expect(markup).not.toContain('aria-label="Annotation grid"');
     expect(markup).not.toContain('aria-label="Draw angle"');

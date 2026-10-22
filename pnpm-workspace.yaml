@@ -8,6 +8,7 @@ allowBuilds:
   # Wrangler validates its local bundler and Worker runtime binaries.
   # Electron installs the pinned desktop runtime.
   electron: true
+  electron-winstaller: false
   esbuild: true
   workerd: true
 minimumReleaseAgeExclude:

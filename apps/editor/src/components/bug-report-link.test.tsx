@@ -27,7 +27,7 @@ describe("bug report link", () => {
     const body = url.searchParams.get("body") ?? "";
 
     expect(url.origin).toBe("https://github.com");
-    expect(url.pathname).toBe("/cascode-ai/analog-canvas/issues/new");
+    expect(url.pathname).toBe("/CanvasQAQ/analog-canvas-desktop/issues/new");
     expect(url.searchParams.get("labels")).toBe("bug");
     expect(url.searchParams.get("title")).toBe("[Bug] ");
     expect(body).toContain("## What happened?");

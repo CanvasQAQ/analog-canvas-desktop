@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 48 48" width="48" height="48" data-symbol-id="depletion-pmos" data-variant="textbook-3terminal" role="img" aria-labelledby="title desc">
+<title id="title">Depletion PMOS</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><polyline points="-4.244186,6.976744 10,6.976744 10,20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="-11.802326,-9.593023 -11.802326,9.593023 -8.895349,9.593023 -8.895349,-9.593023" fill="#000" stroke="none"/><polygon points="-6.569767,-12.5 -6.569767,12.5 -3.662791,12.5 -3.662791,-12.5" fill="#000" stroke="none"/><line x1="-8.895349" y1="0" x2="-20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-0.368217" y1="-7.776744" x2="-0.368217" y2="7.776744" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polyline points="5.639535,-7.122093 10,-7.122093 10,-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="-3.662791,-7.122093 5.639535,-11.19186 5.639535,-3.052326" fill="#000" stroke="none"/></g>
+
+</svg>

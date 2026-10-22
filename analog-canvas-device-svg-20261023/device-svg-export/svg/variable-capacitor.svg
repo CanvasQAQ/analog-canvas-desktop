@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-16 -24 32 48" width="32" height="48" data-symbol-id="variable-capacitor" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Variable Capacitor</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="8.05064" y1="-3.233605" x2="-8.05064" y2="-3.233605" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="8.05064" y1="3.233605" x2="-8.05064" y2="3.233605" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="-3.233605" x2="0" y2="-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="3.233605" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-12" y1="12" x2="9" y2="-9" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polygon points="12,-12 6,-10 10,-6" fill="#000" stroke="none"/></g>
+
+</svg>

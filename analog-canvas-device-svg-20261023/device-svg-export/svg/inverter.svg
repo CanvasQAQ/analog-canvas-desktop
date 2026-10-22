@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-44 -24 88 48" width="88" height="48" data-symbol-id="inverter" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Inverter</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-30" y1="0" x2="-20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><path d="M 3.750981 0 L -20 -15.000436 L -20 13.748365 L 3.750981 0" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/><circle cx="7.522015" cy="0.009591" r="3.750109" stroke-width="2.4" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"/><line x1="11.272124" y1="0" x2="20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

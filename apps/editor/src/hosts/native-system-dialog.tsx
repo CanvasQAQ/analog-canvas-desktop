@@ -92,7 +92,7 @@ export function NativeSystemDialog({ onClose }: { onClose(): void }) {
           <p>
             <a
               data-native-external-link="source"
-              href={`https://github.com/cascode-ai/analog-canvas/commit/${info.commit}`}
+              href={`https://github.com/CanvasQAQ/analog-canvas-desktop/commit/${info.commit}`}
               onClick={(event) => {
                 event.preventDefault();
                 void openNativeExternalLink("source").catch((error) =>
@@ -110,12 +110,11 @@ export function NativeSystemDialog({ onClose }: { onClose(): void }) {
             Application data: {nativePathLabel(info.userData)}
           </p>
           <p>{info.migration}</p>
-          <h3>Windows file opening</h3>
+          <h3>Legacy project file opening</h3>
           <p>
-            Enable opening .icproj files with this installation. These files
-            contain the same project JSON. Existing .icproj.json files still
-            open through File → Open Project. Other JSON files keep their
-            current application.
+            Enable opening legacy .icproj files with this installation. New
+            projects are saved as canonical .icproj.json files and open through
+            File → Open Project. Other JSON files keep their current application.
           </p>
           <p>
             {info.association.enabled

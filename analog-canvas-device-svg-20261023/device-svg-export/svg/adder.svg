@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -16 48 40" width="48" height="40" data-symbol-id="adder" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Adder</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><line x1="-20" y1="0" x2="-13" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><circle cx="0" cy="0" r="12" fill="none" stroke="#000" stroke-width="2.4"/><line x1="13" y1="0" x2="20" y2="0" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="13" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="-6" y1="0" x2="6" y2="0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><line x1="0" y1="-6" x2="0" y2="6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></g>
+
+</svg>

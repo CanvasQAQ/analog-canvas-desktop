@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 39 48" width="39" height="48" data-symbol-id="pulse-voltage-source" data-variant="base" role="img" aria-labelledby="title desc">
+<title id="title">Digital Clock</title>
+<desc id="desc">Analog Canvas device appearance exported from the canonical component definition.</desc>
+<g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="4"><circle cx="0" cy="0" r="10.755814" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><polyline points="4,7 4,4 -4,4 -4,-4 4,-4 4,-7" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="-10.755814" x2="0" y2="-20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/><line x1="0" y1="10.755814" x2="0" y2="20" stroke-width="1.6" stroke-linecap="butt" stroke-linejoin="miter"/></g>
+
+</svg>

@@ -240,7 +240,7 @@ describe("editor shell", () => {
     expect(markup).toContain('class="tokenzhang-credit"');
     expect(markup).not.toContain('data-testid="app-more-menu"');
     expect(markup).toContain(
-      'href="https://github.com/cascode-ai/analog-canvas"',
+      'href="https://github.com/CanvasQAQ/analog-canvas-desktop"',
     );
     // The repository opens beside the drawing, never in its place.
     expect(
@@ -248,20 +248,20 @@ describe("editor shell", () => {
     ).toContain('target="_blank"');
     expect(markup).toContain('data-testid="statusbar-change-log"');
     expect(markup).toContain(
-      'href="https://github.com/cascode-ai/analog-canvas/commits/main"',
+      'href="https://github.com/CanvasQAQ/analog-canvas-desktop/commits/main"',
     );
     expect(markup).toContain('data-testid="statusbar-shortcut-hints"');
     expect(markup).toContain("Hints</button>");
     expect(markup).not.toContain('data-testid="canvas-shortcut-hints"');
     expect(markup).toContain('class="app-chrome-actions"');
     expect(markup).toContain("Presented by");
-    expect(markup).toContain('href="https://tokenzhang.com"');
-    expect(markup).toContain('src="/tokenzhang-favicon.png"');
+    expect(markup).toContain('href="https://github.com/CanvasQAQ"');
+    expect(markup).toContain('src="/icon-192.png"');
     const navigationEnd = markup.indexOf("</nav>");
     const repositoryLink = markup.indexOf(
       'data-testid="editor-repository-link"',
     );
-    const ownerLink = markup.indexOf('href="https://tokenzhang.com"');
+    const ownerLink = markup.indexOf('href="https://github.com/CanvasQAQ"');
     expect(repositoryLink).toBeGreaterThan(navigationEnd);
     expect(ownerLink).toBeGreaterThan(repositoryLink);
     expect(markup).not.toContain('role="dialog"');
