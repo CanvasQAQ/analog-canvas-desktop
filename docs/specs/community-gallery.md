@@ -74,7 +74,10 @@ restrictive CSP.
   account. The Owner is emailed at
   once (Resend, to the usage contact); the scheduled pass resends an unsent
   notice. Owner only: `GET /api/auth/blocked` lists the records, and
-  `POST /api/auth/blocked/unblock {userId}` (same origin) lifts a block.
+  `POST /api/auth/blocked/unblock {userId}` (same origin) lifts a block;
+  `POST /api/auth/blocked/apology {userId, subject, text}` then emails that
+  account the Owner's words once per block (site sender, replies to the
+  usage contact).
 - `/api/*` has a flood limit of 1200 requests a minute per client address
   (Workers rate limiting, `API_RATE_LIMITER`). Past it:
   `429 {"error":"too-many-requests","retryAfterSeconds":60,"usage":…}` with

@@ -21,6 +21,8 @@ import {
   ensureAccountBlockTables,
   isBlocked,
   listBlocks,
+  apologyOwed,
+  markApologized,
   markNotified,
   noteTrapRead,
   recordBlock,
@@ -661,7 +663,51 @@ export class AuthDO {
         unblocked: unblock(this.sql, body.userId, this.now().toISOString()),
       });
     }
+    if (route === "blocked/apology" && method === "POST") {
+      if (!sameOrigin(request))
+        return Response.json({ error: "forbidden" }, { status: 403 });
+      if (!(await this.sessionUser(request))?.isOwner)
+        return Response.json({ error: "owner-only" }, { status: 403 });
+      return this.apologize(request);
+    }
     return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  /**
+   * The Owner's own words to an account blocked by mistake, once it is
+   * unblocked: sent once per block, from the site's address, with replies
+   * going to the Owner.
+   */
+  private async apologize(request: Request): Promise<Response> {
+    const body = (await request.json().catch(() => null)) as {
+      userId?: unknown;
+      subject?: unknown;
+      text?: unknown;
+    } | null;
+    if (
+      typeof body?.userId !== "string" ||
+      typeof body.subject !== "string" ||
+      typeof body.text !== "string" ||
+      body.subject.trim().length === 0 ||
+      body.subject.length > 200 ||
+      body.text.trim().length === 0 ||
+      body.text.length > 5000
+    )
+      return Response.json({ error: "invalid-apology" }, { status: 400 });
+    const owed = apologyOwed(this.sql, body.userId);
+    if (!owed)
+      return Response.json({ error: "no-apology-owed" }, { status: 409 });
+    if (
+      !(await this.sendEmail(
+        owed.email,
+        body.subject,
+        body.text,
+        USAGE_CONTACT,
+      ))
+    )
+      return Response.json({ error: "send-failed" }, { status: 502 });
+    markApologized(this.sql, owed.id, this.now().toISOString());
+    return noStoreJson({ sent: true });
   }
 
   // --- Gallery blocks ---------------------------------------------------
@@ -728,6 +774,7 @@ export class AuthDO {
     to: string,
     subject: string,
     text: string,
+    replyTo?: string,
   ): Promise<boolean> {
     if (!this.env.RESEND_API_KEY) return false;
     try {
@@ -743,6 +790,7 @@ export class AuthDO {
           to: [to],
           subject,
           text,
+          ...(replyTo ? { reply_to: replyTo } : {}),
         }),
       });
       return response.ok;
