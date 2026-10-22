@@ -46,6 +46,7 @@ export interface EditorPropertiesDockProps {
   onToggle: () => void;
   summary: string;
   hasInspectableSelection: boolean;
+  onConvertSignal?: (() => void) | undefined;
   agentIndicator: { status: string; terminal: boolean } | null;
   documentSettings: ComponentProps<typeof DocumentSettingsSection> | null;
   mosBulk: ComponentProps<typeof MosBulkConnectionSection>;
@@ -75,6 +76,7 @@ export function EditorPropertiesDock({
   onToggle,
   summary,
   hasInspectableSelection,
+  onConvertSignal,
   agentIndicator,
   documentSettings,
   mosBulk,
@@ -159,6 +161,11 @@ export function EditorPropertiesDock({
             ) : null}
             <GroupPropertiesSection {...groupProperties} />
             <KeptDocumentStyleSection {...keptStyle} />
+            {onConvertSignal ? (
+              <button type="button" onClick={onConvertSignal}>
+                Convert to bus…
+              </button>
+            ) : null}
             {component ? (
               <section
                 className="property-section component-properties"

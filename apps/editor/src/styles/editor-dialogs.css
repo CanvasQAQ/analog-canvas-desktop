@@ -1245,6 +1245,25 @@
   gap: var(--icm-space-1);
 }
 
+.cell-signal-migration {
+  display: grid;
+  gap: var(--icm-space-3);
+  min-width: 0;
+}
+
+.cell-signal-migration label {
+  display: grid;
+  gap: var(--icm-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--icm-font-sm);
+}
+
+.editor-action-dialog-body > p,
+.editor-action-dialog-body li {
+  overflow-wrap: anywhere;
+}
+
 .editor-action-dialog-field span {
   color: var(--icm-text-muted);
   font-size: var(--icm-font-sm);

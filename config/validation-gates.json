@@ -154,6 +154,7 @@
     "hierarchy": [
       "apps/editor/src/features/hierarchy/**",
       "apps/editor/e2e/hierarchy.spec.ts",
+      "apps/editor/e2e/bus-lifecycle.spec.ts",
       "packages/model/src/cell-interface-projection*",
       "packages/model/src/circuit-component*",
       "packages/model/src/component-interface*",
@@ -496,10 +497,14 @@
       "command": [
         "pnpm",
         "test:e2e:local",
-        "apps/editor/e2e/hierarchy.spec.ts"
+        "apps/editor/e2e/hierarchy.spec.ts",
+        "apps/editor/e2e/bus-lifecycle.spec.ts"
       ],
       "ci": {
-        "e2eArgs": ["apps/editor/e2e/hierarchy.spec.ts"]
+        "e2eArgs": [
+          "apps/editor/e2e/hierarchy.spec.ts",
+          "apps/editor/e2e/bus-lifecycle.spec.ts"
+        ]
       }
     },
     {

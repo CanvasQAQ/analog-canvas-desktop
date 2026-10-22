@@ -93,8 +93,10 @@ gate.
   removes non-interface content, keeping formal terminals. Resets that remove
   every Route re-anchor Route-bound Net/power labels free so names survive;
   route markers go. Each is one revision and one Undo.
-- `upsert/remove_connectivity_evidence` are the only evidence writers (ID
-  namespace checked, final validation checks references). Removing an owner
+- `upsert/remove_connectivity_evidence` write evidence; `migrate_label_signal`
+  updates only its owning Label's claim and member identities atomically with
+  conductor and selector changes. IDs and final references are validated.
+  Removing an owner
   removes only `name-claim` evidence it owns (plus a source-unbacked legacy
   Net-property projection it shadows; an imported node name stays while its
   Base Net is reachable). A Base Net with no remaining

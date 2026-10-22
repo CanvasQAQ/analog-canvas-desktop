@@ -307,8 +307,14 @@ widths, unknown members and ambiguous selections without mutation.
 A branch and its bound selector are one transaction. Its `net-name` binding's
 `memberEndpoint` or ordered `memberEndpoints` are display references: unnamed
 parent members display the current formal name without creating a parent name
-claim. Connected member/name migration, legacy scalar conversion, bus group copy and
-member NoConnect authoring are not yet supported; use the reported refusal.
+claim. `rename-cell-terminal` and an owner `set-net-label` accept `memberMap`,
+mapping existing stable member IDs to requested expanded names or `null` to
+disconnect. Matching names retain identity without a map. Unmatched existing
+members require an explicit choice; reordering never remaps by position. Set
+`convertLegacy:true` to deliberately convert a legacy scalar owner, mapping its
+terminal or naming-claim ID to one member or `null`. Inspect the result before
+continuing; the mutation includes every affected caller in one transaction.
+Bus group copy and member NoConnect authoring remain unsupported.
 
 ## Wiring
 

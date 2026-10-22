@@ -1028,6 +1028,9 @@ async function placeCellPin(
   await page.keyboard.press("Escape");
   await labels.nth(existingLabelCount).dblclick();
   await applyCanvasText(page, options.name);
+  await expect(
+    page.getByRole("dialog", { name: "Change Cell signal members?" }),
+  ).toHaveCount(0);
   if (options.direction) {
     const manager = await openCellManager(page);
     await manager
@@ -1274,6 +1277,9 @@ test("edits a vector Cell Pin with width feedback, invalid draft retention and E
   await expect(preview).toHaveText("4 members · IN<3> → IN<2> → IN<1> → IN<0>");
   await editor.press("Enter");
   await expect(editor).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "Change Cell signal members?" }),
+  ).toHaveCount(0);
   await label.dblclick();
   await editor.fill("IN<0:3>");
   await expect(preview).toHaveText("4 members · IN<0> → IN<1> → IN<2> → IN<3>");

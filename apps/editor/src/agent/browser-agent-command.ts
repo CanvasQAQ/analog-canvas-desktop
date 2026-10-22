@@ -39,6 +39,7 @@ import {
   createRoutingOperationPlan,
   planEnsureNamedNet,
   planEnsureNamedRoute,
+  resolveNetLabelOwnerRoute,
   planElectricalMarkerRename,
   proposedStandalonePowerConnection,
   powerConnectionForSymbol,
@@ -1345,13 +1346,20 @@ export function planBrowserAgentCommand(
           ? { powerDomain: net.powerDomain }
           : {}),
       };
-      const labelRoute = document.routes.find((route) =>
-        existing?.anchor.kind === "route"
-          ? route.id === existing.anchor.routeId
-          : route.netId === netId,
-      );
+      const labelRoute = existing
+        ? resolveNetLabelOwnerRoute(document, existing)
+        : document.routes.find((route) => route.netId === netId);
       const plan = labelRoute
-        ? planEnsureNamedRoute(document, labelRoute.id, nameRequest)
+        ? planEnsureNamedRoute(
+            document,
+            labelRoute.id,
+            nameRequest,
+            {
+              ...(command.memberMap ? { memberMap: command.memberMap } : {}),
+              ...(command.convertLegacy ? { convertLegacy: true } : {}),
+            },
+            resolver,
+          )
         : planEnsureNamedNet(document, nameRequest);
       if (!plan.ok) throw new Error(plan.message);
       if (!existing && !command.position)
@@ -1454,8 +1462,12 @@ export function planBrowserAgentCommand(
           locked: false,
         }),
         content: undefined,
-        netId,
-        binding: { kind: "net-name" as const, netId },
+        netId: plan.netId,
+        binding:
+          existing?.binding?.kind === "net-name" &&
+          (existing.binding.memberEndpoint || existing.binding.memberEndpoints)
+            ? existing.binding
+            : { kind: "net-name" as const, netId: plan.netId },
         formatOverride: labelFormat,
         anchor,
       };
@@ -1584,7 +1596,11 @@ export function planBrowserAgentCommand(
           documentId,
           command.terminalId,
           command.name,
-          { mergeExistingPort: command.mergeExistingPort ?? false },
+          {
+            mergeExistingPort: command.mergeExistingPort ?? false,
+            ...(command.memberMap ? { memberMap: command.memberMap } : {}),
+            ...(command.convertLegacy ? { convertLegacy: true } : {}),
+          },
         ),
       };
     case "remove-cell-terminal":

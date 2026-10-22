@@ -1384,8 +1384,29 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
     commitPendingNetLabelDraft,
     commitTextEditing,
     escapeTextEditing: () => {
-      // Preserve Escape's existing commit behavior for valid edits, but never
-      // trap the user in an invalid or unsupported bound-label draft.
+      const annotation =
+        textEditing?.owner === "annotation"
+          ? options.document.annotations.find(
+              (item) => item.id === textEditing.id,
+            )
+          : undefined;
+      if (
+        annotation &&
+        textEditing?.signalExpression &&
+        !textEditing.displayAlias &&
+        editedBoundAnnotationName(
+          options.document,
+          annotation,
+          textEditing,
+          textEditing.signalExpression,
+          options.resolver,
+        ) !== textEditing.signalExpression
+      ) {
+        setTextEditing(null);
+        options.setStatus("Cancelled signal name changes");
+        return;
+      }
+      // Presentation edits keep their existing Escape commit behavior.
       commitTextEditing();
       setTextEditing(null);
     },

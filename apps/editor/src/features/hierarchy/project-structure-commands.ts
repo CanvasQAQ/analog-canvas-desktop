@@ -1,4 +1,5 @@
 import {
+  cellTerminalHasSignalContacts,
   planEditCellTerminalAnnotation,
   planCreateCell,
   planDeleteCell,
@@ -7,6 +8,7 @@ import {
   planRemoveCellTerminals,
   planRenameCell,
   planRenameCellTerminal,
+  planSetCellTerminalSignal,
   planReorderCellPort,
   planReorderCellTerminal,
   planSetCellSymbolPresentation,
@@ -26,6 +28,7 @@ import {
   semanticTextDocument,
   foldNetName,
   projectCellInterface,
+  parseSignalExpression,
 } from "@icm/model";
 import type {
   Annotation,
@@ -37,6 +40,8 @@ import type {
 } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import type { BlockSymbolLayoutTarget } from "./block-symbol-layout-target";
+import type { CellInterfaceConfirmation } from "./cell-interface-confirmation-types";
+export type { CellInterfaceConfirmation } from "./cell-interface-confirmation-types";
 
 type CellDirection = "input" | "output" | "inout" | "passive";
 type CellPinSide = "north" | "east" | "south" | "west" | "auto";
@@ -70,24 +75,19 @@ export interface ProjectStructureCommandDependencies {
   createDocumentId?: () => string;
 }
 
-export interface CellInterfaceConfirmation {
-  title: string;
-  message: string;
-  confirmLabel: string;
-  apply(): boolean;
-}
-
 /** Confirmation authorizes precisely the immutable Project the user reviewed. */
 export function applyConfirmedCellInterfaceEdit(
   request: CellInterfaceConfirmation,
   snapshot: CircuitProject,
   current: CircuitProject,
+  memberMap?: Record<string, string | null>,
+  expression?: string,
 ): boolean {
   if (current !== snapshot)
     throw new Error(
       "Project changed. Repeat the operation to review its current impact.",
     );
-  return request.apply();
+  return request.apply(memberMap, expression);
 }
 
 /**
@@ -140,6 +140,76 @@ export function createProjectStructureCommands({
       message: `Merge into ${name}. This electrically joins the Ports and their connected parent networks. Undo restores the change.`,
       apply,
     });
+  const confirmSignalMigration = (
+    document: SchematicDocument,
+    terminal: NonNullable<SchematicDocument["netlist"]>["terminals"][number],
+    expression: string,
+    conversion: boolean,
+    apply: (
+      memberMap: Record<string, string | null>,
+      expression: string,
+    ) => boolean,
+  ): boolean => {
+    const previous = terminal.signal?.members ?? [
+      { id: terminal.id, name: terminal.name },
+    ];
+    const affected = [
+      document.name,
+      ...project.documents.flatMap((parent) =>
+        parent.instances
+          .filter(
+            (instance) =>
+              instance.netlist?.binding?.kind === "subcircuit" &&
+              instance.netlist.binding.childDocumentId === document.id,
+          )
+          .map(
+            (instance) => `${parent.name}/${instance.reference ?? instance.id}`,
+          ),
+      ),
+    ];
+    const preview = (targetExpression: string) => {
+      const targetNames = [...parseSignalExpression(targetExpression)];
+      return {
+        conversion,
+        targetNames,
+        affected,
+        members: previous.map((member) => {
+          const same = targetNames.find(
+            (name) => foldNetName(name) === foldNetName(member.name),
+          );
+          return {
+            id: member.id,
+            name: member.name,
+            ...(same ? { target: same } : {}),
+          };
+        }),
+      };
+    };
+    return confirm({
+      title: conversion
+        ? "Convert scalar Cell Pin to bus?"
+        : "Change Cell signal members?",
+      confirmLabel: conversion ? "Convert to Bus" : "Apply Member Changes",
+      message: `Existing signal: ${terminal.name}. Map each existing member or disconnect it; disconnected wires remain editable stubs.`,
+      ...(conversion
+        ? { conversion: { expression, preview } }
+        : { migration: preview(expression) }),
+      apply: (memberMap, targetExpression) => {
+        const name = conversion ? (targetExpression ?? expression) : expression;
+        return apply(
+          memberMap ??
+            Object.fromEntries(
+              previous.flatMap((member) =>
+                preview(name).targetNames.includes(member.name)
+                  ? [[member.id, member.name]]
+                  : [],
+              ),
+            ),
+          name,
+        );
+      },
+    });
+  };
   const commitRemoval = (
     terminalIds: readonly string[],
     apply: () => boolean,
@@ -307,6 +377,35 @@ export function createProjectStructureCommands({
     }
     try {
       if (
+        terminal.signal &&
+        (terminal.signal.members.length > 1 ||
+          (parseSignalExpression(nextName).length > 1 &&
+            cellTerminalHasSignalContacts(
+              project,
+              targetDocumentId,
+              terminal.id,
+            )))
+      ) {
+        confirmSignalMigration(
+          targetDocument!,
+          terminal,
+          nextName,
+          false,
+          (memberMap) =>
+            commitStructure(
+              transactionId,
+              planRenameCellTerminal(
+                project,
+                targetDocumentId,
+                terminalId,
+                nextName,
+                { memberMap },
+              ),
+            ),
+        );
+        return;
+      }
+      if (
         commitStructure(
           transactionId,
           planRenameCellTerminal(
@@ -363,6 +462,36 @@ export function createProjectStructureCommands({
           : {}),
       };
       const renamed = terminal.name !== inputName;
+      if (
+        renamed &&
+        terminal.signal &&
+        (terminal.signal.members.length > 1 ||
+          (parseSignalExpression(inputName).length > 1 &&
+            cellTerminalHasSignalContacts(
+              project,
+              activeDocument.id,
+              terminal.id,
+            )))
+      ) {
+        return confirmSignalMigration(
+          activeDocument,
+          terminal,
+          inputName,
+          false,
+          (memberMap) =>
+            commitStructure(
+              "edit-cell-pin-label",
+              planEditCellTerminalAnnotation(
+                project,
+                activeDocument.id,
+                terminal.id,
+                normalizedAnnotation,
+                inputName,
+                { memberMap },
+              ),
+            ),
+        );
+      }
       if (isMerge(activeDocument, terminal.id, inputName)) {
         return confirmMerge(inputName, () =>
           commitStructure(
@@ -432,6 +561,50 @@ export function createProjectStructureCommands({
     }
     if (commitStructure("format-cell-port-labels", edits)) {
       setStatus("Formatted all Port labels");
+    }
+  };
+
+  const convertCellTerminalSignal = (
+    terminalId: string,
+    expression?: string,
+    documentId = activeDocument.id,
+  ): boolean => {
+    const document = project.documents.find(
+      (candidate) => candidate.id === documentId,
+    );
+    const terminal = document?.netlist?.terminals.find(
+      (candidate) => candidate.id === terminalId,
+    );
+    if (!document || !terminal || terminal.signal) return false;
+    try {
+      const name = expression?.trim() ?? terminal.name;
+      return confirmSignalMigration(
+        document,
+        terminal,
+        name,
+        true,
+        (memberMap, targetExpression) =>
+          commitStructure(
+            "convert-cell-signal",
+            planSetCellTerminalSignal(
+              project,
+              document.id,
+              terminal.id,
+              targetExpression,
+              {
+                memberMap,
+                convertLegacy: true,
+              },
+            ),
+          ),
+      );
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "Could not convert Cell signal",
+      );
+      return false;
     }
   };
 
@@ -819,6 +992,7 @@ export function createProjectStructureCommands({
     updateCellPinDirection,
     updateCellPortDirection,
     renameCellTerminal,
+    convertCellTerminalSignal,
     editCellTerminalAnnotation,
     formatCellTerminalAnnotations,
     removeCellTerminalSelection,

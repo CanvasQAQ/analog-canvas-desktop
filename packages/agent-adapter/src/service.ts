@@ -264,6 +264,7 @@ export function agentEditCategory(
     case "set_instance_signal_flow_parameters":
       return "presentation";
     case "set_instance_netlist":
+    case "migrate_label_signal":
     case "undo":
     case "redo":
     case "unplace_instance":
