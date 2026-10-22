@@ -25,9 +25,19 @@ describe("focused tools", () => {
     const connect = schema.properties.actions.items.oneOf.find(
       (action: any) => action.properties.kind.const === "connect",
     );
+    const exact = declarationSchema(
+      selectToolSchema(toolInputSchema("apply_actions")!, ["connect"]),
+    ) as any;
+    const exactConnect = exact.properties.actions.items;
+    const targetSchema = connect.patternProperties["^(from|to)$"];
+    expect(targetSchema).toEqual(exactConnect.properties.from);
+    expect(targetSchema).toEqual(exactConnect.properties.to);
+    expect(connect.additionalProperties).toBe(false);
+    expect(connect.required).toEqual(exactConnect.required);
     for (const end of ["from", "to"]) {
+      expect(connect.properties[end]).toBe(true);
       for (const kind of ["pin", "junction", "route-segment"]) {
-        const target = connect.properties[end].oneOf.find(
+        const target = targetSchema.oneOf.find(
           (branch: any) => branch.properties.kind.const === kind,
         );
         expect(target.properties.memberId).toMatchObject({
@@ -35,6 +45,18 @@ describe("focused tools", () => {
           maxLength: 256,
         });
         expect(target.required).not.toContain("memberId");
+        expect(target.properties.memberIds).toMatchObject({
+          type: "array",
+          minItems: 1,
+          maxItems: 256,
+          items: { type: "string", maxLength: 256 },
+        });
+        expect(target.properties.selectionExpression).toMatchObject({
+          type: "string",
+          maxLength: 256,
+        });
+        expect(target.required).not.toContain("memberIds");
+        expect(target.required).not.toContain("selectionExpression");
       }
     }
     const invalid = await callTool(
@@ -57,6 +79,50 @@ describe("focused tools", () => {
     );
     expect(invalid.isError).toBe(true);
     expect(invalid.content[0]!.text).toContain("INVALID_TOOL_INPUT");
+    const tooWide = await callTool(
+      "circuit_wire",
+      {
+        actions: [
+          {
+            kind: "connect",
+            from: {
+              kind: "junction",
+              junction: "trunk-end",
+              memberIds: Array.from(
+                { length: 257 },
+                (_, index) => `member-${index}`,
+              ),
+            },
+            to: { kind: "point", x: 100, y: 100 },
+          },
+        ],
+      },
+      {} as never,
+    );
+    expect(tooWide.isError).toBe(true);
+    expect(tooWide.content[0]!.text).toContain("INVALID_TOOL_INPUT");
+    for (const selection of [
+      { memberIds: [2] },
+      { memberIds: ["bit"], unknownSelection: true },
+      { memberId: "bit", memberIds: ["bit"] },
+      { memberIds: ["bit"], selectionExpression: "DATA<0>" },
+    ]) {
+      const rejected = await callTool(
+        "circuit_wire",
+        {
+          actions: [
+            {
+              kind: "connect",
+              from: { kind: "junction", junction: "trunk-end", ...selection },
+              to: { kind: "point", x: 100, y: 100 },
+            },
+          ],
+        },
+        {} as never,
+      );
+      expect(rejected.isError).toBe(true);
+      expect(rejected.content[0]!.text).toContain("INVALID_TOOL_INPUT");
+    }
   });
 
   it("omits repetitive scalar bounds only in discovery while preserving domain bounds and exact rejection", async () => {

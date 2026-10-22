@@ -53,6 +53,9 @@ export interface EditorWiringOverlayProps {
   wireDraftPreview: WireDraftPreview;
   memberChoice?: WireMemberChoice | null | undefined;
   onWireMemberChoose?: ((memberId: string | null) => void) | undefined;
+  onWireExpressionPreview?:
+    ((expression: string) => { text: string; valid: boolean }) | undefined;
+  onWireExpressionChoose?: ((expression: string) => void) | undefined;
   onWireMemberCancel?: (() => void) | undefined;
   wireSnapTarget?: Point | undefined;
   bulkRoutePreview: boolean;
@@ -257,14 +260,23 @@ export function EditorWiringOverlay({
 export function WireMemberChoiceOverlay({
   memberChoice,
   onWireMemberChoose,
+  onWireExpressionPreview,
+  onWireExpressionChoose,
   onWireMemberCancel,
   viewBox,
 }: Pick<
   EditorWiringOverlayProps,
-  "memberChoice" | "onWireMemberChoose" | "onWireMemberCancel" | "viewBox"
+  | "memberChoice"
+  | "onWireMemberChoose"
+  | "onWireMemberCancel"
+  | "viewBox"
+  | "onWireExpressionPreview"
+  | "onWireExpressionChoose"
 >) {
   const root = useRef<SVGForeignObjectElement | null>(null);
   const [unitsPerPixel, setUnitsPerPixel] = useState(1);
+  const [expression, setExpression] = useState("");
+  useLayoutEffect(() => setExpression(""), [memberChoice]);
   useLayoutEffect(() => {
     const svg = root.current?.ownerSVGElement;
     if (!svg) return;
@@ -278,6 +290,9 @@ export function WireMemberChoiceOverlay({
     return () => observer.disconnect();
   }, [memberChoice, viewBox]);
   if (!memberChoice) return null;
+  const preview = expression.trim()
+    ? onWireExpressionPreview?.(expression)
+    : null;
   const point = memberChoice.source.connection.contactPoint;
   const widthPixels = Math.min(240, viewBox.width / unitsPerPixel - 16);
   const width = widthPixels * unitsPerPixel;
@@ -287,7 +302,7 @@ export function WireMemberChoiceOverlay({
   );
   const y = Math.max(
     viewBox.y + 8,
-    Math.min(point.y + 12, viewBox.y + viewBox.height - 106 * unitsPerPixel),
+    Math.min(point.y + 12, viewBox.y + viewBox.height - 196 * unitsPerPixel),
   );
   return (
     <foreignObject
@@ -295,7 +310,7 @@ export function WireMemberChoiceOverlay({
       x={x}
       y={y}
       width={width}
-      height={98 * unitsPerPixel}
+      height={188 * unitsPerPixel}
       data-canvas-overlay="wire-member-choice"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -339,6 +354,30 @@ export function WireMemberChoiceOverlay({
             ))}
           </select>
         </label>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (preview?.valid) onWireExpressionChoose?.(expression);
+          }}
+        >
+          <input
+            aria-label="Bus member expression"
+            value={expression}
+            placeholder="<7:4> or CLK,DATA<3,0>"
+            onChange={(event) => setExpression(event.target.value)}
+          />
+          {preview ? (
+            <div
+              aria-label="Bus selection preview"
+              role={preview.valid ? "status" : "alert"}
+            >
+              {preview.text}
+            </div>
+          ) : null}
+          <button type="submit" disabled={!preview?.valid}>
+            Use selection
+          </button>
+        </form>
         <button type="button" onClick={onWireMemberCancel}>
           {memberChoice.allowWhole ? "Hide" : "Cancel · Esc"}
         </button>

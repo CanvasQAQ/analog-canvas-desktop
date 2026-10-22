@@ -444,8 +444,13 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
       annotation,
     ] of document.annotations.entries()) {
       const binding = annotation.binding;
-      if (binding?.kind === "net-name" && binding.memberEndpoint) {
-        const selected = binding.memberEndpoint;
+      if (
+        binding?.kind === "net-name" &&
+        (binding.memberEndpoint || binding.memberEndpoints)
+      ) {
+        const selectedMembers = binding.memberEndpoints ?? [
+          binding.memberEndpoint!,
+        ];
         const route =
           annotation.anchor.kind === "route"
             ? document.routes.find(
@@ -454,12 +459,14 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
                   route.id === annotation.anchor.routeId,
               )
             : undefined;
+        const edges = route ? routeElectricalConnections(route) : [];
         const matches =
           route &&
-          !route.members &&
           route.netId === binding.netId &&
-          routeElectricalConnections(route).some((edge) =>
-            edge.endpoints.some(
+          !(binding.memberEndpoint && binding.memberEndpoints) &&
+          edges.length === selectedMembers.length &&
+          selectedMembers.every((selected, index) =>
+            edges[index]!.endpoints.some(
               (endpoint) =>
                 endpoint.kind === selected.kind &&
                 endpoint.memberId === selected.memberId &&
@@ -476,7 +483,7 @@ export const SchematicDocumentSchema = SchematicDocumentBaseSchema.superRefine(
             code: "custom",
             message:
               "Bus selector must reference its branch's selected endpoint and Net",
-            path: ["annotations", annotationIndex, "binding", "memberEndpoint"],
+            path: ["annotations", annotationIndex, "binding"],
           });
       }
       if (

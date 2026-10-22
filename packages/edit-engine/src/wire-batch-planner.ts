@@ -115,24 +115,41 @@ function keepClear(
   }
   if (!points) return intent;
   const context = deriveNetConnectivityContext(document, resolver);
-  const ends = [from, to].map((anchor) =>
-    anchor.kind === "endpoint" ? anchor.endpoint : undefined,
+  const ends = [from, to].map((anchor, index) =>
+    anchor.kind === "endpoint"
+      ? index === 0
+        ? path.route.start
+        : routeEnd(path.route)
+      : undefined,
   );
   points = fromLandings(document, resolver, points, ends);
-  const netsOf = (anchor: typeof from): string[] => {
+  const netsOf = (anchor: typeof from, side: "from" | "to"): string[] => {
+    const selectedEndpoint =
+      side === "from" ? path.route.start : routeEnd(path.route);
+    const selectedIds = path.route.members
+      ? new Set(
+          path.route.members.map((member) =>
+            side === "from" ? member.startMemberId : member.endMemberId,
+          ),
+        )
+      : selectedEndpoint.memberId
+        ? new Set([selectedEndpoint.memberId])
+        : undefined;
     if (anchor.kind === "route-segment") {
       const route = document.routes.find(
         (route) => route.id === anchor.routeId,
       );
-      return (route ? routeElectricalConnections(route) : [])
-        .filter(
-          (connection) =>
-            !anchor.memberId || connection.memberId === anchor.memberId,
-        )
-        .map(
-          ({ netId }) =>
-            context.logicalNetResolution.byBaseNetId.get(netId)?.id ?? netId,
-        );
+      const connections = route ? routeElectricalConnections(route) : [];
+      return (
+        selectedIds
+          ? [...selectedIds].flatMap((id) =>
+              connections.filter((connection) => connection.memberId === id),
+            )
+          : connections
+      ).map(
+        ({ netId }) =>
+          context.logicalNetResolution.byBaseNetId.get(netId)?.id ?? netId,
+      );
     }
     if (anchor.kind !== "endpoint") return [];
     const endpoint = anchor.endpoint;
@@ -141,15 +158,38 @@ function keepClear(
       endpoint.kind === "junction"
         ? document.junctions.find((item) => item.id === endpoint.junctionId)
         : undefined;
+    if (selectedIds) {
+      return [...selectedIds].flatMap((memberId) => {
+        const memberEndpoint = { ...endpoint, memberId };
+        const memberKey = endpointKey(memberEndpoint);
+        const netId =
+          endpoint.kind === "junction"
+            ? junction?.members?.find((member) => member.id === memberId)?.netId
+            : (document.nets.find((net) =>
+                net.terminals.some(
+                  (terminal) =>
+                    terminal.instanceId === endpoint.instanceId &&
+                    terminal.pinName === endpoint.pinName &&
+                    terminal.memberId === memberId,
+                ),
+              )?.id ??
+              document.routes
+                .flatMap(routeElectricalConnections)
+                .find((connection) =>
+                  connection.endpoints.some(
+                    (end) => endpointKey(end) === memberKey,
+                  ),
+                )?.netId);
+        return netId
+          ? [context.logicalNetResolution.byBaseNetId.get(netId)?.id ?? netId]
+          : [];
+      });
+    }
     const netIds = [
       ...(endpoint.kind === "junction"
-        ? (junction ? junctionElectricalEndpoints(junction) : [])
-            .filter(
-              (item) =>
-                !endpoint.memberId ||
-                item.endpoint.memberId === endpoint.memberId,
-            )
-            .map((item) => item.netId)
+        ? (junction ? junctionElectricalEndpoints(junction) : []).map(
+            (item) => item.netId,
+          )
         : // A body on its Cell's default leaves it for the wire's Net.
           defaultBoundMosBody(document, endpoint)
           ? []
@@ -158,9 +198,7 @@ function keepClear(
                 net.terminals.some(
                   (terminal) =>
                     terminal.instanceId === endpoint.instanceId &&
-                    terminal.pinName === endpoint.pinName &&
-                    (!endpoint.memberId ||
-                      terminal.memberId === endpoint.memberId),
+                    terminal.pinName === endpoint.pinName,
                 ),
               )
               .map((net) => net.id)),
@@ -179,7 +217,7 @@ function keepClear(
         : [],
     );
   };
-  const nets = { from: netsOf(from), to: netsOf(to) };
+  const nets = { from: netsOf(from, "from"), to: netsOf(to, "to") };
   const clearance = createRouteClearance(document, resolver, context, {
     logicalIds: new Set([...nets.from, ...nets.to]),
     signalWidth: path.route.members?.length ?? 1,
@@ -277,13 +315,37 @@ function tapOwnWire(
         )
       )
         return [];
+      const orderedMembers =
+        route.members &&
+        logicalIds.map((id) =>
+          route.members!.find(
+            (member) =>
+              (context.logicalNetResolution.byBaseNetId.get(member.netId)?.id ??
+                member.netId) === id,
+          ),
+        );
+      if (
+        orderedMembers &&
+        (orderedMembers.length !== signalWidth ||
+          orderedMembers.some((member) => !member))
+      )
+        return [];
       const geometry = resolveRouteGeometry(document, resolver, route);
       return (geometry?.segments ?? []).map((segment) => ({
         route,
         segment,
+        memberIds: orderedMembers?.map((member) => member!.id),
         ends: [
-          { point: geometry!.centerline[0], endpoint: route.start },
-          { point: geometry!.centerline.at(-1), endpoint: routeEnd(route) },
+          {
+            point: geometry!.centerline[0],
+            endpoint: route.start,
+            memberIds: orderedMembers?.map((member) => member!.startMemberId),
+          },
+          {
+            point: geometry!.centerline.at(-1),
+            endpoint: routeEnd(route),
+            memberIds: orderedMembers?.map((member) => member!.endMemberId),
+          },
         ],
       }));
     });
@@ -300,7 +362,7 @@ function tapOwnWire(
       { kind: "route-segment" } | { kind: "endpoint" }
     > | null = null;
     let bestPoint: Point | null = null;
-    for (const { route, segment, ends } of wires) {
+    for (const { route, segment, ends, memberIds } of wires) {
       const near = intersectSegments(outer, pin, segment.from, segment.to);
       const far = intersectSegments(pin, outer, segment.from, segment.to);
       // Touching at one point is a crossing, or the pin itself.
@@ -324,12 +386,17 @@ function tapOwnWire(
             candidate.point && samePoint(candidate.point, near.point),
         );
         best = end
-          ? { kind: "endpoint", endpoint: end.endpoint }
+          ? {
+              kind: "endpoint",
+              endpoint: end.endpoint,
+              ...(end.memberIds ? { memberIds: end.memberIds } : {}),
+            }
           : {
               kind: "route-segment",
               routeId: route.id,
               legId: segment.address.legId,
               point: near.point,
+              ...(memberIds ? { memberIds } : {}),
             };
       }
     }
@@ -507,11 +574,13 @@ export function planWireBatch(
     );
     if (!original || !original.legs.some((leg) => leg.id === anchor.legId))
       return `Wire route or leg does not exist: ${anchor.routeId}/${anchor.legId}`;
-    if (
-      anchor.memberId &&
-      !original.members?.some((member) => member.id === anchor.memberId)
-    )
-      return `Route ${original.id} has no member ${anchor.memberId}`;
+    const selectedIds =
+      anchor.memberIds ?? (anchor.memberId ? [anchor.memberId] : []);
+    const missingId = selectedIds.find(
+      (id) => !original.members?.some((member) => member.id === id),
+    );
+    if (missingId !== undefined)
+      return `Route ${original.id} has no member ${missingId}`;
     const originalSegment = resolveRouteGeometry(
       document,
       resolver,
@@ -544,11 +613,18 @@ export function planWireBatch(
           endpoint: route.start,
           point: geometry.centerline[0],
           memberId: member?.startMemberId,
+          memberIds: anchor.memberIds?.map(
+            (id) =>
+              route.members!.find((item) => item.id === id)!.startMemberId,
+          ),
         },
         {
           endpoint: routeEnd(route),
           point: geometry.centerline.at(-1),
           memberId: member?.endMemberId,
+          memberIds: anchor.memberIds?.map(
+            (id) => route.members!.find((item) => item.id === id)!.endMemberId,
+          ),
         },
       ];
       return endpoints
@@ -558,11 +634,16 @@ export function planWireBatch(
             point?.x === anchor.point.x &&
             point.y === anchor.point.y,
         )
-        .map(({ endpoint, memberId }) =>
-          memberId ? { ...endpoint, memberId } : endpoint,
-        );
+        .map(({ endpoint, memberId, memberIds }) => ({
+          kind: "endpoint" as const,
+          endpoint: memberId ? { ...endpoint, memberId } : endpoint,
+          ...(memberIds ? { memberIds } : {}),
+          ...(anchor.selectionExpression !== undefined
+            ? { selectionExpression: anchor.selectionExpression }
+            : {}),
+        }));
     })[0];
-    if (junction) return { kind: "endpoint", endpoint: junction };
+    if (junction) return junction;
     if (candidates.length !== 1)
       return `Wire route segment has ${candidates.length} descendants at the requested point: ${anchor.routeId}/${anchor.legId}`;
     const match = candidates[0]!;

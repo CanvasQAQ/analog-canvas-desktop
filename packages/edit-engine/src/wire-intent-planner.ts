@@ -17,7 +17,11 @@ import { electricalConnectionGrid } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import { splitRoutePieceIds } from "./split-route-ids.js";
 import { signalEndpointMembers } from "./signal-endpoint.js";
-import { evaluateWireMembers, selectWireMember } from "./wire-member-choice.js";
+import {
+  evaluateWireMembers,
+  selectWireMembers,
+  selectWireExpression,
+} from "./wire-member-choice.js";
 import {
   resolveWireIntentTarget,
   wireTargetReference,
@@ -36,6 +40,11 @@ import {
   type WireSource,
 } from "./wire-commit-planner.js";
 
+interface WireMemberSelection {
+  memberIds?: readonly string[] | undefined;
+  selectionExpression?: string | undefined;
+}
+
 export type WireIntentAnchor =
   | {
       kind: "wire-at";
@@ -46,14 +55,14 @@ export type WireIntentAnchor =
         | undefined;
     }
   | { kind: "net"; net: string }
-  | { kind: "endpoint"; endpoint: RouteEndpoint }
-  | {
+  | ({ kind: "endpoint"; endpoint: RouteEndpoint } & WireMemberSelection)
+  | ({
       kind: "route-segment";
       routeId: string;
       legId: string;
       memberId?: string | undefined;
       point: Point;
-    }
+    } & WireMemberSelection)
   | { kind: "free"; point: Point };
 
 export interface WireIntent {
@@ -242,7 +251,11 @@ export function proposeWireIntent(
   ): WireSource | string => {
     if (anchor.kind === "net") return "Unresolved Net target";
     if (anchor.kind === "endpoint") {
-      return endpointWireSource(document, resolver, anchor.endpoint);
+      return selectedSource(
+        endpointWireSource(document, resolver, anchor.endpoint),
+        anchor,
+        anchor.endpoint.memberId,
+      );
     }
     if (anchor.kind === "route-segment") {
       const route = routeFor(anchor);
@@ -269,10 +282,7 @@ export function proposeWireIntent(
         },
         resolver,
       );
-      if (!anchor.memberId) return source;
-      return source.members?.some((member) => member.id === anchor.memberId)
-        ? selectWireMember(source, anchor.memberId)
-        : `Route ${route.id} has no member ${anchor.memberId}`;
+      return selectedSource(source, anchor, anchor.memberId, true);
     }
     const netId = existingNetId ?? newNetId;
     const createNet = existingNetId === undefined && !freeAnchorCreatedNet;
@@ -284,6 +294,37 @@ export function proposeWireIntent(
       `${intent.id}-${side}-junction`,
     );
   };
+  const selectedSource = (
+    source: WireSource | string,
+    selection: WireMemberSelection,
+    memberId: string | undefined,
+    selectSingle = false,
+  ): WireSource | string => {
+    if (typeof source === "string") return source;
+    if (
+      [memberId, selection.memberIds, selection.selectionExpression].filter(
+        (value) => value !== undefined,
+      ).length > 1
+    )
+      return "Use exactly one of memberId, memberIds or selectionExpression";
+    try {
+      if (selection.memberIds !== undefined)
+        return selectWireMembers(source, selection.memberIds);
+      if (selection.selectionExpression !== undefined)
+        return selectWireExpression(
+          document,
+          source,
+          selection.selectionExpression,
+        );
+      if (selectSingle && memberId !== undefined)
+        return selectWireMembers(source, [memberId]);
+      return source;
+    } catch (error) {
+      return error instanceof Error
+        ? error.message
+        : "Invalid bus member selection";
+    }
+  };
   let from = source(intent.from, "from");
   if (typeof from === "string") return from;
   let to = source(intent.to, "to");
@@ -291,7 +332,9 @@ export function proposeWireIntent(
   const evaluated = evaluateWireMembers(document, from, to);
   if (evaluated.kind === "invalid") return evaluated.message;
   if (evaluated.kind === "choose")
-    return "Select one bus member before connecting a scalar endpoint";
+    return evaluated.choice.expectedWidth === 1
+      ? "Select one bus member before connecting a scalar endpoint"
+      : `Bus widths differ; select ${evaluated.choice.expectedWidth} ordered members before connecting`;
   from = evaluated.from;
   to = evaluated.to;
   const diagonal =

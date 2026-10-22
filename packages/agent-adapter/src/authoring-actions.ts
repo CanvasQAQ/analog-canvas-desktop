@@ -12,6 +12,7 @@ import {
 import {
   AgentSemanticIntentSchema,
   AgentWireAtAnchorSchema,
+  AgentWireMemberSelectionShape,
 } from "./schema.js";
 
 /**
@@ -95,28 +96,47 @@ const PinTargetSchema = z.strictObject({
     ),
   pin: z.string().min(1),
 });
-const ConnectTargetSchema = z.discriminatedUnion("kind", [
-  AgentWireAtAnchorSchema,
-  z.strictObject({
-    kind: z.literal("route-segment"),
-    routeId: z.string().min(1),
-    legId: z.string().min(1),
-    memberId: StableIdSchema.optional(),
-    point: PointInputSchema,
-  }),
-  PinTargetSchema.extend({ memberId: StableIdSchema.optional() }),
-  z.strictObject({ kind: z.literal("net"), net: z.string().min(1) }),
-  z.strictObject({
-    kind: z.literal("junction"),
-    junction: z.string().min(1),
-    memberId: StableIdSchema.optional(),
-  }),
-  z.strictObject({
-    kind: z.literal("point"),
-    x: z.number().int(),
-    y: z.number().int(),
-  }),
-]);
+const ConnectTargetSchema = z
+  .discriminatedUnion("kind", [
+    AgentWireAtAnchorSchema,
+    z.strictObject({
+      kind: z.literal("route-segment"),
+      routeId: z.string().min(1),
+      legId: z.string().min(1),
+      memberId: StableIdSchema.optional(),
+      ...AgentWireMemberSelectionShape,
+      point: PointInputSchema,
+    }),
+    PinTargetSchema.extend({
+      memberId: StableIdSchema.optional(),
+      ...AgentWireMemberSelectionShape,
+    }),
+    z.strictObject({ kind: z.literal("net"), net: z.string().min(1) }),
+    z.strictObject({
+      kind: z.literal("junction"),
+      junction: z.string().min(1),
+      memberId: StableIdSchema.optional(),
+      ...AgentWireMemberSelectionShape,
+    }),
+    z.strictObject({
+      kind: z.literal("point"),
+      x: z.number().int(),
+      y: z.number().int(),
+    }),
+  ])
+  .refine((target) => {
+    if (
+      target.kind !== "pin" &&
+      target.kind !== "junction" &&
+      target.kind !== "route-segment"
+    )
+      return true;
+    return (
+      [target.memberId, target.memberIds, target.selectionExpression].filter(
+        (value) => value !== undefined,
+      ).length <= 1
+    );
+  }, "Use only one of memberId, memberIds or selectionExpression");
 
 const TextInputSchema = z.union([
   z.string().min(1).max(256),

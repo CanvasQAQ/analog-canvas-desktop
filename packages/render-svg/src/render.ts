@@ -423,11 +423,15 @@ export function buildSvgScene(
         strokeColor,
         routeProfile,
       );
-      const taps = busTapMarks(route, geometry.centerline)
+      const taps = busTapMarks(document, resolver, route, geometry.centerline)
         .map((mark) => {
           const d = `M ${mark.from.x} ${mark.from.y} L ${mark.to.x} ${mark.to.y}`;
           addInk(strokeColor, routeProfile.strokes.wire, "", d);
-          return `<path data-role="bus-tap" data-route-id="${escapeXml(route.id)}" data-member-id="${escapeXml(mark.memberId)}" d="${d}" fill="none" stroke="none"/>`;
+          const members =
+            mark.memberIds.length === 1
+              ? `data-member-id="${escapeXml(mark.memberIds[0]!)}"`
+              : `data-member-ids="${escapeXml(mark.memberIds.join(" "))}"`;
+          return `<path data-role="bus-tap" data-route-id="${escapeXml(route.id)}" ${members} d="${d}" fill="none" stroke="none"/>`;
         })
         .join("");
       return `<polyline data-object-id="${escapeXml(route.id)}" data-net-id="${escapeXml(route.netId)}"${presentationAttribute} points="${pointList(geometry.centerline)}" fill="none" stroke="none"/>${directionArrow}${taps}`;

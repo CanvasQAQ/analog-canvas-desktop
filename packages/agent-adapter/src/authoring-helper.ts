@@ -1594,6 +1594,7 @@ export function directConnectIntent(
     if (target.kind === "junction")
       return {
         kind: "endpoint",
+        ...wireMemberSelection(target),
         endpoint: {
           kind: "junction",
           junctionId: target.junction,
@@ -1607,6 +1608,7 @@ export function directConnectIntent(
     )
       return {
         kind: "endpoint",
+        ...wireMemberSelection(target),
         endpoint: {
           kind: "terminal",
           instanceId: target.instance.id,
@@ -1635,6 +1637,18 @@ function connectIntent(
     ...(action.routingMode ? { routingMode: action.routingMode } : {}),
     ...(action.cornerOrder ? { cornerOrder: action.cornerOrder } : {}),
   });
+}
+
+function wireMemberSelection(target: {
+  memberIds?: string[] | undefined;
+  selectionExpression?: string | undefined;
+}) {
+  return {
+    ...(target.memberIds ? { memberIds: target.memberIds } : {}),
+    ...(target.selectionExpression !== undefined
+      ? { selectionExpression: target.selectionExpression }
+      : {}),
+  };
 }
 
 function compileConnect(
@@ -1671,6 +1685,7 @@ function compileConnect(
       requirePin(index, action.kind, instance, target.pin);
       return {
         kind: "endpoint",
+        ...wireMemberSelection(target),
         endpoint: {
           ...terminalEndpoint(instance, target.pin),
           ...(target.memberId ? { memberId: target.memberId } : {}),
@@ -1693,6 +1708,7 @@ function compileConnect(
       );
       return {
         kind: "endpoint",
+        ...wireMemberSelection(target),
         endpoint: {
           kind: "junction",
           junctionId: junction.id,

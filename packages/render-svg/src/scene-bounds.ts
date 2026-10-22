@@ -25,7 +25,7 @@ import {
 import type { ResolvedSvgAnnotation } from "./annotation-render.js";
 import { signalFlowFormulaLocalBounds } from "./signal-flow-formula.js";
 import { inductorCouplingBounds } from "./inductor-coupling-render.js";
-import { busTapMarks } from "./route-render.js";
+import { busStrokeProfile, busTapMarks } from "./route-render.js";
 
 function symbolBounds(
   definition: SymbolDefinition,
@@ -156,8 +156,17 @@ export function deriveBounds(
     for (const point of geometry.centerline) {
       bounds.push({ x: point.x, y: point.y, width: 0, height: 0 });
     }
-    const strokeRadius = objectStyleProfile(profile, route).strokes.wire / 2;
-    for (const mark of busTapMarks(route, geometry.centerline)) {
+    const strokeRadius =
+      busStrokeProfile(
+        objectStyleProfile(profile, route),
+        route.members?.length ?? 0,
+      ).strokes.wire / 2;
+    for (const mark of busTapMarks(
+      document,
+      resolver,
+      route,
+      geometry.centerline,
+    )) {
       bounds.push({
         x: Math.min(mark.from.x, mark.to.x) - strokeRadius,
         y: Math.min(mark.from.y, mark.to.y) - strokeRadius,

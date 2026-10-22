@@ -1,15 +1,197 @@
 import {
   deriveStableId,
+  foldNetName,
+  flattenRichText,
   parseSignalExpression,
   routeEndpoints,
   type SchematicDocument,
+  type RichTextDocument,
+  type Point,
 } from "@icm/model";
+import { isFreeWireAnchor, type WireSource } from "./wire-commit-planner.js";
+import {
+  createRoutingOperationPlan,
+  evaluateRoutingOperationPlan,
+} from "./routing-operation-plan.js";
+import type { EditExecutionContext } from "./transaction-result.js";
 import type { SchematicEdit } from "./edit-schema.js";
 import {
   planEnsureNamedNet,
   type EnsureNamedNetPlan,
 } from "./named-net-planner.js";
-import { resolveDocumentLogicalNets } from "@icm/derived";
+import {
+  resolveAnnotationText,
+  resolveRouteGeometry,
+  resolveRouteAttachment,
+  netLabelStandardOffset,
+  netLabelBaselineForName,
+} from "@icm/derived";
+
+/** Naming is transient until the whole Wire gesture commits. */
+export function prepareNamedWireSource(
+  source: WireSource,
+  expression: string,
+): WireSource {
+  const names = parseSignalExpression(expression);
+  if (!isFreeWireAnchor(source)) {
+    if (names.length !== (source.members?.length ?? 1))
+      throw new Error(
+        "Label expression width must match the fixed source; a scalar source cannot be widened",
+      );
+    return source;
+  }
+  const endpoint = source.endpoint;
+  if (endpoint.kind !== "junction") return source;
+  const members = names.map((name, index) => ({
+    id: deriveStableId("signal-member", endpoint.junctionId, String(index)),
+    netId:
+      index === 0 && source.netId
+        ? source.netId
+        : deriveStableId("signal-net", endpoint.junctionId, String(index)),
+    name,
+  }));
+  const {
+    members: _previous,
+    declaredScalarName: _previousName,
+    ...scalar
+  } = source;
+  return {
+    ...scalar,
+    netId: members[0]!.netId,
+    ...(names.length > 1 ? { members } : { declaredScalarName: names[0]! }),
+    preludeEdits: source.preludeEdits.map((edit) => {
+      if (
+        edit.kind !== "add_junction" ||
+        edit.junctionId !== endpoint.junctionId
+      )
+        return edit;
+      const { members: _old, ...anchor } = edit;
+      return {
+        ...anchor,
+        netId: members[0]!.netId,
+        createNet: true,
+        ...(names.length > 1
+          ? { members: members.map(({ id, netId }) => ({ id, netId })) }
+          : {}),
+      };
+    }),
+  };
+}
+
+/** Plan the Label against the completed geometry, then publish both in one transaction. */
+export function planNamedWireEdits(
+  document: SchematicDocument,
+  edits: readonly SchematicEdit[],
+  routeId: string,
+  label: {
+    name: string;
+    content: RichTextDocument;
+    sizeScale: number;
+    alignment: "start" | "middle" | "end";
+    position: Point;
+  },
+  context: EditExecutionContext,
+): SchematicEdit[] {
+  const path = edits.find(
+    (edit) => edit.kind === "set_route_path" && edit.route.id === routeId,
+  );
+  if (path?.kind !== "set_route_path")
+    throw new Error("A named Wire needs a visible route");
+  const annotationId = `net-label-${routeId}`;
+  const pending: SchematicEdit = {
+    kind: "upsert_schematic_annotation",
+    annotation: {
+      id: annotationId,
+      kind: "net-label",
+      netId: path.route.netId,
+      binding: { kind: "net-name", netId: path.route.netId },
+      anchor: {
+        kind: "route",
+        routeId,
+        legId: path.route.legs[0]!.id,
+        t: 0.5,
+        normalOffset: 10,
+        direction: "forward",
+        orientation: "horizontal",
+        fallbackPosition: label.position,
+      },
+      alignment: label.alignment,
+      rotation: 0,
+      locked: false,
+      sizeScale: label.sizeScale,
+    },
+  };
+  const authored = [...edits, pending];
+  const evaluation = evaluateRoutingOperationPlan(
+    document,
+    createRoutingOperationPlan(document, {
+      intent: "connect",
+      edits: authored,
+      diagnostics: [],
+    }),
+    context,
+  );
+  if (!evaluation.ok) throw new Error(evaluation.message);
+  const candidate = evaluation.value.finalDocument;
+  const annotation = candidate.annotations.find(
+    (item) => item.id === annotationId,
+  )!;
+  const finalRouteId =
+    annotation.anchor.kind === "route" ? annotation.anchor.routeId : routeId;
+  const route = candidate.routes.find((item) => item.id === finalRouteId);
+  if (!route) throw new Error("A named Wire needs a visible route");
+  if (!context.symbolResolver || annotation.anchor.kind !== "route")
+    throw new Error("A named Wire needs resolvable route geometry");
+  const geometry = resolveRouteGeometry(
+    candidate,
+    context.symbolResolver,
+    route,
+  );
+  const segment = geometry?.segments.find(
+    (item) =>
+      annotation.anchor.kind === "route" &&
+      item.address.legId === annotation.anchor.legId,
+  );
+  if (!geometry || !segment)
+    throw new Error("A named Wire needs resolvable route geometry");
+  const anchor = {
+    ...annotation.anchor,
+    normalOffset: netLabelStandardOffset(
+      segment.from,
+      segment.to,
+      netLabelBaselineForName(
+        label.name,
+        label.content,
+        candidate.presentation,
+        label.sizeScale,
+      ),
+    ),
+  };
+  const placement = resolveRouteAttachment(geometry, anchor);
+  if (!placement)
+    throw new Error("A named Wire needs resolvable route geometry");
+  const naming = planEnsureNamedRoute(candidate, finalRouteId, {
+    candidateNetId: route.netId,
+    name: label.name,
+    evidenceId: deriveStableId("signal-name", document.id, annotationId),
+    owner: { kind: "net-label", annotationId },
+  });
+  if (!naming.ok) throw new Error(naming.message);
+  return [
+    ...authored,
+    ...naming.edits,
+    {
+      kind: "upsert_schematic_annotation",
+      annotation: {
+        ...annotation,
+        anchor: { ...anchor, fallbackPosition: placement.labelPoint },
+        netId: naming.netId,
+        binding: { kind: "net-name", netId: naming.netId },
+        formatOverride: label.content,
+      },
+    },
+  ];
+}
 
 /** GUI and Agent Label authoring share the same electrical decision. */
 export function planEnsureNamedRoute(
@@ -21,6 +203,13 @@ export function planEnsureNamedRoute(
   if (request.owner.kind !== "net-label" || !route)
     return planEnsureNamedNet(document, request);
   const annotationId = request.owner.annotationId;
+  const binding = document.annotations.find(
+    (item) => item.id === annotationId,
+  )?.binding;
+  const selector =
+    binding?.kind === "net-name" &&
+    (binding.memberEndpoint !== undefined ||
+      binding.memberEndpoints !== undefined);
   try {
     const unchangedLiteral = document.connectivityEvidence.some(
       (evidence) =>
@@ -33,9 +222,7 @@ export function planEnsureNamedRoute(
     if (!unchangedLiteral) parseSignalExpression(request.name);
     if (
       unchangedLiteral ||
-      (!route.members &&
-        !routeEndpoints(route).some((endpoint) => endpoint.memberId) &&
-        !/[<>]/u.test(request.name))
+      (!route.members && !selector && !/[<>,]/u.test(request.name))
     )
       return planEnsureNamedNet(document, request);
     return {
@@ -69,13 +256,14 @@ function planSignalRouteName(
   if (!route) throw new Error(`Route does not exist: ${routeId}`);
   const names = parseSignalExpression(expression);
   const name = expression.trim();
+  const owner = document.annotations.find((item) => item.id === annotationId);
   if (
-    !route.members &&
-    routeEndpoints(route).some((endpoint) => endpoint.memberId)
+    owner?.binding?.kind === "net-name" &&
+    (owner.binding.memberEndpoint || owner.binding.memberEndpoints)
   ) {
     if (
-      resolveDocumentLogicalNets(document).byBaseNetId.get(route.netId)
-        ?.name === name
+      foldNetName(flattenRichText(resolveAnnotationText(document, owner))) ===
+      foldNetName(name)
     )
       return [];
     throw new Error(

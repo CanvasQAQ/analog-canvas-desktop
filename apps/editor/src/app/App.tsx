@@ -1427,6 +1427,8 @@ function WorkspaceEditor({
     setWireRoutingMode,
     setWireCornerOrder,
     completeWire,
+    editWireLabel,
+    acceptWireLabel,
     setDraftingSource,
     setDraftingHover,
     setDraftingWaypoints,
@@ -1444,6 +1446,10 @@ function WorkspaceEditor({
           steps: current.steps,
           routingMode: current.routingMode,
           cornerOrder: current.cornerOrder,
+          ...(current.label ? { label: current.label } : {}),
+          ...(current.labelEditing
+            ? { labelEditing: current.labelEditing }
+            : {}),
         }
       : {
           source: null,
@@ -1453,6 +1459,10 @@ function WorkspaceEditor({
           cornerOrder: "auto" as const,
         };
   };
+  const wireLabelEditing =
+    interactionState.kind === "wire"
+      ? interactionState.labelEditing
+      : undefined;
   // The gate, ordinary commits and interaction readers share this exact snapshot.
   const documentConnectivity = projectConnectivityIndex.documents.get(
     document.id,
@@ -2711,7 +2721,12 @@ function WorkspaceEditor({
 
   const {
     memberChoice,
+    beginWireLabelEditing,
+    commitWireLabelEditing,
+    cancelWireLabelEditing,
     chooseWireMember,
+    previewWireExpression,
+    chooseWireExpression,
     cancelMemberChoice,
     sourceForTarget,
     startWire,
@@ -2754,6 +2769,8 @@ function WorkspaceEditor({
       setWirePreview,
       setWireDraftSteps,
       completeWire,
+      editWireLabel,
+      acceptWireLabel,
       clearTransientCanvasState,
       cancelInteraction,
       setBulkDrawInstanceId,
@@ -3388,7 +3405,8 @@ function WorkspaceEditor({
       ),
       getInteractionKind: () => getCurrentInteractionState().kind,
       cancelInteraction,
-      memberChoicePending: memberChoice?.allowWhole === false,
+      memberChoicePending:
+        memberChoice?.allowWhole === false || Boolean(wireLabelEditing),
       setWireDraftSteps,
       setWireRoutingMode,
       setWireCornerOrder,
@@ -4612,11 +4630,21 @@ function WorkspaceEditor({
       selectedHighlightNetId,
       setSimulationPickMode,
       beginNetLabelEditing,
-      cancelNetLabelEditing,
+      beginWireLabelEditing,
+      cancelNetLabelEditing: wireLabelEditing
+        ? cancelWireLabelEditing
+        : cancelNetLabelEditing,
       commitInstancePropertyDraft,
       commitPendingNetLabelDraft,
       escapeTextEditing,
-      netLabelPlacement,
+      netLabelPlacement: wireLabelEditing
+        ? {
+            ...wireLabelEditing,
+            phase: "naming",
+            target: null,
+            commitAfterNaming: false,
+          }
+        : netLabelPlacement,
       textEditing,
       finishWireAtPoint,
       cancelComponentInsertFromHook,
@@ -6951,24 +6979,33 @@ function WorkspaceEditor({
           }}
           wiring={{
             viewBox,
-            netLabelPlacement: netLabelPlacement?.direction
-              ? {
-                  ...netLabelPlacement,
-                  look: netLabelDirectionText(netLabelPlacement.direction),
-                }
-              : netLabelPlacement,
+            netLabelPlacement: wireLabelEditing
+              ? { ...wireLabelEditing, phase: "naming" }
+              : netLabelPlacement?.direction
+                ? {
+                    ...netLabelPlacement,
+                    look: netLabelDirectionText(netLabelPlacement.direction),
+                  }
+                : netLabelPlacement,
             styleProfile,
-            onNetLabelTextChange: updateNetLabelPlacementText,
-            onNetLabelSubmit: commitNetLabelEditing,
+            onNetLabelTextChange: wireLabelEditing
+              ? (change) => editWireLabel({ ...wireLabelEditing, ...change })
+              : updateNetLabelPlacementText,
+            onNetLabelSubmit: wireLabelEditing
+              ? commitWireLabelEditing
+              : commitNetLabelEditing,
             onNetLabelEscape: () => {
-              cancelNetLabelEditing();
+              if (wireLabelEditing) cancelWireLabelEditing();
+              else cancelNetLabelEditing();
               paintSnapGuides([]);
             },
             flightlines: displayedFlightlines,
             onFlightlineClick: handleFlightline,
             wireDraftPreview,
-            memberChoice,
+            memberChoice: wireLabelEditing ? null : memberChoice,
             onWireMemberChoose: chooseWireMember,
+            onWireExpressionPreview: previewWireExpression,
+            onWireExpressionChoose: chooseWireExpression,
             onWireMemberCancel: cancelMemberChoice,
             wireSnapTarget:
               wireSource && wirePreviewTarget?.kind !== "free"

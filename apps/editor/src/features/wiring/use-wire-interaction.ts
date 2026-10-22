@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { segmentDragPreviewPolyline } from "./segment-drag-preview";
 import { resolveWireDraftShape } from "./wire-draft-shape";
+import { prepareNetLabelDraft } from "../text-editing/net-label-draft";
 import {
   wireDraftTargetIdsForSuffix,
   wirePassThroughContacts,
@@ -15,7 +16,10 @@ import {
 
 import {
   evaluateWireMembers,
+  prepareNamedWireSource,
+  planNamedWireEdits,
   selectWireMember,
+  selectWireExpression,
   wireMemberChoice,
   type WireMemberChoice,
   type WireDraftStep,
@@ -47,6 +51,7 @@ import { snapCoordinate } from "../../snap/engine";
 import type { Flightline } from "@icm/derived";
 import {
   routeEnd,
+  semanticTextDocument,
   type Point,
   type RouteEndpoint,
   type SchematicDocument,
@@ -57,6 +62,7 @@ import type { SymbolResolver } from "@icm/symbols";
 import {
   freeWireDraftTarget,
   type WireDraftTarget,
+  type WireLabelDraft,
 } from "../../interaction/interaction-state";
 import {
   startCanvasDragSession,
@@ -103,6 +109,8 @@ export interface CurrentWireSession {
   steps: readonly WireDraftStep[];
   routingMode: WireRoutingMode;
   cornerOrder: WireCornerOrder;
+  label?: WireLabelDraft;
+  labelEditing?: WireLabelDraft;
 }
 
 type TransactionResult = {
@@ -138,6 +146,8 @@ export interface UseWireInteractionOptions {
     setWirePreview: (target: WireDraftTarget | null) => void;
     setWireDraftSteps: (steps: WireDraftStep[]) => void;
     completeWire: () => void;
+    editWireLabel: (draft: WireLabelDraft | null) => void;
+    acceptWireLabel: (draft: WireLabelDraft, source: WireSource) => void;
     clearTransientCanvasState: () => void;
     cancelInteraction: () => void;
     setBulkDrawInstanceId: (instanceId: string | null) => void;
@@ -279,6 +289,52 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       options.resolver,
     );
 
+  const beginWireLabelEditing = (position: Point): boolean => {
+    const wire = options.readCurrentWireSession();
+    if (!wire.source) return false;
+    options.editWireLabel(
+      wire.label ?? {
+        content: semanticTextDocument("", "net-label"),
+        sizeScale: 1,
+        alignment: "start",
+        position,
+      },
+    );
+    options.setStatus(
+      "Name the Wire · Enter resumes routing · Esc discards this name edit",
+    );
+    return true;
+  };
+  const commitWireLabelEditing = (): void => {
+    const wire = options.readCurrentWireSession();
+    if (!wire.source || !wire.labelEditing) return;
+    if (wire.sourceRevision !== options.document.revision) {
+      options.cancelInteraction();
+      options.setStatus("Wire cancelled because its source revision is stale");
+      return;
+    }
+    try {
+      const prepared = prepareNetLabelDraft(
+        wire.labelEditing.content,
+        options.document.presentation,
+      );
+      const source = prepareNamedWireSource(wire.source, prepared.name);
+      options.acceptWireLabel(
+        { ...wire.labelEditing, content: prepared.content },
+        source,
+      );
+      options.setStatus("Wire name accepted · Continue routing");
+    } catch (error) {
+      options.setStatus(
+        error instanceof Error ? error.message : "Invalid Wire name",
+      );
+    }
+  };
+  const cancelWireLabelEditing = (): void => {
+    options.editWireLabel(null);
+    options.setStatus("Name edit cancelled · Continue routing");
+  };
+
   const commitResolvedWire = (
     source: WireSource,
     candidate: WireSource,
@@ -352,7 +408,26 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
             }),
           ]
         : proposal.edits;
-      const result = transactProposal(proposalFor("connect", edits), {
+      const namedEdits = wire.label
+        ? planNamedWireEdits(
+            options.document,
+            edits,
+            proposal.routeId,
+            {
+              ...wire.label,
+              ...prepareNetLabelDraft(
+                wire.label.content,
+                options.document.presentation,
+              ),
+            },
+            {
+              symbolResolver: options.resolver,
+              externalSubcircuitDefinitions:
+                options.externalSubcircuitDefinitions,
+            },
+          )
+        : edits;
+      const result = transactProposal(proposalFor("connect", namedEdits), {
         completesWireSession: true,
       });
       if (result.ok) {
@@ -379,7 +454,8 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       revision: options.document.revision,
       accept,
     });
-    if (!choice.allowWhole) options.setStatus("Choose one bus member");
+    if (!choice.allowWhole)
+      options.setStatus(`Choose ${choice.expectedWidth ?? 1} bus member(s)`);
   };
   const startWire = (candidate: WireSource, description?: string): void => {
     const selectSource = (source: WireSource) => {
@@ -401,6 +477,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       );
   };
   const commitWire = (candidate: WireSource): void => {
+    if (options.readCurrentWireSession().labelEditing) return;
     const source = options.readCurrentWireSession().source;
     if (!source) return;
     const evaluation = evaluateWireMembers(options.document, source, candidate);
@@ -432,8 +509,75 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       memberId === null
         ? pendingChoice.choice.source
         : selectWireMember(pendingChoice.choice.source, memberId);
+    if (
+      pendingChoice.choice.expectedWidth &&
+      (source.members?.length ?? 1) !== pendingChoice.choice.expectedWidth
+    ) {
+      options.setStatus(
+        `Choose ${pendingChoice.choice.expectedWidth} members to match the other endpoint`,
+      );
+      return;
+    }
     setPendingChoice(null);
     pendingChoice.accept(source);
+  };
+  const wireExpressionSelection = (expression: string): WireSource => {
+    if (
+      !pendingChoice ||
+      pendingChoice.document !== options.document ||
+      pendingChoice.revision !== options.document.revision
+    )
+      throw new Error("That member choice is stale; restart the Wire");
+    const source = selectWireExpression(
+      options.document,
+      pendingChoice.choice.source,
+      expression,
+    );
+    const width = source.members?.length ?? 1;
+    if (
+      pendingChoice.choice.expectedWidth &&
+      width !== pendingChoice.choice.expectedWidth
+    )
+      throw new Error(
+        `Select ${pendingChoice.choice.expectedWidth} members; this expression selects ${width}`,
+      );
+    return source;
+  };
+  const previewWireExpression = (
+    expression: string,
+  ): { text: string; valid: boolean } => {
+    try {
+      const source = wireExpressionSelection(expression);
+      const ids = source.members?.map((member) => member.id) ?? [
+        source.endpoint.memberId,
+      ];
+      const names = ids.map(
+        (id) =>
+          pendingChoice!.choice.options.find((option) => option.id === id)!
+            .label,
+      );
+      return {
+        text: `${names.length} member${names.length === 1 ? "" : "s"} · ${names.join(" → ")}`,
+        valid: true,
+      };
+    } catch (error) {
+      return {
+        text: error instanceof Error ? error.message : "Invalid selection",
+        valid: false,
+      };
+    }
+  };
+  const chooseWireExpression = (expression: string): void => {
+    try {
+      const source = wireExpressionSelection(expression);
+      const accept = pendingChoice!.accept;
+      setPendingChoice(null);
+      accept(source);
+    } catch (error) {
+      options.setStatus(
+        error instanceof Error ? error.message : "Invalid selection",
+      );
+    }
   };
 
   const handleWireEndpoint = (
@@ -1121,6 +1265,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
 
   const fixWirePoint = (point: Point): void => {
     const wire = options.readCurrentWireSession();
+    if (wire.labelEditing) return;
     if (!wire.source) {
       const source = sourceForTarget(freeWireDraftTarget(point))!;
       options.setWireSource(source, options.document.revision);
@@ -1150,8 +1295,13 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
   };
 
   return {
+    beginWireLabelEditing,
+    commitWireLabelEditing,
+    cancelWireLabelEditing,
     memberChoice: pendingChoice?.choice ?? null,
     chooseWireMember,
+    previewWireExpression,
+    chooseWireExpression,
     cancelMemberChoice: () => setPendingChoice(null),
     sourceForTarget,
     startWire,

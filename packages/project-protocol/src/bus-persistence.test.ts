@@ -1,6 +1,10 @@
 import { expect, it } from "vitest";
 import { createEmptyProject, createRoutePath, routeEnd } from "@icm/model";
-import { parseProject, serializeProject } from "./index.js";
+import {
+  CURRENT_PROJECT_FILE_VERSION,
+  parseProject,
+  serializeProject,
+} from "./index.js";
 
 function busProject(reversed = false, bent = false) {
   const project = createEmptyProject("bus-codec", "Bus codec");
@@ -128,61 +132,222 @@ it.each(["expression", "width", "order", "identity"])(
 
 it("requires a new file envelope for explicit member connectivity", () => {
   const source = JSON.parse(serializeProject(busProject()));
-  expect(source.schemaVersion).toBe(75);
+  expect(source.schemaVersion).toBe(CURRENT_PROJECT_FILE_VERSION);
   source.schemaVersion = 74;
   expect(() => parseProject(JSON.stringify(source))).toThrow(
     /Signal members require Project schema 75/u,
   );
 });
 
-it("keeps old bracketed Cell Pin and Net Label names scalar", () => {
-  const project = createEmptyProject("literal", "Literal names");
+it("writes ordered bundles in schema 76 and refuses them under a schema 75 envelope", () => {
+  const project = busProject();
+  const terminal = project.documents[0]!.netlist!.terminals[0]!;
+  terminal.name = "CLK,RESET,DATA<1:0>";
+  terminal.signal!.expression = terminal.name;
+  terminal.signal!.members.forEach((member, index) => {
+    member.name = ["CLK", "RESET", "DATA<1>", "DATA<0>"][index]!;
+  });
+  const saved = serializeProject(project);
+  const source = JSON.parse(saved);
+  expect(source.schemaVersion).toBe(76);
+  const reopened = parseProject(saved);
+  expect(reopened.documents[0]!.netlist!.terminals[0]!.signal!.members).toEqual(
+    terminal.signal!.members,
+  );
+  expect(serializeProject(reopened)).toBe(saved);
+  source.schemaVersion = 75;
+  expect(() => parseProject(JSON.stringify(source))).toThrow(
+    /Ordered signal expressions require Project schema 76/u,
+  );
+});
+
+it("round-trips an ordered slice selector and rejects its portable binding in older envelopes", () => {
+  const project = busProject();
   const document = project.documents[0]!;
-  document.instances.push({ id: "port", symbolId: "port", placement: null });
-  document.nets.push({
-    id: "literal-net",
-    terminals: [{ instanceId: "port", pinName: "P" }],
+  const members = ["bit-1", "bit-3"].map((id) =>
+    document.junctions[0]!.members!.find((member) => member.id === id)!,
+  );
+  document.junctions.push({
+    id: "slice-end",
+    netId: "net-1",
+    position: { x: 200, y: 100 },
+    role: "route-anchor",
+    members,
   });
-  document.netlist!.terminals.push({
-    id: "literal-port",
-    name: "DATA<3:0>",
-    netId: "literal-net",
-    direction: "input",
-    interfaceInstanceIds: ["port"],
+  const route = createRoutePath({
+    id: "slice",
+    netId: "net-1",
+    start: { kind: "junction", junctionId: "bus-end" },
+    end: { kind: "junction", junctionId: "slice-end" },
+    bends: [],
+    modes: ["manual"],
+    members: members.map((member) => ({
+      ...member,
+      id: `slice-${member.id}`,
+      startMemberId: member.id,
+      endMemberId: member.id,
+    })),
   });
+  document.routes.push(route);
+  const memberEndpoints = members.map((member) => ({
+    kind: "junction" as const,
+    junctionId: "bus-end",
+    memberId: member.id,
+  }));
   document.annotations.push({
-    id: "label",
+    id: "slice-selector",
     kind: "net-label",
-    netId: "literal-net",
-    binding: { kind: "net-name", netId: "literal-net" },
-    anchor: { kind: "free", position: { x: 0, y: 0 } },
+    netId: "net-1",
+    binding: { kind: "net-name", netId: "net-1", memberEndpoints },
+    anchor: {
+      kind: "route",
+      routeId: "slice",
+      legId: route.legs[0]!.id,
+      t: 0.25,
+      normalOffset: 10,
+      direction: "forward",
+      orientation: "horizontal",
+      fallbackPosition: { x: 100, y: 0 },
+    },
     alignment: "start",
     rotation: 0,
     locked: false,
   });
-  document.connectivityEvidence.push({
-    id: "claim",
-    kind: "name-claim",
-    netId: "literal-net",
-    name: "DATA<3:0>",
-    scope: "local",
-    owner: { kind: "net-label", annotationId: "label" },
+  const saved = serializeProject(project);
+  const reopened = parseProject(saved);
+  expect(reopened.documents[0]!.annotations[0]!.binding).toEqual({
+    kind: "net-name",
+    netId: "net-1",
+    memberEndpoints,
   });
-  const source = JSON.parse(serializeProject(project));
+  expect(
+    reopened.documents[0]!.routes.find(
+      (item) => item.id === "slice",
+    )!.members!.map((member) => member.netId),
+  ).toEqual(["net-1", "net-3"]);
+  expect(serializeProject(reopened)).toBe(saved);
+  const source = JSON.parse(saved);
+  source.schemaVersion = 75;
+  expect(() => parseProject(JSON.stringify(source))).toThrow(
+    /Slice selectors require Project schema 76/u,
+  );
   source.schemaVersion = 74;
-  const reopened = parseProject(JSON.stringify(source)).documents[0]!;
-  expect(reopened.nets).toHaveLength(1);
-  expect(reopened.netlist!.terminals[0]!.signal).toBeUndefined();
-  expect(reopened.netlist!.terminals[0]!.name).toBe("DATA<3:0>");
-  expect(reopened.connectivityEvidence[0]).toMatchObject({ name: "DATA<3:0>" });
-  expect(reopened.connectivityEvidence[0]).not.toHaveProperty("signal");
+  expect(() => parseProject(JSON.stringify(source))).toThrow(
+    /Signal members require Project schema 75/u,
+  );
 });
+
+it("loads schema 75 ranges without changing their stable members", () => {
+  const project = busProject();
+  const source = JSON.parse(serializeProject(project));
+  source.schemaVersion = 75;
+  const reopened = parseProject(JSON.stringify(source));
+  expect(reopened.documents[0]!.netlist!.terminals).toEqual(
+    project.documents[0]!.netlist!.terminals,
+  );
+  expect(reopened.documents[0]!.routes).toEqual(project.documents[0]!.routes);
+});
+
+it.each(["DATA<3:0>", "CLK,RESET"])(
+  "keeps old Cell Pin and Net Label name %s scalar",
+  (name) => {
+    const project = createEmptyProject("literal", "Literal names");
+    const document = project.documents[0]!;
+    document.instances.push({ id: "port", symbolId: "port", placement: null });
+    document.nets.push({
+      id: "literal-net",
+      terminals: [{ instanceId: "port", pinName: "P" }],
+    });
+    document.netlist!.terminals.push({
+      id: "literal-port",
+      name,
+      netId: "literal-net",
+      direction: "input",
+      interfaceInstanceIds: ["port"],
+    });
+    document.annotations.push({
+      id: "label",
+      kind: "net-label",
+      netId: "literal-net",
+      binding: { kind: "net-name", netId: "literal-net" },
+      anchor: { kind: "free", position: { x: 0, y: 0 } },
+      alignment: "start",
+      rotation: 0,
+      locked: false,
+    });
+    document.connectivityEvidence.push({
+      id: "claim",
+      kind: "name-claim",
+      netId: "literal-net",
+      name,
+      scope: "local",
+      owner: { kind: "net-label", annotationId: "label" },
+    });
+    const source = JSON.parse(serializeProject(project));
+    source.schemaVersion = 74;
+    const reopened = parseProject(JSON.stringify(source)).documents[0]!;
+    expect(reopened.nets).toHaveLength(1);
+    expect(reopened.netlist!.terminals[0]!.signal).toBeUndefined();
+    expect(reopened.netlist!.terminals[0]!.name).toBe(name);
+    expect(reopened.connectivityEvidence[0]).toMatchObject({ name });
+    expect(reopened.connectivityEvidence[0]).not.toHaveProperty("signal");
+  },
+);
+
+it.each(["terminal", "name claim"])(
+  "requires schema 76 for an ordered list on a %s",
+  (owner) => {
+    const project = busProject();
+    const document = project.documents[0]!;
+    const expression = "DATA<3,2,1,0>";
+    if (owner === "terminal") {
+      document.netlist!.terminals[0]!.name = expression;
+      document.netlist!.terminals[0]!.signal!.expression = expression;
+    } else {
+      document.annotations.push({
+        id: "named-bus",
+        kind: "net-label",
+        netId: "net-3",
+        binding: { kind: "net-name", netId: "net-3" },
+        anchor: { kind: "free", position: { x: 50, y: -10 } },
+        alignment: "start",
+        rotation: 0,
+        locked: false,
+      });
+      document.connectivityEvidence.push({
+        id: "bus-claim",
+        kind: "name-claim",
+        netId: "net-3",
+        name: expression,
+        scope: "local",
+        owner: { kind: "net-label", annotationId: "named-bus" },
+        signal: {
+          expression,
+          members: document.routes[0]!.members!.map((member, index) => ({
+            id: member.id,
+            netId: member.netId,
+            name: ["DATA<3>", "DATA<2>", "DATA<1>", "DATA<0>"][index]!,
+          })),
+        },
+      });
+    }
+    const saved = serializeProject(project);
+    expect(serializeProject(parseProject(saved))).toBe(saved);
+    const source = JSON.parse(saved);
+    source.schemaVersion = 75;
+    expect(() => parseProject(JSON.stringify(source))).toThrow(
+      /Ordered signal expressions require Project schema 76/u,
+    );
+  },
+);
 
 it.each([
   "route endpoint",
   "contact endpoint",
   "symbol pin",
   "selector binding",
+  "portable selector binding",
+  "portable slice binding",
 ])("rejects isolated new metadata in an old envelope: %s", (location) => {
   const source = JSON.parse(serializeProject(createEmptyProject("old", "Old")));
   source.schemaVersion = 74;
@@ -208,6 +373,21 @@ it.each([
             junctionId: "junction",
             memberId: "bit",
           },
+        },
+      },
+    ];
+  if (
+    location === "portable selector binding" ||
+    location === "portable slice binding"
+  )
+    document.annotations = [
+      {
+        bind: {
+          kind: "net-name",
+          netId: "net",
+          [location === "portable selector binding"
+            ? "memberEndpoint"
+            : "memberEndpoints"]: [],
         },
       },
     ];

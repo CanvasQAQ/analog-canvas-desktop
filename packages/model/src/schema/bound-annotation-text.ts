@@ -33,6 +33,7 @@ interface BoundAnnotationLike {
         terminalId?: string | undefined;
         netId?: string | undefined;
         memberEndpoint?: unknown;
+        memberEndpoints?: unknown;
       }
     | undefined;
 }
@@ -74,7 +75,7 @@ export function boundAnnotationName(
   if (binding.kind !== "net-name") return null;
   // A selector may read a caller's formal interface through a Symbol Resolver.
   // Its renderer accepts a format only while it still presents that live name.
-  if (binding.memberEndpoint) return null;
+  if (binding.memberEndpoint || binding.memberEndpoints) return null;
 
   // Pre-parse callers reach this before schema defaults are applied, so the
   // arrays this reads may legitimately be absent rather than empty.

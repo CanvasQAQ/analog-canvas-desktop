@@ -317,7 +317,7 @@ export function resolveWireDraftPreview({
       message:
         evaluation.kind === "invalid"
           ? evaluation.message
-          : "Choose one bus member",
+          : `Choose ${evaluation.choice.expectedWidth ?? 1} bus member(s)`,
     };
   const contacts = wirePassThroughContacts(visibleEndpoints, {
     from: source,

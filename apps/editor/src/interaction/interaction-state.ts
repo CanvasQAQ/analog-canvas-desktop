@@ -114,6 +114,13 @@ function sameWireTarget(
 
 export type InteractionMode = InteractionState<unknown>["kind"];
 
+export interface WireLabelDraft {
+  content: RichTextDocument;
+  sizeScale: number;
+  alignment: "start" | "middle" | "end";
+  position: Point;
+}
+
 export interface PendingComponentPlacement {
   capture?: import("../features/user-components/component-placement").PendingCircuitCapture;
   componentDefinition?: ComponentDefinition;
@@ -211,6 +218,8 @@ export type InteractionState<TClipboard = never> =
       steps: WireDraftStep[];
       routingMode: WireRoutingMode;
       cornerOrder: WireCornerOrder;
+      label?: WireLabelDraft;
+      labelEditing?: WireLabelDraft;
     }
   | {
       kind: "drawing";
@@ -256,6 +265,8 @@ export type InteractionAction<TClipboard = never> =
   | { type: "set-wire-routing-mode"; mode: WireRoutingMode }
   | { type: "set-wire-corner-order"; cornerOrder: WireCornerOrder }
   | { type: "complete-wire" }
+  | { type: "edit-wire-label"; draft: WireLabelDraft | null }
+  | { type: "accept-wire-label"; draft: WireLabelDraft; source: WireSource }
   | { type: "set-drawing-source"; point: Point | null }
   | { type: "set-drawing-hover"; point: Point | null }
   | { type: "set-drawing-waypoints"; update: SetStateAction<Point[]> }
@@ -478,6 +489,7 @@ export function interactionReducer<TClipboard>(
         : state;
     case "set-wire-preview":
       return state.kind === "wire" &&
+        !state.labelEditing &&
         !sameWireTarget(state.preview, action.target)
         ? { ...state, preview: action.target }
         : state;
@@ -519,6 +531,16 @@ export function interactionReducer<TClipboard>(
             cornerOrder: state.cornerOrder,
           }
         : state;
+    case "edit-wire-label": {
+      if (state.kind !== "wire") return state;
+      const { labelEditing: _editing, ...wire } = state;
+      return action.draft ? { ...wire, labelEditing: action.draft } : wire;
+    }
+    case "accept-wire-label": {
+      if (state.kind !== "wire") return state;
+      const { labelEditing: _editing, ...wire } = state;
+      return { ...wire, label: action.draft, source: action.source };
+    }
     case "set-drawing-source":
       return state.kind === "drawing"
         ? { ...state, source: action.point }
@@ -664,6 +686,10 @@ export function useInteractionState<TClipboard>() {
     setWireCornerOrder: (cornerOrder: WireCornerOrder) =>
       dispatch({ type: "set-wire-corner-order", cornerOrder }),
     completeWire: () => dispatch({ type: "complete-wire" }),
+    editWireLabel: (draft: WireLabelDraft | null) =>
+      dispatch({ type: "edit-wire-label", draft }),
+    acceptWireLabel: (draft: WireLabelDraft, source: WireSource) =>
+      dispatch({ type: "accept-wire-label", draft, source }),
     setDraftingSource: (point: Point | null) =>
       dispatch({ type: "set-drawing-source", point }),
     setDraftingHover: (point: Point | null) =>

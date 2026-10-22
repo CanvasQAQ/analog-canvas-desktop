@@ -1,4 +1,5 @@
-import type { SchematicDocument } from "@icm/model";
+import { routeElectricalConnections, type SchematicDocument } from "@icm/model";
+import { endpointKey } from "@icm/derived";
 import type { SymbolResolver } from "@icm/symbols";
 
 import { resolveRouteEditPath } from "./route-operations.js";
@@ -306,6 +307,24 @@ export function remapNetLabelsAfterSplit(
         1,
       ),
     };
+    const binding = annotation.binding;
+    if (
+      binding?.kind === "net-name" &&
+      (binding.memberEndpoint || binding.memberEndpoints)
+    ) {
+      const edges = routeElectricalConnections(closest.route);
+      const selected = binding.memberEndpoints ?? [binding.memberEndpoint!];
+      const remapped = selected.map((endpoint, index) => {
+        const edge = edges[index]!;
+        return (
+          edge.endpoints.find(
+            (candidate) => endpointKey(candidate) === endpointKey(endpoint),
+          ) ?? edge.endpoints[0]
+        );
+      });
+      if (binding.memberEndpoints) binding.memberEndpoints = remapped;
+      else binding.memberEndpoint = remapped[0]!;
+    }
     changedObjectIds.add(annotation.id);
   }
 }
