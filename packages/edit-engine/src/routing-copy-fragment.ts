@@ -4,7 +4,7 @@ import {
   type RoutingAffectedClosure,
   type RoutingSelectionSeed,
 } from "@icm/derived";
-import type { SchematicDocument } from "@icm/model";
+import { routeElectricalConnections, type SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import { withPowerMarkerOwnership } from "./power-marker-ownership.js";
 
@@ -56,13 +56,20 @@ export function captureRoutingCopyFragment(
         : affected.internalJunctions.some((id) =>
               document.junctions.some(
                 (j) =>
-                  j.id === id && j.netId === net.id && j.styleOverride?.color,
+                  j.id === id &&
+                  (j.members?.some((member) => member.netId === net.id) ??
+                    j.netId === net.id) &&
+                  j.styleOverride?.color,
               ),
             ) ||
-            affected.internalRoutes.some(
-              (routeId) =>
-                document.routes.find((route) => route.id === routeId)?.netId ===
-                net.id,
+            affected.internalRoutes.some((routeId) =>
+              document.routes.some(
+                (route) =>
+                  route.id === routeId &&
+                  routeElectricalConnections(route).some(
+                    (connection) => connection.netId === net.id,
+                  ),
+              ),
             )
           ? [net.id]
           : [],
@@ -71,7 +78,9 @@ export function captureRoutingCopyFragment(
   const ownerNetIds = stable([
     ...(document.netlist?.terminals.flatMap((terminal) =>
       terminal.interfaceInstanceIds.some((id) => selectedInstances.has(id))
-        ? [terminal.netId]
+        ? (terminal.signal?.members.map((member) => member.netId) ?? [
+            terminal.netId,
+          ])
         : [],
     ) ?? []),
     ...document.connectivityEvidence.flatMap((evidence) => {
@@ -80,13 +89,21 @@ export function captureRoutingCopyFragment(
         evidence.owner.kind === "power-marker" &&
         selectedInstances.has(evidence.owner.objectId)
       ) {
-        return [evidence.netId];
+        return (
+          evidence.signal?.members.map((member) => member.netId) ?? [
+            evidence.netId,
+          ]
+        );
       }
       if (
         evidence.owner.kind === "net-label" &&
         selectedAnnotations.has(evidence.owner.annotationId)
       ) {
-        return [evidence.netId];
+        return (
+          evidence.signal?.members.map((member) => member.netId) ?? [
+            evidence.netId,
+          ]
+        );
       }
       return [];
     }),

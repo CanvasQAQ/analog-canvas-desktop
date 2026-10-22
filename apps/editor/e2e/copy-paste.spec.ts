@@ -8,14 +8,238 @@ import {
   expectStatus,
   setComponentCodeField,
   expectRecovered,
+  openProject,
 } from "./editor-fixtures";
-import type { SchematicDocument } from "@icm/model";
+import type { CircuitProject, SchematicDocument } from "@icm/model";
+import { serializeProject } from "@icm/project-protocol";
+import { busReuseProject } from "./bus-reuse-fixtures";
 import { expect, test } from "@playwright/test";
 import {
   placeComponent,
   openSelectionShelf,
 } from "./manual-editor-fixtures.js";
 import { centre, copySelectionAt, drawWire } from "./canvas-fixtures.js";
+
+const documentsWithoutRevision = (project: CircuitProject) =>
+  project.documents.map((document) => ({ ...document, revision: 0 }));
+
+test("moves and copies converted bus groups across tabs with member bindings, history and recovery", async ({
+  page,
+}) => {
+  await openProject(page, serializeProject(busReuseProject()));
+  const original: CircuitProject = await exportedProject(page);
+  const originalTop = original.documents.find((cell) => cell.id === "top")!;
+  const canvas = page.getByTestId("schematic-canvas");
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  const start = centre((await page.getByTestId("hit-X1").boundingBox())!);
+  await page.mouse.move(start.x, start.y);
+  await page.keyboard.press("m");
+  await page.keyboard.down("Alt");
+  await page.mouse.move(start.x + 70, start.y + 40, { steps: 3 });
+  await page.mouse.click(start.x + 70, start.y + 40);
+  await page.keyboard.up("Alt");
+  const moved: CircuitProject = await exportedProject(page);
+  const movedTop = moved.documents.find((cell) => cell.id === "top")!;
+  const first = movedTop.instances.find((instance) => instance.id === "X1")!
+    .placement!.position;
+  const delta = { x: first.x - 400, y: first.y - 200 };
+  expect(Math.hypot(delta.x, delta.y)).toBeGreaterThan(0);
+  for (const instance of originalTop.instances) {
+    expect(
+      movedTop.instances.find((item) => item.id === instance.id)!.placement!
+        .position,
+    ).toEqual({
+      x: instance.placement!.position.x + delta.x,
+      y: instance.placement!.position.y + delta.y,
+    });
+  }
+  for (const junction of originalTop.junctions)
+    expect(
+      movedTop.junctions.find((item) => item.id === junction.id)!.position,
+    ).toEqual({
+      x: junction.position.x + delta.x,
+      y: junction.position.y + delta.y,
+    });
+  expect(movedTop.nets).toEqual(originalTop.nets);
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(documentsWithoutRevision(await exportedProject(page))).toEqual(
+    documentsWithoutRevision(original),
+  );
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("c");
+  await canvas.hover({ position: { x: 380, y: 280 } });
+  const ghost = page.getByTestId("copy-placement-preview");
+  await expect(ghost).toBeVisible();
+  await page.keyboard.press("r");
+  await page.keyboard.press("Shift+r");
+  await page
+    .getByRole("button", { name: "New project tab", exact: true })
+    .click();
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await canvas.hover({ position: { x: 380, y: 280 } });
+  await expect(ghost).toBeVisible();
+  const blank: CircuitProject = await exportedProject(page);
+  await page.keyboard.press("Escape");
+  expect((await exportedProject(page)).documents).toEqual(blank.documents);
+  await page.keyboard.press("v");
+  await canvas.hover({ position: { x: 380, y: 280 } });
+  await expect(ghost).toBeVisible();
+  await page.keyboard.press("r");
+  await page.keyboard.press("Shift+r");
+  await canvas.click({ position: { x: 400, y: 300 } });
+  await page.keyboard.press("Escape");
+  const copied: CircuitProject = await exportedProject(page);
+  const target = copied.documents.find(
+    (cell) => cell.id === copied.topDocumentId,
+  )!;
+  const child = copied.documents.find(
+    (cell) => cell.id !== copied.topDocumentId,
+  )!;
+  expect(target.instances).toHaveLength(2);
+  const copiedPositions = target.instances.map(
+    (instance) => instance.placement!.position,
+  );
+  expect({
+    x: copiedPositions[1]!.x - copiedPositions[0]!.x,
+    y: copiedPositions[1]!.y - copiedPositions[0]!.y,
+  }).toEqual({ x: 200, y: 250 });
+  expect(copied.documents).toHaveLength(2);
+  expect(child.netlist!.terminals[0]!.signal!.expression).toBe("IN<1:0>");
+  expect(
+    child.netlist!.terminals[0]!.signal!.members.map((member) => member.id),
+  ).not.toEqual(
+    original.documents
+      .find((cell) => cell.id === "child")!
+      .netlist!.terminals[0]!.signal!.members.map((member) => member.id),
+  );
+  const claim = target.connectivityEvidence.find(
+    (item) =>
+      item.kind === "name-claim" && item.signal?.expression === "DATA<1:0>",
+  )!;
+  expect(claim.kind).toBe("name-claim");
+  if (claim.kind !== "name-claim" || claim.owner.kind !== "net-label")
+    throw new Error("Copied naming owner missing");
+  const labelId = claim.owner.annotationId;
+  const label = target.annotations.find((item) => item.id === labelId)!;
+  expect(label.formatOverride).toEqual(
+    movedTop.annotations.find((item) => item.id === "label")!.formatOverride,
+  );
+  expect(label.sizeScale).toBe(1.25);
+  expect(
+    target.annotations.some(
+      (item) =>
+        item.binding?.kind === "net-name" && item.binding.memberEndpoint,
+    ),
+  ).toBe(true);
+  expect(target.routes.filter((route) => route.members).length).toBe(
+    movedTop.routes.filter((route) => route.members).length,
+  );
+  expect(
+    target.nets.every((net) => !movedTop.nets.some((old) => old.id === net.id)),
+  ).toBe(true);
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+z");
+  expect(documentsWithoutRevision(await exportedProject(page))).toEqual(
+    documentsWithoutRevision(blank),
+  );
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  const restored: CircuitProject = await exportedProject(page);
+  expect(documentsWithoutRevision(restored)).toEqual(
+    documentsWithoutRevision(copied),
+  );
+  await expectRecovered(
+    page,
+    `"revision": ${restored.documents.find((cell) => cell.id === restored.topDocumentId)!.revision}`,
+  );
+  await page.reload();
+  await awaitEditorReady(page);
+  expect(documentsWithoutRevision(await exportedProject(page))).toEqual(
+    documentsWithoutRevision(copied),
+  );
+  await openProject(page, serializeProject(restored));
+  expect((await exportedProject(page)).documents).toEqual(restored.documents);
+});
+
+test("keeps a captured bus snapshot after source rename and reuses its child on repeated cross-tab paste", async ({
+  page,
+}) => {
+  await openProject(page, serializeProject(busReuseProject()));
+  const canvas = page.getByTestId("schematic-canvas");
+  await canvas.focus();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("c");
+  await canvas.hover({ position: { x: 380, y: 280 } });
+  await expect(page.getByTestId("copy-placement-preview")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.getByTestId("annotation-hit-label").dblclick();
+  await page
+    .getByRole("textbox", { name: "Canvas text editor" })
+    .fill("RENAMED<1:0>");
+  await page.getByRole("button", { name: "Apply text changes" }).click();
+  const migration = page.getByRole("dialog", { name: "Update bus Label" });
+  await migration
+    .getByLabel("Map DATA<1>", { exact: true })
+    .selectOption({ label: "RENAMED<1>" });
+  await migration
+    .getByLabel("Map DATA<0>", { exact: true })
+    .selectOption({ label: "RENAMED<0>" });
+  await migration.getByRole("button", { name: "Apply", exact: true }).click();
+  await expect(
+    migration,
+    (await page.getByTestId("status").textContent()) ??
+      "Label migration status",
+  ).toBeHidden();
+  const renamed: CircuitProject = await exportedProject(page);
+  expect(
+    renamed.documents[0]!.connectivityEvidence.some(
+      (item) => item.kind === "name-claim" && item.name === "RENAMED<1:0>",
+    ),
+  ).toBe(true);
+
+  await page
+    .getByRole("button", { name: "New project tab", exact: true })
+    .click();
+  for (const point of [
+    { x: 260, y: 240 },
+    { x: 620, y: 480 },
+  ]) {
+    await canvas.focus();
+    await page.keyboard.press("v");
+    await canvas.hover({ position: { x: 380, y: 280 } });
+    await expect(page.getByTestId("copy-placement-preview")).toBeVisible();
+    await canvas.click({ position: point });
+    await page.keyboard.press("Escape");
+  }
+  const copied: CircuitProject = await exportedProject(page);
+  const top = copied.documents.find(
+    (cell) => cell.id === copied.topDocumentId,
+  )!;
+  expect(copied.documents).toHaveLength(2);
+  expect(top.instances).toHaveLength(4);
+  expect(
+    top.connectivityEvidence
+      .filter((item) => item.kind === "name-claim")
+      .map((item) => item.kind === "name-claim" && item.name),
+  ).toEqual(["DATA<1:0>", "DATA<1:0>"]);
+  const childIds = top.instances
+    .map((instance) => instance.netlist?.binding)
+    .map(
+      (binding) => binding?.kind === "subcircuit" && binding.childDocumentId,
+    );
+  expect(new Set(childIds).size).toBe(1);
+  const firstMembers = top.routes
+    .filter((route) => route.members)
+    .map((route) => route.members![0]!.id);
+  expect(new Set(firstMembers).size).toBe(firstMembers.length);
+  await page.getByRole("tab", { name: /Bus reuse source$/ }).click();
+  expect((await exportedProject(page)).documents).toEqual(renamed.documents);
+});
 
 test("connects copied multi-pin groups through a manually bent wire", async ({
   page,

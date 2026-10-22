@@ -99,12 +99,13 @@ export function createPropertyEditPlanner({
           ? { conversion: { expression: name, preview } }
           : { migration: preview(name) }),
         apply: (memberMap, expression) => {
+          const nextName = convertLegacy ? (expression ?? name) : name;
           const plan = planEnsureNamedRoute(
             document,
             routeId,
             {
               candidateNetId: claim.netId,
-              name: convertLegacy ? (expression ?? name) : name,
+              name: nextName,
               evidenceId: claim.id,
               owner: claim.owner,
             },
@@ -126,6 +127,16 @@ export function createPropertyEditPlanner({
                     kind: "upsert_schematic_annotation" as const,
                     annotation: {
                       ...presentationAnnotation,
+                      ...(presentationAnnotation.formatOverride
+                        ? {
+                            formatOverride: renamedLabelFormat(
+                              presentationAnnotation,
+                              claim.name,
+                              nextName,
+                              document.presentation,
+                            ),
+                          }
+                        : {}),
                       netId: plan.netId,
                       binding: { kind: "net-name" as const, netId: plan.netId },
                     },

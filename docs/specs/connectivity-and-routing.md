@@ -79,8 +79,7 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   SVG, PNG and PDF share this geometry and exclude editing controls.
 - Unknown members, unequal widths and malformed expressions refuse atomically.
   Fixed scalar sources cannot acquire vector or bundle width from a Label.
-  Bus group copy and member NoConnect authoring are refused without changing
-  the circuit.
+  Member NoConnect authoring is refused without changing the circuit.
 - Editing a bus source Pin or Label, or a connected scalar Pin, previews the affected interface and member
   mapping. Matching names retain stable identity; other renames and removed
   members require an explicit target or disconnect. Reordering follows identity,
@@ -172,6 +171,14 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   boundary pins open). Selected Pins, markers and labels rejoin only by
   `name + scope`; names owned by unselected objects, Bulk overrides and No
   Connects never travel; a whole Cell takes its names, No Connects and testbench.
+  Bus members follow their stored identities and ordered mappings. New local
+  contacts receive fresh identities; callers of a reused Cell retain its formal
+  identities. Imported Cells, captured caller artwork, selector bindings and
+  naming claims travel together. Explicitly copied boundary wires terminate on
+  independent local anchors. Names, scope and authored formatting stay intact.
+  A selector whose naming owner stays behind retains its captured display as
+  a presentation fallback; a live name takes precedence, and the fallback
+  creates no naming claim or logical connection.
   No labels are synthesized; provenance travels but never rejoins.
 - Delete is one graph operation: Route geometry dominates incidental Junction
   dots; Junction-only deletion owns its arms; orphans and unreferenced local
