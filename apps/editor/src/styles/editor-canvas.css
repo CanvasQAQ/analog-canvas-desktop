@@ -1058,6 +1058,20 @@
   font-size: var(--icm-font-xs);
 }
 
+.signal-expression-preview {
+  box-sizing: border-box;
+  max-height: 48px;
+  overflow: auto;
+  padding: 0.35rem 0.55rem;
+  background: var(--icm-panel, #fff);
+  color: var(--icm-text);
+  font-size: var(--icm-font-xs);
+}
+
+.signal-expression-preview[role="alert"] {
+  color: var(--icm-danger, #b42318);
+}
+
 .rich-text-formula-mathfield math-field {
   box-sizing: border-box;
   width: 100%;
@@ -1350,4 +1364,40 @@
 .placement-tray-entry button:last-child {
   width: auto;
   white-space: nowrap;
+}
+
+.wire-member-choice {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--icm-border);
+  border-radius: 6px;
+  background: var(--icm-surface);
+  color: var(--icm-text);
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
+}
+.wire-member-choice label {
+  display: grid;
+  gap: 4px;
+}
+.wire-member-choice select {
+  width: 100%;
+}
+.wire-member-choice button {
+  justify-self: end;
+}
+.wire-preview[data-blocked] {
+  stroke: var(--icm-danger, #b34336);
+  stroke-dasharray: 5 4;
+}
+.wire-preview[data-bus-width] {
+  stroke-width: 3;
+}
+.wire-connection-preview {
+  font:
+    11px system-ui,
+    sans-serif;
+  fill: var(--icm-text);
 }

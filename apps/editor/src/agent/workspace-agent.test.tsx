@@ -180,11 +180,11 @@ async function settle(until: () => void) {
 }
 
 function deferredRuntime() {
-  let release!: () => void;
+  let release!: () => Promise<void>;
   vi.mocked(loadAgentRuntime).mockImplementationOnce(
     () =>
       new Promise<AgentRuntime>((resolve) => {
-        release = () => void realRuntime().then(resolve);
+        release = async () => resolve(await realRuntime());
       }),
   );
   return () => release();
@@ -211,7 +211,7 @@ describe("workspace Agent provider (#1673)", () => {
       pendingOperation: "creating",
     });
     expect(loadAgentRuntime).toHaveBeenCalledOnce();
-    release();
+    await act(release);
     await settle(() => expect(seen.session!.claimCode).toBe("CLAIM-1"));
     expect(sessionCreations).toBe(1);
     expect(seen.session!.status).not.toBe("idle");
@@ -250,7 +250,7 @@ describe("workspace Agent provider (#1673)", () => {
       status: "idle",
       pendingOperation: null,
     });
-    release();
+    await act(release);
     await settle(() => expect(seen.session!.status).toBe("idle"));
     expect(sessionCreations).toBe(0);
   });

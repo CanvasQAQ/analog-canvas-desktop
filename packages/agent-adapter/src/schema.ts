@@ -17,6 +17,8 @@ import {
   PresentationIntentSchema,
   GridRectSchema,
   RouteEndpointSchema,
+  RouteBranchSchema,
+  JunctionSchema,
   RouteLegSchema,
   RoutePresentationSchema,
   RouteStyleOverrideSchema,
@@ -27,6 +29,7 @@ import {
   SignalFlowParametersSchema,
   ExternalSubcircuitDefinitionSchema,
   CellNetlistInterfaceSchema,
+  CellNetlistTerminalSchema,
   MosBulkDefaultsSchema,
   ProjectSimulationFolderSchema,
   SimulationCircuitBindingSchema,
@@ -162,12 +165,7 @@ export const AgentWireAtAnchorSchema = z
     kind: z.literal("wire-at"),
     point: PointSchema,
     net: z.string().min(1).optional(),
-    member: z
-      .strictObject({
-        instanceId: StableIdSchema,
-        pinName: z.string().min(1),
-      })
-      .optional(),
+    member: TerminalRefSchema.optional(),
   })
   .describe(
     "Resolve a tap on the current draft, including earlier wires. Optional net or member restricts the intended Net; a tap joining a different crossing Net is rejected.",
@@ -187,6 +185,7 @@ const AgentWireIntentAnchorSchema = z.discriminatedUnion("kind", [
     kind: z.literal("route-segment"),
     routeId: StableIdSchema,
     legId: StableIdSchema,
+    memberId: StableIdSchema.optional(),
     point: PointSchema,
   }),
   z.strictObject({ kind: z.literal("free"), point: PointSchema }),
@@ -433,6 +432,17 @@ const AgentSnapshotLogicalNetIdSchema = StableIdSchema.describe(
 
 const AgentSnapshotPinSchema = z.strictObject({
   name: z.string().min(1),
+  members: z
+    .array(
+      z.strictObject({
+        id: StableIdSchema,
+        name: z.string().min(1),
+        netId: AgentSnapshotLogicalNetIdSchema.nullable(),
+      }),
+    )
+    .min(1)
+    .max(256)
+    .optional(),
   role: z.string().min(1).nullable(),
   direction: z.enum(["north", "east", "south", "west"]).nullable(),
   visibility: z.enum(["visible", "implicit", "conditional", "unknown"]),
@@ -551,18 +561,14 @@ const AgentSnapshotNetSchema = z.strictObject({
   name: z.string().min(1).nullable(),
   scope: z.enum(["local", "global"]),
   powerDomain: NetPowerDomainSchema,
-  terminals: z.array(
-    z.strictObject({
-      instanceId: StableIdSchema,
-      pinName: z.string().min(1),
-    }),
-  ),
+  terminals: z.array(TerminalRefSchema),
   routeIds: z.array(StableIdSchema),
   junctionIds: z.array(StableIdSchema),
 });
 
 const AgentSnapshotRouteSchema = z.strictObject({
   id: StableIdSchema,
+  members: RouteBranchSchema.shape.members,
   netId: AgentSnapshotLogicalNetIdSchema,
   start: RouteEndpointSchema,
   legs: z.array(RouteLegSchema).min(1),
@@ -573,6 +579,7 @@ const AgentSnapshotRouteSchema = z.strictObject({
 
 const AgentSnapshotJunctionSchema = z.strictObject({
   id: StableIdSchema,
+  members: JunctionSchema.shape.members,
   netId: AgentSnapshotLogicalNetIdSchema,
   position: PointSchema,
   role: JunctionRoleSchema.optional(),
@@ -629,16 +636,7 @@ export const AgentSnapshotDocumentSchema = z.strictObject({
   cellInterface: z
     .strictObject({
       name: z.string().min(1),
-      terminals: z.array(
-        z.strictObject({
-          id: StableIdSchema,
-          name: z.string().min(1),
-          netId: StableIdSchema,
-          direction: z.enum(["input", "output", "inout", "passive"]),
-          interfaceInstanceIds: z.array(StableIdSchema).max(1),
-          interfaceAnnotationId: StableIdSchema.optional(),
-        }),
-      ),
+      terminals: z.array(CellNetlistTerminalSchema),
     })
     .nullable(),
   instances: z.array(AgentSnapshotInstanceSchema),
@@ -874,6 +872,7 @@ export const AgentGeometryObjectSchema = z.discriminatedUnion("kind", [
     kind: z.literal("route"),
     id: StableIdSchema,
     netId: StableIdSchema,
+    members: RouteBranchSchema.shape.members,
     start: RouteEndpointSchema,
     legs: z.array(RouteLegSchema),
     presentation: RoutePresentationSchema.optional(),
@@ -882,6 +881,7 @@ export const AgentGeometryObjectSchema = z.discriminatedUnion("kind", [
     kind: z.literal("junction"),
     id: StableIdSchema,
     netId: StableIdSchema,
+    members: JunctionSchema.shape.members,
     position: PointSchema,
   }),
   z.strictObject({

@@ -43,6 +43,11 @@ const SymbolPinRoutingSchema = z.strictObject({
 
 export const SymbolPinSchema = z.strictObject({
   name: z.string().min(1),
+  signalMembers: z
+    .array(z.strictObject({ id: StableIdSchema, name: z.string().min(1) }))
+    .min(2)
+    .max(256)
+    .optional(),
   role: z.string().min(1),
   at: SymbolLocalPointSchema,
   direction: z.enum(["north", "east", "south", "west"]),

@@ -405,6 +405,8 @@ export function copySelection(
       (endpoint) => endpoint.instanceId !== instance.id,
     );
     terminal.netId = netId;
+    if (terminal.signal?.members.length === 1)
+      terminal.signal.members[0]!.netId = netId;
     for (const annotation of clipboard.annotations) {
       if (
         annotation.anchor.kind !== "object" ||

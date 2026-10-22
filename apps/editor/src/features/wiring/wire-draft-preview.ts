@@ -1,5 +1,8 @@
-import { endpointKey } from "@icm/derived";
+import { endpointKey, resolveDocumentLogicalNets } from "@icm/derived";
 import {
+  evaluateWireMembers,
+  wireMemberChoice,
+  compileWireDraft,
   createFreeWireAnchor,
   createRouteWireAnchor,
   normalizeRouteGeometry,
@@ -103,7 +106,7 @@ export function wireSourceForTarget(
       return createFreeWireAnchor(
         target.point,
         activeNetId ?? ids.newNetId,
-        activeNetId === null,
+        !document.nets.some((net) => net.id === activeNetId),
         ids.junctionId,
       );
     }
@@ -166,6 +169,9 @@ export interface WireDraftPreview {
   readonly points: readonly Point[];
   /** Interior pin contacts the commit will make, in path order. */
   readonly contacts: readonly Point[];
+  readonly message?: string;
+  readonly width?: number;
+  readonly blocked?: boolean;
 }
 
 export const EMPTY_WIRE_DRAFT_PREVIEW: WireDraftPreview = {
@@ -274,7 +280,7 @@ export function resolveWireDraftPreview({
   cornerOrder,
   visibleEndpoints,
 }: WireDraftPreviewInput): WireDraftPreview {
-  const to = wireSourceForTarget(
+  let to = wireSourceForTarget(
     document,
     target,
     source.netId,
@@ -282,6 +288,11 @@ export function resolveWireDraftPreview({
     resolver,
   );
   if (!to) return EMPTY_WIRE_DRAFT_PREVIEW;
+  const evaluation = evaluateWireMembers(document, source, to);
+  if (evaluation.kind === "ready") {
+    source = evaluation.from;
+    to = evaluation.to;
+  }
   const shape = resolveWireDraftShape(
     document,
     resolver,
@@ -292,18 +303,76 @@ export function resolveWireDraftPreview({
     cornerOrder,
     visibleEndpoints,
   );
+  if (evaluation.kind !== "ready")
+    return {
+      points: compileWireDraft(
+        source,
+        to,
+        shape.steps,
+        routingMode,
+        shape.cornerOrder,
+      ).points,
+      contacts: [],
+      blocked: true,
+      message:
+        evaluation.kind === "invalid"
+          ? evaluation.message
+          : "Choose one bus member",
+    };
   const contacts = wirePassThroughContacts(visibleEndpoints, {
     from: source,
     to,
     steps: shape.steps,
   });
-  const proposal = proposeWireCommitThroughContacts(
-    source,
-    to,
-    shape.steps.map((item) => item.point),
-    contacts,
-    PREVIEW_IDS,
-    { steps: shape.steps, routingMode, cornerOrder: shape.cornerOrder },
-  );
-  return proposedWireGeometry(proposal.edits, [source, to, ...contacts]);
+  try {
+    const proposal = proposeWireCommitThroughContacts(
+      source,
+      to,
+      shape.steps.map((item) => item.point),
+      contacts,
+      PREVIEW_IDS,
+      { steps: shape.steps, routingMode, cornerOrder: shape.cornerOrder },
+    );
+    const width = source.members?.length ?? to.members?.length ?? 1;
+    const aggregate = source.members ? source : to.members ? to : undefined;
+    const ordered = aggregate
+      ? wireMemberChoice(document, aggregate, false).options
+      : undefined;
+    const selected = source.endpoint.memberId
+      ? source
+      : to.endpoint.memberId
+        ? to
+        : undefined;
+    const memberName = selected?.netId
+      ? resolveDocumentLogicalNets(document).byBaseNetId.get(selected.netId)
+          ?.name
+      : undefined;
+    return {
+      ...proposedWireGeometry(proposal.edits, [source, to, ...contacts]),
+      width,
+      ...(ordered
+        ? {
+            message: `${width} members · ${ordered
+              .slice(0, 4)
+              .map((member) => member.label)
+              .join(" → ")}${width > 4 ? " …" : ""}`,
+          }
+        : selected
+          ? { message: memberName ? `1 member · ${memberName}` : "1 member" }
+          : {}),
+    };
+  } catch (error) {
+    return {
+      points: compileWireDraft(
+        source,
+        to,
+        shape.steps,
+        routingMode,
+        shape.cornerOrder,
+      ).points,
+      contacts: [],
+      blocked: true,
+      message: error instanceof Error ? error.message : "Cannot connect here",
+    };
+  }
 }

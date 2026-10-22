@@ -68,6 +68,7 @@ export function planPlacedCellPin(
         )[0];
   const plan = planCreateCellPin(project, documentId, {
     instance: input.instance,
+    ...(!supply ? { signalExpression: name } : {}),
     connectionEdits: [
       ...input.connectionEdits,
       ...(supply

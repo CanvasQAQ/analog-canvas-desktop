@@ -8,6 +8,68 @@ import {
 import { AgentAuthoringCommandSchema } from "@icm/agent-adapter";
 import { expect, it } from "vitest";
 import { planBrowserAgentCommand } from "./browser-agent-command";
+import { liveAgentEditor } from "./live-agent-editor.test-support";
+
+it("authors and reads vector Cell Pins through the live semantic Agent service", () => {
+  const { controller, service } = liveAgentEditor();
+  const created = service.handle({
+    apiVersion: "3.0",
+    requestId: "create-bus",
+    transactionId: "create-bus",
+    operation: "transact",
+    documentId: "main",
+    expectedRevision: 0,
+    expectedStructureRevision: controller.project.structureRevision,
+    actions: [
+      {
+        kind: "place-component",
+        symbol: "port",
+        reference: "DATA<0:3>",
+        direction: "input",
+        position: { x: 100, y: 100 },
+      },
+    ],
+  });
+  expect(created.ok, JSON.stringify(created)).toBe(true);
+  const read = service.handle({
+    apiVersion: "3.0",
+    requestId: "read-bus",
+    operation: "snapshot",
+    documentId: "main",
+  });
+  expect(read.ok, JSON.stringify(read)).toBe(true);
+  if (!read.ok || read.operation !== "snapshot" || !("snapshot" in read))
+    return;
+  const terminal = read.snapshot.document.cellInterface!.terminals[0]!;
+  expect(terminal.signal?.members.map((member) => member.name)).toEqual([
+    "DATA<0>",
+    "DATA<1>",
+    "DATA<2>",
+    "DATA<3>",
+  ]);
+  expect(
+    read.snapshot.document.nets
+      .map((net) => net.terminals[0]?.memberId)
+      .filter(Boolean),
+  ).toHaveLength(4);
+  const before = structuredClone(controller.project);
+  const invalid = service.handle({
+    apiVersion: "3.0",
+    requestId: "invalid-bus",
+    transactionId: "invalid-bus",
+    operation: "transact",
+    documentId: "main",
+    expectedRevision: controller.document.revision,
+    expectedStructureRevision: controller.project.structureRevision,
+    command: {
+      kind: "rename-cell-terminal",
+      terminalId: terminal.id,
+      name: "DATA<3:>",
+    },
+  });
+  expect(invalid.ok).toBe(false);
+  expect(controller.project).toEqual(before);
+});
 
 it("creates a Cell from a pinned Cell without inheriting foreign pin placements", () => {
   const project = createEmptyProject("p", "Project");

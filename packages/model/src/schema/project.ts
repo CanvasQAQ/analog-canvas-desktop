@@ -318,6 +318,84 @@ export const CircuitProjectSchema = z
     );
     const childrenByDocument = new Map<string, string[]>();
     for (const [documentIndex, document] of project.documents.entries()) {
+      for (const [netIndex, net] of document.nets.entries()) {
+        for (const [terminalIndex, terminal] of net.terminals.entries()) {
+          const instance = document.instances.find(
+            (item) => item.id === terminal.instanceId,
+          );
+          const binding = instance?.netlist?.binding;
+          const declaration =
+            binding?.kind === "subcircuit"
+              ? documentById
+                  .get(binding.childDocumentId)
+                  ?.netlist?.terminals.find(
+                    (item) =>
+                      foldNetName(item.name) === foldNetName(terminal.pinName),
+                  )
+              : document.netlist?.terminals.find(
+                  (item) =>
+                    item.interfaceInstanceIds.includes(terminal.instanceId) &&
+                    terminal.pinName === "P",
+                );
+          const members = declaration?.signal?.members;
+          const vector = members && members.length > 1;
+          if (
+            vector
+              ? !members.some((member) => member.id === terminal.memberId)
+              : terminal.memberId !== undefined
+          ) {
+            context.addIssue({
+              code: "custom",
+              message:
+                "Terminal endpoint must select an existing scalar member of its declared interface",
+              path: [
+                "documents",
+                documentIndex,
+                "nets",
+                netIndex,
+                "terminals",
+                terminalIndex,
+              ],
+            });
+          }
+        }
+      }
+      for (const [terminalIndex, terminal] of (
+        document.netlist?.terminals ?? []
+      ).entries()) {
+        for (const member of terminal.signal?.members ?? []) {
+          const net = document.nets.find((item) => item.id === member.netId);
+          if (
+            !net ||
+            terminal.interfaceInstanceIds.some(
+              (instanceId) =>
+                !net.terminals.some(
+                  (endpoint) =>
+                    endpoint.instanceId === instanceId &&
+                    endpoint.pinName === "P" &&
+                    endpoint.memberId ===
+                      (terminal.signal!.members.length > 1
+                        ? member.id
+                        : undefined),
+                ),
+            )
+          ) {
+            context.addIssue({
+              code: "custom",
+              message:
+                "Cell signal member must own its interface endpoint on an existing Net",
+              path: [
+                "documents",
+                documentIndex,
+                "netlist",
+                "terminals",
+                terminalIndex,
+                "signal",
+              ],
+            });
+          }
+        }
+      }
       const children: string[] = [];
       for (const [instanceIndex, instance] of document.instances.entries()) {
         const binding = instance.netlist?.binding;

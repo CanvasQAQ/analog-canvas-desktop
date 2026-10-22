@@ -32,6 +32,7 @@ import {
 } from "./editor-transient-preview-overlays";
 import {
   EditorWiringOverlay,
+  WireMemberChoiceOverlay,
   NetLabelEditorOverlay,
 } from "./editor-wiring-overlay";
 import type { CameraRuntime } from "./camera-runtime";
@@ -406,6 +407,12 @@ export function EditorCanvasSurface({
           {cellSymbolLayout ? (
             <EditorCellSymbolLayoutOverlay {...cellSymbolLayout} />
           ) : null}
+          <WireMemberChoiceOverlay
+            memberChoice={wiring.memberChoice}
+            onWireMemberChoose={wiring.onWireMemberChoose}
+            onWireMemberCancel={wiring.onWireMemberCancel}
+            viewBox={wiring.viewBox}
+          />
           <NetLabelEditorOverlay
             netLabelPlacement={wiring.netLabelPlacement}
             onNetLabelTextChange={wiring.onNetLabelTextChange}

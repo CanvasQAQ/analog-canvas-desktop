@@ -19,7 +19,7 @@ belong to a simulation deck ([simulation](simulation.md)).
 | Fact                       | Authority                                                         | Never inferred from                                    |
 | -------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
 | Cell name                  | `Document.netlist.name`                                           | Document title or filename                             |
-| Cell interface order       | first occurrence in `projectCellInterface`                        | coordinates or alphabetical order                      |
+| Cell interface order       | first occurrence, then explicit signal member order                        | coordinates or alphabetical order                      |
 | Connectivity               | Base-Net membership and the shared Logical-Net/interface resolver | SVG geometry, loose label text, or uncommitted overlap |
 | Logical Net name/scope     | resolved owner-addressed marker claims                            | legacy Base fields or text appearance                  |
 | Instance reference         | `Instance.reference`                                              | object ID or annotation text                           |
@@ -34,6 +34,12 @@ belong to a simulation deck ([simulation](simulation.md)).
   block with `INVALID_COMPONENT_INTERFACE` even when loading is bypassed; every
   Symbol pin maps once with unique formal names. A descriptor calling a built-in
   model with an incompatible mapping is `COMPONENT_MODEL_INTERFACE_MISMATCH`.
+
+Explicit [signals](connectivity-and-routing.md#ordered-signals-and-buses)
+expand to scalar formal ports and caller nodes in declaration order. Each
+caller occurrence retains its own member mapping; parent Net names never
+rename child ports. Existing dialect escaping and collision refusal apply to
+every expanded member.
 
 ## Persisted data model
 

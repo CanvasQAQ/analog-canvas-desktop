@@ -24,3 +24,4 @@ export * from "./simulation-source-authoring.js";
 export * from "./greek-letters.js";
 export * from "./identifier-text.js";
 export * from "./label-typography.js";
+export * from "./signal-expression.js";

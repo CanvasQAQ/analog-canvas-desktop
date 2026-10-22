@@ -24,7 +24,7 @@ import {
   signalFlowBodyTextDocument,
   signalFlowFormulaSource,
 } from "@icm/symbols";
-import type { SymbolFormulaPresentation } from "@icm/symbols";
+import type { SymbolFormulaPresentation, SymbolResolver } from "@icm/symbols";
 import { resolveAnnotationText, resolveAnnotationName } from "@icm/derived";
 import {
   createReferenceIndex,
@@ -84,6 +84,10 @@ export interface TextEditingSession {
    * makes it show text of its own while the Pin keeps its name.
    */
   cellPinTerminalId?: string;
+  /** Only explicitly authored signals preview a range before characters change. */
+  signalExpression?: string;
+  /** Visible characters when the bound name editor opened; formatting is not a rename. */
+  initialNameText?: string;
   /** False follows/edits the electrical Reference; true owns display text. */
   displayAlias?: boolean;
   /** Symbol body text only: where and what the Symbol draws by default. */
@@ -296,9 +300,15 @@ export function editedBoundAnnotationName(
   annotation: Annotation,
   session: TextEditingSession,
   currentName: string,
+  resolver?: SymbolResolver,
 ): string {
   if (!session.contentEdited) return currentName;
-  const original = resolveAnnotationText(document, annotation);
+  const original = resolveAnnotationText(
+    document,
+    annotation,
+    undefined,
+    resolver,
+  );
   const before = flattenRichText(original);
   const after = flattenRichText(session.content);
   const name =
@@ -321,12 +331,13 @@ export function editedBoundAnnotationName(
 export function createTextEditingSession(
   target: EditableTextTarget,
   document?: SchematicDocument,
+  resolver?: SymbolResolver,
 ): TextEditingSession {
   if (target.owner === "annotation") {
     const annotation = target.object;
     const anchor = annotation.anchor;
     const content = document
-      ? resolveAnnotationText(document, annotation)
+      ? resolveAnnotationText(document, annotation, undefined, resolver)
       : (annotation.content ?? { runs: [] });
     const automaticTerminalOverride =
       annotation.binding?.kind === "cell-terminal-name" &&
@@ -363,6 +374,23 @@ export function createTextEditingSession(
         annotation.binding !== undefined &&
         annotation.binding.kind !== "instance-reference",
       ...(annotation.binding ? { bindingKind: annotation.binding.kind } : {}),
+      ...(["cell-terminal-name", "net-name"].includes(
+        annotation.binding?.kind ?? "",
+      )
+        ? { initialNameText: flattenRichText(content) }
+        : {}),
+      ...(() => {
+        if (annotation.binding?.kind !== "net-name") return {};
+        const claim = document?.connectivityEvidence.find(
+          (item) =>
+            item.kind === "name-claim" &&
+            item.owner.kind === "net-label" &&
+            item.owner.annotationId === annotation.id,
+        );
+        return claim?.kind === "name-claim" && claim.signal
+          ? { signalExpression: claim.signal.expression }
+          : {};
+      })(),
       ...(annotation.formatOverride &&
       !automaticTerminalOverride &&
       !automaticRoleFormat
@@ -394,6 +422,9 @@ export function createTextEditingSession(
         return terminal
           ? {
               cellPinTerminalId: terminal.id,
+              ...(terminal.signal
+                ? { signalExpression: terminal.signal.expression }
+                : {}),
               displayAlias:
                 !annotation.binding &&
                 !richTextPresentsIdentifier(content, terminal.name),

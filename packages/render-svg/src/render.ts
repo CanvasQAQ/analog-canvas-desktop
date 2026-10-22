@@ -55,6 +55,8 @@ import type { ResolvedSvgAnnotation } from "./annotation-render.js";
 import { renderDraftingLayer } from "./drafting-render.js";
 import { renderInductorCouplingLayer } from "./inductor-coupling-render.js";
 import {
+  busStrokeProfile,
+  busTapMarks,
   junctionMiterBridgePaths,
   renderNoConnectMarkers,
   renderRouteDirectionArrow,
@@ -154,9 +156,10 @@ export function buildSvgScene(
   // one the engine re-creates under a copied circuit still matches it.
   const junctionProfile = (junctionId: string) => {
     const junction = junctionsById.get(junctionId);
-    return junction?.documentStyle
+    const kept = junction?.documentStyle
       ? objectStyleProfile(profile, junction)
       : sharedProfile(routesAtJunction.get(junctionId) ?? []);
+    return busStrokeProfile(kept, junction?.members?.length ?? 0);
   };
   const contactProfile = (contact: CoincidentContact) => {
     const junction = contact.endpoints.find(
@@ -192,7 +195,12 @@ export function buildSvgScene(
   const resolvedAnnotations: ResolvedSvgAnnotation[] = [];
   for (const annotation of document.annotations) {
     if (!included(annotation.id) || annotation.visible === false) continue;
-    const content = resolveAnnotationText(document, annotation, logicalNets);
+    const content = resolveAnnotationText(
+      document,
+      annotation,
+      logicalNets,
+      resolver,
+    );
     if (
       !isSchematicAnnotationVisible(document, annotation, logicalNets, content)
     )
@@ -228,6 +236,21 @@ export function buildSvgScene(
         ),
     )
     .filter((contact) => {
+      if (
+        contact.endpoints.some(
+          (endpoint) =>
+            endpoint.memberId ||
+            (endpoint.kind === "junction" &&
+              (junctionsById.get(endpoint.junctionId)?.members?.length ?? 0) >
+                1),
+        ) ||
+        contact.incidents.some(
+          (incident) =>
+            incident.kind === "route" &&
+            (routesById.get(incident.objectId)?.members?.length ?? 0) > 1,
+        )
+      )
+        return false;
       if (
         contact.incidents.some(
           (incident) =>
@@ -372,7 +395,10 @@ export function buildSvgScene(
         presentation !== "wire"
           ? ` data-route-presentation="${presentation}"`
           : "";
-      const routeProfile = objectStyleProfile(profile, route);
+      const routeProfile = busStrokeProfile(
+        objectStyleProfile(profile, route),
+        route.members?.length ?? 0,
+      );
       const strokeWidth = isPowerRail
         ? routeProfile.strokes.powerRail
         : routeProfile.strokes.wire;
@@ -397,7 +423,14 @@ export function buildSvgScene(
         strokeColor,
         routeProfile,
       );
-      return `<polyline data-object-id="${escapeXml(route.id)}" data-net-id="${escapeXml(route.netId)}"${presentationAttribute} points="${pointList(geometry.centerline)}" fill="none" stroke="none"/>${directionArrow}`;
+      const taps = busTapMarks(route, geometry.centerline)
+        .map((mark) => {
+          const d = `M ${mark.from.x} ${mark.from.y} L ${mark.to.x} ${mark.to.y}`;
+          addInk(strokeColor, routeProfile.strokes.wire, "", d);
+          return `<path data-role="bus-tap" data-route-id="${escapeXml(route.id)}" data-member-id="${escapeXml(mark.memberId)}" d="${d}" fill="none" stroke="none"/>`;
+        })
+        .join("");
+      return `<polyline data-object-id="${escapeXml(route.id)}" data-net-id="${escapeXml(route.netId)}"${presentationAttribute} points="${pointList(geometry.centerline)}" fill="none" stroke="none"/>${directionArrow}${taps}`;
     })
     .join("");
   for (const bridge of junctionMiterBridgePaths(

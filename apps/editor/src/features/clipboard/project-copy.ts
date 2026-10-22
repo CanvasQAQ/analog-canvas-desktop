@@ -345,8 +345,12 @@ export function captureProjectCopy(
         if (split) {
           clipboard.nets = clipboard.nets.filter((item) => item !== split);
           netIds.delete(splitId);
-          for (const cell of clipboard.cellTerminals)
-            if (cell.netId === splitId) cell.netId = net.id;
+          for (const cell of clipboard.cellTerminals) {
+            if (cell.netId !== splitId) continue;
+            cell.netId = net.id;
+            if (cell.signal?.members.length === 1)
+              cell.signal.members[0]!.netId = net.id;
+          }
           for (const annotation of clipboard.annotations) {
             if (annotation.netId === splitId) annotation.netId = net.id;
             if (
@@ -580,6 +584,28 @@ export function prepareProjectCopy(
   document: SchematicDocument,
   sourceClipboard: SchematicClipboard,
 ) {
+  if (
+    sourceClipboard.cellTerminals.some(
+      (terminal) => terminal.signal && terminal.signal.members.length > 1,
+    ) ||
+    sourceClipboard.routes.some(
+      (route) =>
+        route.members || route.start.memberId || routeEnd(route).memberId,
+    ) ||
+    sourceClipboard.junctions.some((junction) => junction.members) ||
+    sourceClipboard.nets.some((net) =>
+      net.terminals.some((terminal) => terminal.memberId),
+    ) ||
+    sourceClipboard.context?.documents.some((cell) =>
+      cell.netlist?.terminals.some(
+        (terminal) => terminal.signal && terminal.signal.members.length > 1,
+      ),
+    )
+  ) {
+    throw new Error(
+      "Copying bus groups requires member identity remapping, which is not supported yet; the original circuit is unchanged",
+    );
+  }
   let clipboard = structuredClone(sourceClipboard);
   const dependencyMapping = {
     cells: {} as Record<string, string>,

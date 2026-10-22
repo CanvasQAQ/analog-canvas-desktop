@@ -18,8 +18,123 @@ import {
   materializeSourceConnectivity,
   type SourceConnectivity,
 } from "./source-connectivity.js";
-export const CURRENT_PROJECT_FILE_VERSION = 74;
+export const CURRENT_PROJECT_FILE_VERSION = 75;
 type Value = Record<string, any>;
+
+/** Old envelopes never infer or accept new member-qualified connectivity. */
+export function rejectSignalMembers(raw: Value): void {
+  const records = (value: unknown): Value[] =>
+    Array.isArray(value)
+      ? value.filter(
+          (item) => item && typeof item === "object" && !Array.isArray(item),
+        )
+      : [];
+  const check = (
+    value: unknown,
+    fields: string[],
+    path: (string | number)[],
+  ) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    for (const field of fields)
+      if (Object.hasOwn(value, field))
+        throw new ProjectFormatError([
+          {
+            code: "INVALID_PROJECT",
+            path: [...path, field],
+            message: "Signal members require Project schema 75",
+          },
+        ]);
+  };
+  const artwork = (
+    definition: Value | undefined,
+    path: (string | number)[],
+  ) => {
+    records(definition?.symbol?.pins).forEach((pin, index) =>
+      check(pin, ["signalMembers"], [...path, "symbol", "pins", index]),
+    );
+    records(definition?.symbol?.variants).forEach((variant, index) =>
+      records(variant.auxiliaryPins).forEach((pin, pinIndex) =>
+        check(
+          pin,
+          ["signalMembers"],
+          [...path, "symbol", "variants", index, "auxiliaryPins", pinIndex],
+        ),
+      ),
+    );
+  };
+  records(raw.componentDefinitions).forEach((definition, index) =>
+    artwork(definition, ["componentDefinitions", index]),
+  );
+  records(raw.modelSources).forEach((source, sourceIndex) =>
+    records(source.draft?.authoring).forEach((candidate, index) => {
+      const path = ["modelSources", sourceIndex, "draft", "authoring", index];
+      artwork(candidate.lastValidArtwork, [...path, "lastValidArtwork"]);
+      artwork(candidate.legacyRepair?.baseline, [
+        ...path,
+        "legacyRepair",
+        "baseline",
+      ]);
+    }),
+  );
+  records(raw.documents).forEach((document, index) => {
+    const path = ["documents", index];
+    records(document.netlist?.terminals).forEach((terminal, i) =>
+      check(terminal, ["signal"], [...path, "netlist", "terminals", i]),
+    );
+    records(document.connectivityEvidence).forEach((evidence, i) =>
+      check(evidence, ["signal"], [...path, "connectivityEvidence", i]),
+    );
+    records(document.annotations).forEach((annotation, i) =>
+      check(
+        annotation.binding,
+        ["memberEndpoint"],
+        [...path, "annotations", i, "binding"],
+      ),
+    );
+    records(document.routes).forEach((route, i) => {
+      const rp = [...path, "routes", i];
+      check(route, ["members"], rp);
+      check(route.start, ["memberId"], [...rp, "start"]);
+      check(route.end, ["memberId"], [...rp, "end"]);
+      records(route.legs).forEach((leg, j) => {
+        check(leg, ["memberId"], [...rp, "legs", j]);
+        check(
+          leg.to?.endpoint,
+          ["memberId"],
+          [...rp, "legs", j, "to", "endpoint"],
+        );
+      });
+    });
+    records(document.junctions).forEach((junction, i) => {
+      check(junction, ["members"], [...path, "junctions", i]);
+      check(
+        junction.contactAnchor,
+        ["memberId"],
+        [...path, "junctions", i, "contactAnchor"],
+      );
+    });
+    records(document.nets).forEach((net, i) => {
+      check(net.at, ["memberId"], [...path, "nets", i, "at"]);
+      records(net.terminals).forEach((terminal, j) =>
+        check(terminal, ["memberId"], [...path, "nets", i, "terminals", j]),
+      );
+    });
+    records(document.noConnects).forEach((mark, i) =>
+      check(
+        mark.endpoint,
+        ["memberId"],
+        [...path, "noConnects", i, "endpoint"],
+      ),
+    );
+    for (const kind of ["contacts", "unrouted"])
+      if (Array.isArray(document.connections?.[kind]))
+        document.connections[kind].forEach((link: unknown, i: number) =>
+          records(link).forEach((endpoint, j) =>
+            check(endpoint, ["memberId"], [...path, "connections", kind, i, j]),
+          ),
+        );
+  });
+}
 
 /** An object's kept Document style first appears in schema 64. */
 export function rejectKeptDocumentStyle(raw: Value): void {
@@ -66,8 +181,20 @@ export function encodeProjectFile(project: CircuitProject): Value {
   for (const [index, document] of owned.documents.entries()) {
     document.nets = connections[index]!.nets;
     document.connections = connections[index]!.connections;
-    for (const route of document.routes) delete route.netId;
-    for (const junction of document.junctions) delete junction.netId;
+    for (const route of document.routes) {
+      delete route.netId;
+      if (route.members)
+        route.members = route.members.map(
+          ({ netId: _netId, ...member }: Value) => member,
+        );
+    }
+    for (const junction of document.junctions) {
+      delete junction.netId;
+      if (junction.members)
+        junction.members = junction.members.map(
+          ({ netId: _netId, ...member }: Value) => member,
+        );
+    }
   }
   owned.schemaVersion = CURRENT_PROJECT_FILE_VERSION;
   return compactProjectFile(owned);
@@ -89,6 +216,13 @@ export function decodeProjectFile(raw: Value): Value {
         if (Object.hasOwn(route, "netId"))
           throw new Error("Route netId is derived; edit its endpoints instead");
         route.netId = "pending-network";
+        for (const member of route.members ?? []) {
+          if (Object.hasOwn(member, "netId"))
+            throw new Error(
+              "Route member netId is derived; edit its endpoint mapping instead",
+            );
+          member.netId = "pending-network";
+        }
       }
       for (const junction of document.junctions) {
         if (Object.hasOwn(junction, "netId"))
@@ -96,6 +230,13 @@ export function decodeProjectFile(raw: Value): Value {
             "Junction netId is derived; edit its connections instead",
           );
         junction.netId = "pending-network";
+        for (const member of junction.members ?? []) {
+          if (Object.hasOwn(member, "netId"))
+            throw new Error(
+              "Junction member netId is derived; edit its connections instead",
+            );
+          member.netId = "pending-network";
+        }
       }
     }
     const decoded = decodeOwned(owned, {

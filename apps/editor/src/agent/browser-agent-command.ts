@@ -38,6 +38,7 @@ import {
   gateRoutingOperationPlan,
   createRoutingOperationPlan,
   planEnsureNamedNet,
+  planEnsureNamedRoute,
   planElectricalMarkerRename,
   proposedStandalonePowerConnection,
   powerConnectionForSymbol,
@@ -1323,7 +1324,7 @@ export function planBrowserAgentCommand(
               name,
             )
         : text;
-      const plan = planEnsureNamedNet(document, {
+      const nameRequest: Parameters<typeof planEnsureNamedNet>[1] = {
         candidateNetId: netId,
         name,
         evidenceId:
@@ -1343,7 +1344,15 @@ export function planBrowserAgentCommand(
         ...(net.powerDomain === "vdd" || net.powerDomain === "ground"
           ? { powerDomain: net.powerDomain }
           : {}),
-      });
+      };
+      const labelRoute = document.routes.find((route) =>
+        existing?.anchor.kind === "route"
+          ? route.id === existing.anchor.routeId
+          : route.netId === netId,
+      );
+      const plan = labelRoute
+        ? planEnsureNamedRoute(document, labelRoute.id, nameRequest)
+        : planEnsureNamedNet(document, nameRequest);
       if (!plan.ok) throw new Error(plan.message);
       if (!existing && !command.position)
         throw new Error("New Net Label requires position");

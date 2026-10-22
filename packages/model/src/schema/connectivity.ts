@@ -1,9 +1,60 @@
 import { z } from "zod";
+import { parseSignalExpression } from "../signal-expression.js";
 
 import { StableIdSchema } from "./common.js";
 import { TerminalRefSchema } from "./instance.js";
 import { ObjectDocumentStyleSchema } from "./presentation.js";
 import { SourceSpanSchema } from "./source.js";
+
+export const SignalDeclarationSchema = z
+  .strictObject({
+    expression: z.string().trim().min(1).max(256),
+    members: z
+      .array(
+        z.strictObject({
+          id: StableIdSchema,
+          name: z.string().min(1).max(256),
+          netId: StableIdSchema,
+        }),
+      )
+      .min(1)
+      .max(256),
+  })
+  .superRefine((signal, context) => {
+    let names: readonly string[];
+    try {
+      names = parseSignalExpression(signal.expression);
+    } catch (error) {
+      context.addIssue({
+        code: "custom",
+        path: ["expression"],
+        message: `Signal expression is invalid: ${error instanceof Error ? error.message : "Invalid syntax"}`,
+      });
+      return;
+    }
+    if (names.length !== signal.members.length)
+      context.addIssue({
+        code: "custom",
+        path: ["members"],
+        message: "Signal member count must match its expression width",
+      });
+    const ids = new Set<string>();
+    signal.members.forEach((member, index) => {
+      if (member.name !== names[index])
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "name"],
+          message: "Signal member name and order must match its expression",
+        });
+      if (ids.has(member.id))
+        context.addIssue({
+          code: "custom",
+          path: ["members", index, "id"],
+          message: "Signal member identities must be unique",
+        });
+      ids.add(member.id);
+    });
+  });
 
 /** Logical-Net electrical role shared by derived and Agent contracts. */
 export const NetPowerDomainSchema = z.enum([
@@ -40,6 +91,7 @@ export const ConnectivityEvidenceSchema = z.discriminatedUnion("kind", [
     kind: z.literal("name-claim"),
     netId: StableIdSchema,
     name: z.string().trim().min(1).max(256),
+    signal: SignalDeclarationSchema.optional(),
     owner: ConnectivityNameClaimOwnerSchema,
     scope: z.enum(["local", "global"]),
     /** Electrical classification carried by the marker, never inferred from its symbol. */

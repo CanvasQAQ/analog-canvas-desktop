@@ -1,4 +1,9 @@
-import { routeEndpoints, type SchematicDocument } from "@icm/model";
+import {
+  routeEndpoints,
+  routeElectricalConnections,
+  junctionElectricalEndpoints,
+  type SchematicDocument,
+} from "@icm/model";
 import {
   deriveElectricalTopologyProjection,
   endpointKey,
@@ -416,9 +421,9 @@ function existingEndpointKeys(document: SchematicDocument): readonly string[] {
         endpointKey({ kind: "terminal", ...terminal }),
       ),
     ),
-    ...document.junctions.map((junction) =>
-      endpointKey({ kind: "junction", junctionId: junction.id }),
-    ),
+    ...document.junctions
+      .flatMap(junctionElectricalEndpoints)
+      .map((item) => endpointKey(item.endpoint)),
   ]);
 }
 
@@ -432,7 +437,9 @@ function mergeGroupsFromEdits(
 ): readonly (readonly string[])[] {
   return edits.flatMap((edit) => {
     if (edit.kind === "set_route_path") {
-      return [routeEndpoints(edit.route).map(endpointKey)];
+      return routeElectricalConnections(edit.route).map((edge) =>
+        edge.endpoints.map(endpointKey),
+      );
     }
     if (edit.kind === "route_orthogonal") {
       return [[endpointKey(edit.from), endpointKey(edit.to)]];
@@ -477,7 +484,9 @@ function expectedElectricalEffectForOperation(
     const sourceBaseNetIds = unique(
       cutRouteIds.flatMap((routeId) => {
         const route = document.routes.find((item) => item.id === routeId);
-        return route ? [route.netId] : [];
+        return route
+          ? routeElectricalConnections(route).map((edge) => edge.netId)
+          : [];
       }),
     );
     return { kind: "partition", sourceBaseNetIds, cutRouteIds };

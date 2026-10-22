@@ -705,7 +705,7 @@ export function annotationHitBox(
   const fontSize =
     schematicTextFontSize(annotation.kind, markerProfile) * sizeScale;
   const textLayout = measureRichTextDocument(
-    resolveAnnotationText(document, annotation, logicalNets),
+    resolveAnnotationText(document, annotation, logicalNets, resolver),
     richTextMetrics(markerProfile, "label", sizeScale),
   );
   let labelPosition = anchor;

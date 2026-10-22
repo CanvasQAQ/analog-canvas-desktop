@@ -40,6 +40,7 @@ export function rebuildRoutePathWithRemap(
   const rebuilt = createRoutePath({
     id: source.id,
     netId: source.netId,
+    ...(source.members ? { members: source.members } : {}),
     start: structuredClone(start),
     end: structuredClone(end),
     bends,

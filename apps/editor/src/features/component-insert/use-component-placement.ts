@@ -643,9 +643,9 @@ export function useComponentPlacement(options: UseComponentPlacementOptions) {
           ]),
     ];
     const terminalId = `terminal-${id.toLowerCase()}`;
-    const committed = options.transactProject(
-      "place-cell-pin",
-      planPlacedCellPin(
+    let placementEdits: ProjectStructureEdit[];
+    try {
+      placementEdits = planPlacedCellPin(
         options.project,
         options.document.id,
         options.resolver,
@@ -661,8 +661,14 @@ export function useComponentPlacement(options: UseComponentPlacementOptions) {
               : placementRequest.direction!,
           styleProfile: options.styleProfile,
         },
-      ),
-    );
+      );
+    } catch (error) {
+      options.setStatus(
+        error instanceof Error ? error.message : "Could not place Cell Pin",
+      );
+      return;
+    }
+    const committed = options.transactProject("place-cell-pin", placementEdits);
     if (!committed) return;
     options.selectOnly("instance", [id]);
     options.setComponentPreviewPoint(position);

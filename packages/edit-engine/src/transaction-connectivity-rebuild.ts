@@ -1,5 +1,6 @@
 import {
   routeEndpoints,
+  routeElectricalConnections,
   isFrozenSnapshot,
   type Net,
   type RouteEndpoint,
@@ -64,6 +65,23 @@ function partitionNet(
     changed.add(id);
   });
   for (const junction of draft.junctions) {
+    if (junction.members) {
+      for (const member of junction.members) {
+        const id = byEndpoint.get(
+          endpointKey({
+            kind: "junction",
+            junctionId: junction.id,
+            memberId: member.id,
+          }),
+        );
+        if (member.netId === net.id && id) {
+          member.netId = id;
+          changed.add(junction.id);
+        }
+      }
+      junction.netId = junction.members[0]!.netId;
+      continue;
+    }
     if (junction.netId !== net.id) continue;
     const id = byEndpoint.get(
       endpointKey({ kind: "junction", junctionId: junction.id }),
@@ -74,6 +92,21 @@ function partitionNet(
     }
   }
   for (const route of draft.routes) {
+    if (route.members) {
+      for (const edge of routeElectricalConnections(route)) {
+        if (edge.netId !== net.id) continue;
+        const id = edge.endpoints
+          .map((endpoint) => byEndpoint.get(endpointKey(endpoint)))
+          .find(Boolean);
+        const member = route.members.find((item) => item.id === edge.memberId)!;
+        if (id) {
+          member.netId = id;
+          changed.add(route.id);
+        }
+      }
+      route.netId = route.members[0]!.netId;
+      continue;
+    }
     if (route.netId !== net.id) continue;
     const id = routeEndpoints(route)
       .map((e) => byEndpoint.get(endpointKey(e)))
@@ -94,6 +127,28 @@ function partitionNet(
     }
   }
   for (const terminal of draft.netlist?.terminals ?? []) {
+    if (terminal.signal && terminal.signal.members.length > 1) {
+      for (const member of terminal.signal.members) {
+        if (member.netId !== net.id) continue;
+        const instanceId = terminal.interfaceInstanceIds[0];
+        const id =
+          instanceId &&
+          byEndpoint.get(
+            endpointKey({
+              kind: "terminal",
+              instanceId,
+              pinName: "P",
+              memberId: member.id,
+            }),
+          );
+        if (id) {
+          member.netId = id;
+          changed.add(terminal.id);
+        }
+      }
+      terminal.netId = terminal.signal.members[0]!.netId;
+      continue;
+    }
     if (terminal.netId !== net.id) continue;
     const instanceId = terminal.interfaceInstanceIds[0];
     const annotation = draft.annotations.find(
@@ -113,6 +168,7 @@ function partitionNet(
         : undefined;
     if (id && id !== terminal.netId) {
       terminal.netId = id;
+      if (terminal.signal) terminal.signal.members[0]!.netId = id;
       changed.add(terminal.id);
     }
   }
@@ -147,7 +203,8 @@ export function rebuildEditedConnectivity(
   for (const net of draft.nets)
     for (const e of read.netEndpoints(net)) remember(e);
   for (const route of draft.routes)
-    graph.join(routeEndpoints(route).map(remember));
+    for (const edge of routeElectricalConnections(route))
+      graph.join(edge.endpoints.map(remember));
   // Coincidence of confirmed endpoint contacts is an edge; an interior X is
   // never an edge. Newly made cross-Net contacts are settled by the ordinary
   // endpoint-contact normalizer immediately after this rebuild.
@@ -159,7 +216,10 @@ export function rebuildEditedConnectivity(
   const cutNetIds = new Set(
     transaction.edits.flatMap((edit) =>
       edit.kind === "cut_connection"
-        ? before.routes.filter((r) => r.id === edit.routeId).map((r) => r.netId)
+        ? before.routes
+            .filter((r) => r.id === edit.routeId)
+            .flatMap(routeElectricalConnections)
+            .map((edge) => edge.netId)
         : [],
     ),
   );
@@ -213,15 +273,16 @@ export function rebuildEditedConnectivity(
     if (edit.kind === "remove_route_geometry") {
       const route = before.routes.find((r) => r.id === edit.routeId);
       if (route)
-        graph.join(
-          routeEndpoints(route)
-            .filter(
-              (e) =>
-                endpoints.has(endpointKey(e)) &&
-                !explicitlyDisconnected.has(endpointKey(e)),
-            )
-            .map(remember),
-        );
+        for (const edge of routeElectricalConnections(route))
+          graph.join(
+            edge.endpoints
+              .filter(
+                (e) =>
+                  endpoints.has(endpointKey(e)) &&
+                  !explicitlyDisconnected.has(endpointKey(e)),
+              )
+              .map(remember),
+          );
     }
     // An explicit logical merge is still supported by the typed Agent API.
     // The Wire planner does not emit one merely to draw a path.
@@ -272,12 +333,19 @@ export function rebuildEditedConnectivity(
     const cutRoute = transaction.edits.flatMap((edit) =>
       edit.kind === "cut_connection"
         ? before.routes.filter(
-            (r) => r.id === edit.routeId && r.netId === net.id,
+            (r) =>
+              r.id === edit.routeId &&
+              routeElectricalConnections(r).some(
+                (edge) => edge.netId === net.id,
+              ),
           )
         : [],
     )[0];
     const preferredKeys = cutRoute
-      ? routeEndpoints(cutRoute).map(endpointKey)
+      ? routeElectricalConnections(cutRoute)
+          .filter((edge) => edge.netId === net.id)
+          .flatMap((edge) => edge.endpoints)
+          .map(endpointKey)
       : net.terminals.map((t) => endpointKey({ kind: "terminal", ...t }));
     const primary = preferredKeys
       .map((key) => groups.findIndex((group) => group.includes(key)))
@@ -290,12 +358,20 @@ export function rebuildEditedConnectivity(
   // Existing Net IDs choose stable identities only after the graph is known.
   // Two unconnected paths carrying the same stale hint remain separate.
   const occupiedHints = new Set(draft.nets.map((n) => n.id));
-  const routesByRoot = new Map<string, SchematicDocument["routes"]>();
+  const routesByRoot = new Map<
+    string,
+    Array<{
+      route: SchematicDocument["routes"][number];
+      edge: ReturnType<typeof routeElectricalConnections>[number];
+    }>
+  >();
   for (const route of draft.routes) {
-    const root = graph.root(endpointKey(route.start));
-    const routes = routesByRoot.get(root) ?? [];
-    routes.push(route);
-    routesByRoot.set(root, routes);
+    for (const edge of routeElectricalConnections(route)) {
+      const root = graph.root(endpointKey(edge.endpoints[0]));
+      const routes = routesByRoot.get(root) ?? [];
+      routes.push({ route, edge });
+      routesByRoot.set(root, routes);
+    }
   }
   for (const keys of graph.groups([...endpoints.keys()])) {
     const groupEndpoints = keys.map((key) => endpoints.get(key)!);
@@ -321,7 +397,7 @@ export function rebuildEditedConnectivity(
       netId = target;
     }
     if (!netId) {
-      const hint = routes[0]!.netId;
+      const hint = routes[0]!.edge.netId;
       netId = occupiedHints.has(hint)
         ? uniquePhysicalContactId(draft, "net", keys[0]!)
         : hint;
@@ -337,8 +413,10 @@ export function rebuildEditedConnectivity(
       }
       removeNoConnectForEndpoint(draft, e, changed);
     }
-    for (const route of routes) {
-      if (route.netId !== netId) {
+    for (const { route, edge } of routes) {
+      const member = route.members?.find((item) => item.id === edge.memberId);
+      if (member) member.netId = netId;
+      if (route.netId !== netId && (!member || member === route.members?.[0])) {
         route.netId = netId;
         changed.add(route.id);
       }

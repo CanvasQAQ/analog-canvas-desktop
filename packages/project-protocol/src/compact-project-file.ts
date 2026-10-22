@@ -171,7 +171,9 @@ export function expandProjectFile(input: RecordValue): RecordValue {
         const { end, legId, mode } = route;
         if (
           !record(end) ||
-          Object.keys(end).some((k) => !["terminal", "junction"].includes(k))
+          Object.keys(end).some(
+            (k) => !["terminal", "junction", "memberId"].includes(k),
+          )
         )
           throw new Error("A route end specifies only a terminal or junction");
         route.legs = [

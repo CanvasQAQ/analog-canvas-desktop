@@ -1,4 +1,8 @@
-import { deriveStableId, routeEnd } from "@icm/model";
+import {
+  deriveStableId,
+  routeEnd,
+  routeElectricalConnections,
+} from "@icm/model";
 import type { Net, Point, RouteEndpoint, SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import { assessImportReference } from "./import-reference.js";
@@ -135,11 +139,18 @@ export function deriveNetConnectivity(
   for (const key of nodes.keys()) sets.add(key);
   const routesForNet =
     context?.routesByNetId.get(net.id) ??
-    document.routes.filter((candidate) => candidate.netId === net.id);
+    document.routes.filter((candidate) =>
+      routeElectricalConnections(candidate).some(
+        (edge) => edge.netId === net.id,
+      ),
+    );
   for (const route of routesForNet) {
-    const from = endpointKey(route.start);
-    const to = endpointKey(routeEnd(route));
-    if (nodes.has(from) && nodes.has(to)) sets.union(from, to);
+    for (const edge of routeElectricalConnections(route)) {
+      if (edge.netId !== net.id) continue;
+      const from = endpointKey(edge.endpoints[0]);
+      const to = endpointKey(edge.endpoints[1]);
+      if (nodes.has(from) && nodes.has(to)) sets.union(from, to);
+    }
   }
   const contacts = context
     ? (context.contactsByNetId.get(net.id) ?? [])
@@ -164,6 +175,11 @@ export function deriveNetConnectivity(
       document.annotations.find(
         (candidate) => candidate.id === binding.annotationId,
       )!;
+    if (
+      annotation.binding?.kind === "net-name" &&
+      annotation.binding.memberEndpoint
+    )
+      continue;
     const label = resolveAnnotationName(
       document,
       annotation,

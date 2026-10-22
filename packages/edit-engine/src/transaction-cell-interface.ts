@@ -173,6 +173,51 @@ function mutateCellInterface(
           ),
         };
       }
+      const changesSignal =
+        (terminal.signal || edit.signal) &&
+        ((edit.name !== undefined && edit.name !== terminal.name) ||
+          (edit.signal !== undefined &&
+            JSON.stringify(edit.signal) !== JSON.stringify(terminal.signal)));
+      const nextMember = edit.signal?.members[0];
+      const preservesScalarIdentity =
+        (terminal.signal?.members.length ?? 1) === 1 &&
+        (edit.signal?.members.length ?? 1) === 1 &&
+        (!nextMember ||
+          (nextMember.netId === terminal.netId &&
+            nextMember.id ===
+              (terminal.signal?.members[0]?.id ?? terminal.id)));
+      const signalNets = new Set(
+        terminal.signal?.members.map((member) => member.netId) ?? [
+          terminal.netId,
+        ],
+      );
+      if (
+        changesSignal &&
+        !preservesScalarIdentity &&
+        (draft.routes.some(
+          (route) =>
+            signalNets.has(route.netId) ||
+            route.members?.some((member) => signalNets.has(member.netId)),
+        ) ||
+          draft.nets.some(
+            (net) =>
+              signalNets.has(net.id) &&
+              net.terminals.some(
+                (endpoint) =>
+                  !terminal.interfaceInstanceIds.includes(endpoint.instanceId),
+              ),
+          ))
+      ) {
+        return {
+          ok: false,
+          rejection: reject(
+            "EDIT_PRECONDITION",
+            "Connected signal interface changes require an explicit migration",
+            [],
+            [terminal.id],
+          ),
+        };
+      }
       if (edit.name !== undefined) {
         const previousName = terminal.name;
         terminal.name = edit.name;
@@ -210,6 +255,10 @@ function mutateCellInterface(
         }
       }
       if (edit.direction !== undefined) terminal.direction = edit.direction;
+      if (edit.signal !== undefined) {
+        terminal.signal = structuredClone(edit.signal);
+        terminal.netId = edit.signal.members[0]!.netId;
+      }
       changedObjectIds.add(terminal.id);
       return { ok: true, connectivityChanged: true };
     }

@@ -38,6 +38,7 @@ export interface HierarchicalBlockTerminal {
   readonly name: string;
   readonly direction: "input" | "output" | "inout" | "passive";
   readonly nameContent?: RichTextDocument;
+  readonly signalMembers?: Array<{ id: string; name: string }>;
 }
 
 interface PinSlot {

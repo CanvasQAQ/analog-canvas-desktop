@@ -19,6 +19,13 @@ function retargetConnectivityEvidence(
   changedObjectIds: Set<string>,
 ): void {
   for (const evidence of draft.connectivityEvidence) {
+    if (evidence.kind === "name-claim")
+      for (const member of evidence.signal?.members ?? []) {
+        if (member.netId === sourceNetId) {
+          member.netId = targetNetId;
+          changedObjectIds.add(evidence.id);
+        }
+      }
     if (evidence.netId === sourceNetId) {
       evidence.netId = targetNetId;
       changedObjectIds.add(evidence.id);
@@ -116,25 +123,32 @@ export function mergeBaseNets(
   }
   for (const terminal of draft.netlist?.terminals ?? []) {
     if (terminal.netId === source.id) terminal.netId = target.id;
+    for (const member of terminal.signal?.members ?? [])
+      if (member.netId === source.id) member.netId = target.id;
   }
   for (const terminal of source.terminals) {
     if (
       !target.terminals.some(
         (candidate) =>
           candidate.instanceId === terminal.instanceId &&
-          candidate.pinName === terminal.pinName,
+          candidate.pinName === terminal.pinName &&
+          candidate.memberId === terminal.memberId,
       )
     ) {
       target.terminals.push(structuredClone(terminal));
     }
   }
   for (const route of draft.routes) {
+    for (const member of route.members ?? [])
+      if (member.netId === source.id) member.netId = target.id;
     if (route.netId === source.id) {
       route.netId = target.id;
       changedObjectIds.add(route.id);
     }
   }
   for (const junction of draft.junctions) {
+    for (const member of junction.members ?? [])
+      if (member.netId === source.id) member.netId = target.id;
     if (junction.netId === source.id) {
       junction.netId = target.id;
       changedObjectIds.add(junction.id);
@@ -488,7 +502,28 @@ export function retargetOwnerEvidenceAfterSplit(
     }
   }
   for (const evidence of draft.connectivityEvidence) {
-    if (evidence.kind !== "name-claim" || evidence.netId !== originalNetId) {
+    if (evidence.kind !== "name-claim") continue;
+    if (evidence.signal && evidence.owner.kind === "net-label") {
+      const ownerId = evidence.owner.annotationId;
+      const annotation = draft.annotations.find((item) => item.id === ownerId);
+      const anchor = annotation?.anchor;
+      const route =
+        anchor?.kind === "route"
+          ? draft.routes.find((item) => item.id === anchor.routeId)
+          : undefined;
+      if (
+        route?.members &&
+        route.members.length === evidence.signal.members.length
+      ) {
+        evidence.signal.members.forEach((member, index) => {
+          member.netId = route.members![index]!.netId;
+        });
+        evidence.netId = route.netId;
+        if (annotation) retargetAnnotation(annotation);
+        changedObjectIds.add(evidence.id);
+      }
+    }
+    if (evidence.netId !== originalNetId) {
       continue;
     }
     let targetNetId: string | undefined;

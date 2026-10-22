@@ -9,8 +9,13 @@ export const RouteEndpointSchema = z.discriminatedUnion("kind", [
     kind: z.literal("terminal"),
     instanceId: StableIdSchema,
     pinName: z.string().min(1),
+    memberId: StableIdSchema.optional(),
   }),
-  z.strictObject({ kind: z.literal("junction"), junctionId: StableIdSchema }),
+  z.strictObject({
+    kind: z.literal("junction"),
+    junctionId: StableIdSchema,
+    memberId: StableIdSchema.optional(),
+  }),
 ]);
 export const SegmentModeSchema = z.enum([
   "auto",
@@ -55,6 +60,18 @@ export const RouteBranchSchema = z
     id: StableIdSchema,
     netId: StableIdSchema,
     start: RouteEndpointSchema,
+    members: z
+      .array(
+        z.strictObject({
+          id: StableIdSchema,
+          netId: StableIdSchema,
+          startMemberId: StableIdSchema,
+          endMemberId: StableIdSchema,
+        }),
+      )
+      .min(2)
+      .max(256)
+      .optional(),
     legs: z.array(RouteLegSchema).min(1),
     // Electrical connectivity is always owned by `netId` and the endpoints.
     presentation: RoutePresentationSchema.optional(),
@@ -64,6 +81,25 @@ export const RouteBranchSchema = z
     documentStyle: ObjectDocumentStyleSchema.optional(),
   })
   .superRefine((route, context) => {
+    const end = route.legs.at(-1)?.to;
+    if (
+      route.members &&
+      (route.netId !== route.members[0]?.netId ||
+        (["id", "startMemberId", "endMemberId"] as const).some(
+          (key) =>
+            new Set(route.members!.map((member) => member[key])).size !==
+            route.members!.length,
+        ) ||
+        route.start.memberId ||
+        (end?.kind === "endpoint" && end.endpoint.memberId))
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Whole-bus Route requires unique ordered members and aggregate endpoints",
+        path: ["members"],
+      });
+    }
     for (const [index, leg] of route.legs.entries()) {
       const isFinal = index === route.legs.length - 1;
       if (isFinal && leg.to.kind !== "endpoint") {
@@ -93,6 +129,11 @@ export const JunctionStyleOverrideSchema = z.strictObject({
 export const JunctionSchema = z.strictObject({
   id: StableIdSchema,
   netId: StableIdSchema,
+  members: z
+    .array(z.strictObject({ id: StableIdSchema, netId: StableIdSchema }))
+    .min(2)
+    .max(256)
+    .optional(),
   position: PointSchema,
   // Omitted role preserves the legacy branch-anchor topology. Visible dots are
   // derived from contact directions rather than guaranteed by this role.

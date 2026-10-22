@@ -15,7 +15,7 @@ import type {
   HierarchyFrame,
   ProjectConnectivityIndex,
 } from "@icm/derived";
-import type { WireSource } from "@icm/edit-engine";
+import { signalEndpointMembers, type WireSource } from "@icm/edit-engine";
 import type {
   CircuitProject,
   RouteEndpoint,
@@ -134,6 +134,7 @@ function visibleWireSources(
             endpoint,
             index,
           );
+          const members = signalEndpointMembers(document, resolver, endpoint);
           return connection
             ? [
                 {
@@ -141,6 +142,7 @@ function visibleWireSources(
                   connection,
                   netId: endpointNetId(document, endpoint, index),
                   preludeEdits: [],
+                  ...(members ? { members, netId: members[0]!.netId } : {}),
                   ...(isMosBulkTerminal(document, endpoint)
                     ? { routePresentation: "bulk-dashed" as const }
                     : {}),
@@ -172,6 +174,15 @@ function visibleWireSources(
                 connection,
                 netId: junction.netId,
                 preludeEdits: [],
+                ...(junction.members
+                  ? {
+                      members: signalEndpointMembers(
+                        document,
+                        resolver,
+                        endpoint,
+                      )!,
+                    }
+                  : {}),
               },
             ]
           : [];

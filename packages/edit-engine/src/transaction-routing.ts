@@ -5,7 +5,11 @@ import type {
   RouteEndpoint,
   SchematicDocument,
 } from "@icm/model";
-import { routeEnd } from "@icm/model";
+import {
+  routeEnd,
+  routeElectricalConnections,
+  junctionElectricalEndpoints,
+} from "@icm/model";
 import {
   derivePowerRailComponent,
   deriveDocumentContactEvidence,
@@ -17,12 +21,16 @@ import {
   resolveDocumentLogicalNets,
   resolveEndpointConnection,
 } from "@icm/derived";
-import type { DocumentContactEvidence } from "@icm/derived";
+import type {
+  DocumentContactEvidence,
+  EndpointObjectLookup,
+} from "@icm/derived";
 import type { SymbolResolver } from "@icm/symbols";
 import { prepareConnectivityPhaseRead } from "./connectivity-phase-read.js";
 
 import type { SchematicEdit } from "./edit-schema.js";
 import { resolveRouteEditPath } from "./route-operations.js";
+import { signalEndpointMembers } from "./signal-endpoint.js";
 
 export function pointOnSegment(point: Point, from: Point, to: Point): boolean {
   return pointOnGenericSegment(point, from, to, { interior: true });
@@ -55,15 +63,17 @@ export function endpointOwnerNetId(
           net.terminals.some(
             (terminal) =>
               terminal.instanceId === endpoint.instanceId &&
-              terminal.pinName === endpoint.pinName,
+              terminal.pinName === endpoint.pinName &&
+              terminal.memberId === endpoint.memberId,
           ),
         )?.id ?? null
       );
     case "junction":
       return (
-        document.junctions.find(
-          (junction) => junction.id === endpoint.junctionId,
-        )?.netId ?? null
+        document.junctions
+          .flatMap(junctionElectricalEndpoints)
+          .find((item) => endpointKey(item.endpoint) === endpointKey(endpoint))
+          ?.netId ?? null
       );
   }
 }
@@ -77,8 +87,8 @@ export function netEndpointGroups(
   const net = document.nets.find((candidate) => candidate.id === netId);
   if (!net) return [];
   const keys = netEndpoints(document, net).map(endpointKey);
-  const routes = document.routes.filter(
-    (candidate) => candidate.netId === netId,
+  const routes = document.routes.filter((candidate) =>
+    routeElectricalConnections(candidate).some((edge) => edge.netId === netId),
   );
   const contacts = resolver
     ? (
@@ -138,9 +148,11 @@ function netEndpointGroupsFromEdges(
     parent.set(second!, first!);
   };
   for (const route of routes) {
-    const from = endpointKey(route.start);
-    const to = endpointKey(routeEnd(route));
-    if (parent.has(from) && parent.has(to)) union(from, to);
+    for (const edge of routeElectricalConnections(route)) {
+      const from = endpointKey(edge.endpoints[0]);
+      const to = endpointKey(edge.endpoints[1]);
+      if (parent.has(from) && parent.has(to)) union(from, to);
+    }
   }
   // A pin or Junction placed directly on another explicit same-Net endpoint
   // is a real electrical contact even when no Route object exists between the
@@ -170,12 +182,15 @@ export function validateConnectableEndpoint(
   document: SchematicDocument,
   endpoint: RouteEndpoint,
   resolver: SymbolResolver | undefined,
+  lookup?: EndpointObjectLookup,
 ): string | null {
   switch (endpoint.kind) {
     case "terminal": {
-      const instance = document.instances.find(
-        (candidate) => candidate.id === endpoint.instanceId,
-      );
+      const instance = lookup
+        ? lookup.instancesById.get(endpoint.instanceId)
+        : document.instances.find(
+            (candidate) => candidate.id === endpoint.instanceId,
+          );
       if (!instance) return `Instance does not exist: ${endpoint.instanceId}`;
       if (!resolver) return "Terminal edits require a Symbol Resolver";
       const symbol = resolver.resolve(
@@ -187,14 +202,43 @@ export function validateConnectableEndpoint(
       ) {
         return `Symbol pin does not exist: ${endpoint.instanceId}.${endpoint.pinName}`;
       }
+      const members = signalEndpointMembers(document, resolver, {
+        kind: "terminal",
+        instanceId: endpoint.instanceId,
+        pinName: endpoint.pinName,
+      });
+      // A Cell Pin's member Nets are established before its formal declaration
+      // in the same transaction; the completed Project validates that owner.
+      if (
+        (instance.symbolId === "port" || instance.symbolId === "port-filled") &&
+        !document.netlist?.terminals.some((terminal) =>
+          terminal.interfaceInstanceIds.includes(instance.id),
+        )
+      )
+        return null;
+      if (
+        members
+          ? !members.some((member) => member.id === endpoint.memberId)
+          : endpoint.memberId !== undefined
+      )
+        return "Select an existing scalar member of the declared bus endpoint";
       return null;
     }
-    case "junction":
-      return document.junctions.some(
-        (junction) => junction.id === endpoint.junctionId,
+    case "junction": {
+      const junction = lookup
+        ? lookup.junctionsById.get(endpoint.junctionId)
+        : document.junctions.find((item) => item.id === endpoint.junctionId);
+      if (
+        junction &&
+        (junction.members
+          ? !junction.members.some((member) => member.id === endpoint.memberId)
+          : endpoint.memberId !== undefined)
       )
+        return "Select an existing scalar member of the bus junction";
+      return junction
         ? null
         : `Junction does not exist: ${endpoint.junctionId}`;
+    }
   }
 }
 
@@ -222,12 +266,14 @@ export function addEndpointToNet(
       !net.terminals.some(
         (terminal) =>
           terminal.instanceId === endpoint.instanceId &&
-          terminal.pinName === endpoint.pinName,
+          terminal.pinName === endpoint.pinName &&
+          terminal.memberId === endpoint.memberId,
       )
     ) {
       net.terminals.push({
         instanceId: endpoint.instanceId,
         pinName: endpoint.pinName,
+        ...(endpoint.memberId ? { memberId: endpoint.memberId } : {}),
       });
     }
   }
@@ -264,6 +310,7 @@ export function validateRoute(
   resolver: SymbolResolver,
   resolvedPath?: ReturnType<typeof resolveRouteEditPath>,
   membership: "committed" | "pending" = "committed",
+  lookup?: EndpointObjectLookup,
 ): string | null {
   const net = document.nets.find((candidate) => candidate.id === route.netId);
   if (membership === "committed" && !net)
@@ -275,20 +322,26 @@ export function validateRoute(
   ) {
     return `Power rail ${route.id} must belong to a named Net`;
   }
-  if (
-    membership === "committed" &&
-    net &&
-    !endpointBelongsToNet(document, net, route.start)
-  ) {
-    return `Route from endpoint is not a member of ${route.netId}`;
-  }
   const end = routeEnd(route);
-  if (
-    membership === "committed" &&
-    net &&
-    !endpointBelongsToNet(document, net, end)
-  ) {
-    return `Route to endpoint is not a member of ${route.netId}`;
+  for (const edge of routeElectricalConnections(route)) {
+    const memberNet = document.nets.find(
+      (candidate) => candidate.id === edge.netId,
+    );
+    for (const endpoint of edge.endpoints) {
+      const problem = validateConnectableEndpoint(
+        document,
+        endpoint,
+        resolver,
+        lookup,
+      );
+      if (problem) return problem;
+      if (
+        membership === "committed" &&
+        (!memberNet || !endpointBelongsToNet(document, memberNet, endpoint))
+      ) {
+        return `Route endpoint is not a member of ${edge.netId}`;
+      }
+    }
   }
   const polyline =
     resolvedPath === undefined

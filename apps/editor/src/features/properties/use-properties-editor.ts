@@ -3,8 +3,9 @@ import {
   rewriteRichTextIdentifier,
   labelTypography,
   labelTextDocument,
+  richTextIdentifier,
 } from "@icm/model";
-import { resolveAnnotationName } from "@icm/derived";
+import { resolveAnnotationName, resolveAnnotationText } from "@icm/derived";
 import type { NetLabelDirection } from "@icm/derived";
 import { referenceDeviceLetter } from "@icm/devices";
 import { useEffect, useRef, useState } from "react";
@@ -1002,6 +1003,7 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
       createTextEditingSession(
         { owner: "annotation", object: annotation },
         options.document,
+        options.resolver,
       ),
     );
   };
@@ -1082,16 +1084,26 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
       boundAnnotation.binding.kind !== "instance-reference" &&
       boundAnnotation.binding.kind !== "instance-value"
     ) {
+      const currentName = (
+        boundAnnotation.binding.kind === "net-name" &&
+        boundAnnotation.binding.memberEndpoint
+          ? richTextIdentifier(
+              resolveAnnotationText(
+                options.document,
+                boundAnnotation,
+                undefined,
+                options.resolver,
+              ),
+            )
+          : resolveAnnotationName(options.document, boundAnnotation)
+      ).trim();
       const name = editedBoundAnnotationName(
         options.document,
         boundAnnotation,
         textEditing,
-        resolveAnnotationName(options.document, boundAnnotation),
+        currentName,
+        options.resolver,
       );
-      const currentName = resolveAnnotationName(
-        options.document,
-        boundAnnotation,
-      ).trim();
       const presentationChanged =
         (boundAnnotation.sizeScale ?? 1) !== textEditing.sizeScale ||
         boundAnnotation.alignment !== textEditing.alignment;
@@ -1132,8 +1144,16 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
         options.setStatus("Bound electrical names cannot be empty");
         return;
       }
-      if (name === currentName && !formatOverrideChanged) {
-        if (presentationChanged && !options.transact([presentationEdit]).ok) {
+      if (
+        name === currentName &&
+        (!formatOverrideChanged ||
+          (boundAnnotation.binding.kind === "net-name" &&
+            boundAnnotation.binding.memberEndpoint))
+      ) {
+        if (
+          (presentationChanged || formatOverrideChanged) &&
+          !options.transact([presentationEdit]).ok
+        ) {
           return;
         }
         setTextEditing(null);

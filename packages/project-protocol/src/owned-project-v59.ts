@@ -53,9 +53,14 @@ function coordinates(value: { x: number; y: number }): number[] {
   return [value.x, value.y];
 }
 function encodeEndpoint(endpoint: RouteEndpoint): ObjectValue {
-  return endpoint.kind === "terminal"
-    ? { terminal: [endpoint.instanceId, endpoint.pinName] }
-    : { junction: endpoint.junctionId };
+  const anchor =
+    endpoint.kind === "terminal"
+      ? { terminal: [endpoint.instanceId, endpoint.pinName] }
+      : { junction: endpoint.junctionId };
+  return {
+    ...anchor,
+    ...(endpoint.memberId !== undefined ? { memberId: endpoint.memberId } : {}),
+  };
 }
 function decodeTerminal(value: unknown, path: Path): ObjectValue {
   const pair = array(value, path);
@@ -67,10 +72,15 @@ function decodeEndpoint(value: ObjectValue, path: Path): ObjectValue {
   const junction = Object.hasOwn(value, "junction");
   if (terminal === junction)
     fail(path, "Specify exactly one terminal or junction");
-  if (junction) return { kind: "junction", junctionId: value.junction };
+  const member = Object.hasOwn(value, "memberId")
+    ? { memberId: value.memberId }
+    : {};
+  if (junction)
+    return { kind: "junction", junctionId: value.junction, ...member };
   return {
     kind: "terminal",
     ...decodeTerminal(value.terminal, [...path, "terminal"]),
+    ...member,
   };
 }
 function encodeText(text: Annotation["content"]): unknown {
@@ -546,7 +556,11 @@ export function decodeProjectFile(
               const p = [...path, "routes", index];
               const route = object(value, p);
               const start = object(route.start, [...p, "start"]);
-              exactKeys(start, ["terminal", "junction"], [...p, "start"]);
+              exactKeys(
+                start,
+                ["terminal", "junction", "memberId"],
+                [...p, "start"],
+              );
               return {
                 ...route,
                 start: decodeEndpoint(start, [...p, "start"]),
@@ -554,9 +568,20 @@ export function decodeProjectFile(
                   const lp = [...p, "legs", index];
                   const leg = object(value, lp);
                   forbid(leg, ["to"], lp);
-                  const { bend, coordinate, terminal, junction, ...rest } = leg;
+                  const {
+                    bend,
+                    coordinate,
+                    terminal,
+                    junction,
+                    memberId,
+                    ...rest
+                  } = leg;
                   if (bend !== undefined) {
-                    if (terminal !== undefined || junction !== undefined)
+                    if (
+                      terminal !== undefined ||
+                      junction !== undefined ||
+                      memberId !== undefined
+                    )
                       fail(lp, "A bend cannot also be an endpoint");
                     return {
                       ...rest,
@@ -577,6 +602,7 @@ export function decodeProjectFile(
                         {
                           ...(terminal !== undefined ? { terminal } : {}),
                           ...(junction !== undefined ? { junction } : {}),
+                          ...(memberId !== undefined ? { memberId } : {}),
                         },
                         lp,
                       ),

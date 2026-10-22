@@ -3,7 +3,7 @@ import type {
   MutableRefObject,
   PointerEvent as ReactPointerEvent,
 } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { segmentDragPreviewPolyline } from "./segment-drag-preview";
 import { resolveWireDraftShape } from "./wire-draft-shape";
@@ -14,6 +14,10 @@ import {
 } from "./wire-draft-preview";
 
 import {
+  evaluateWireMembers,
+  selectWireMember,
+  wireMemberChoice,
+  type WireMemberChoice,
   type WireDraftStep,
   createRoutingOperationPlan,
   gateRoutingOperationPlan,
@@ -127,6 +131,7 @@ export interface UseWireInteractionOptions {
     setSelectedEndpoint: (endpoint: WireSource | null) => void;
   };
   session: {
+    wireActive: boolean;
     readCurrentWireSession: () => CurrentWireSession;
     setTool: (tool: "wire") => void;
     setWireSource: (source: WireSource | null, revision: number | null) => void;
@@ -181,6 +186,42 @@ function segmentDragOrigin(
  * cross-domain canvas pointer arbiter.
  */
 export function useWireInteraction(capabilities: UseWireInteractionOptions) {
+  const [pendingChoice, setPendingChoice] = useState<{
+    choice: WireMemberChoice;
+    document: SchematicDocument;
+    revision: number;
+    accept: (source: WireSource) => void;
+  } | null>(null);
+  const hasWireSource =
+    capabilities.session.readCurrentWireSession().source !== null;
+  useEffect(() => {
+    if (
+      !capabilities.session.wireActive ||
+      pendingChoice?.document !== capabilities.model.document ||
+      (pendingChoice?.choice.allowWhole && !hasWireSource)
+    )
+      setPendingChoice(null);
+  }, [
+    capabilities.session.wireActive,
+    capabilities.model.document,
+    pendingChoice?.document,
+    pendingChoice?.choice.allowWhole,
+    hasWireSource,
+  ]);
+  useEffect(() => {
+    if (!pendingChoice || pendingChoice.choice.allowWhole) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setPendingChoice(null);
+      capabilities.transaction.setStatus(
+        "Bus choice cancelled · Wire remains active",
+      );
+    };
+    window.addEventListener("keydown", escape, true);
+    return () => window.removeEventListener("keydown", escape, true);
+  }, [pendingChoice, capabilities.transaction.setStatus]);
   const segmentPlanner = useMemo(
     () =>
       prepareWireSegmentMove(
@@ -238,8 +279,11 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       options.resolver,
     );
 
-  const commitWire = (candidate: WireSource): void => {
-    const wire = options.readCurrentWireSession();
+  const commitResolvedWire = (
+    source: WireSource,
+    candidate: WireSource,
+  ): void => {
+    const wire = { ...options.readCurrentWireSession(), source };
     if (!wire.source) return;
     if (wire.sourceRevision !== options.document.revision) {
       options.clearTransientCanvasState();
@@ -248,75 +292,148 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       options.setStatus("Wire cancelled because its source revision is stale");
       return;
     }
-    const shape = resolveWireDraftShape(
-      options.document,
-      options.resolver,
-      wire.source,
-      candidate,
-      wire.steps,
-      wire.routingMode,
-      wire.cornerOrder,
-      options.visibleEndpoints,
-    );
-    const proposal = proposeWireCommitThroughContacts(
-      wire.source,
-      candidate,
-      shape.steps.map((item) => item.point),
-      wirePassThroughContacts(options.visibleEndpoints, {
-        from: wire.source,
-        to: candidate,
-        steps: shape.steps,
-      }),
-      options.nextRoutingSuffix(),
-      {
-        steps: shape.steps,
-        routingMode: wire.routingMode,
-        cornerOrder: shape.cornerOrder,
-      },
-    );
-    const bulkEndpoint = [wire.source.endpoint, candidate.endpoint].find(
-      (endpoint) => endpoint.kind === "terminal" && endpoint.pinName === "B",
-    );
-    const defaultBoundInstance =
-      bulkEndpoint?.kind === "terminal"
-        ? options.document.instances.find(
-            (instance) => instance.id === bulkEndpoint.instanceId,
-          )
-        : undefined;
-    const edits = defaultBoundInstance?.mosBulkBinding
-      ? [
-          {
-            kind: "clear_mos_bulk_default" as const,
-            instanceId: defaultBoundInstance.id,
-          },
-          ...proposal.edits.map((edit) => {
-            if (edit.kind !== "connect_endpoints") return edit;
-            const target =
-              edit.from.kind === "terminal" && edit.from.pinName === "B"
-                ? edit.to
-                : edit.from;
-            return {
-              ...edit,
-              from: target,
-              to: {
-                kind: "terminal" as const,
-                instanceId: defaultBoundInstance.id,
-                pinName: "B",
-              },
-            };
-          }),
-        ]
-      : proposal.edits;
-    const result = transactProposal(proposalFor("connect", edits), {
-      completesWireSession: true,
-    });
-    if (result.ok) {
-      options.completeWire();
-      options.setBulkDrawInstanceId(null);
+    try {
+      const shape = resolveWireDraftShape(
+        options.document,
+        options.resolver,
+        wire.source,
+        candidate,
+        wire.steps,
+        wire.routingMode,
+        wire.cornerOrder,
+        options.visibleEndpoints,
+      );
+      const proposal = proposeWireCommitThroughContacts(
+        wire.source,
+        candidate,
+        shape.steps.map((item) => item.point),
+        wirePassThroughContacts(options.visibleEndpoints, {
+          from: wire.source,
+          to: candidate,
+          steps: shape.steps,
+        }),
+        options.nextRoutingSuffix(),
+        {
+          steps: shape.steps,
+          routingMode: wire.routingMode,
+          cornerOrder: shape.cornerOrder,
+        },
+      );
+      const bulkEndpoint = [wire.source.endpoint, candidate.endpoint].find(
+        (endpoint) => endpoint.kind === "terminal" && endpoint.pinName === "B",
+      );
+      const defaultBoundInstance =
+        bulkEndpoint?.kind === "terminal"
+          ? options.document.instances.find(
+              (instance) => instance.id === bulkEndpoint.instanceId,
+            )
+          : undefined;
+      const edits = defaultBoundInstance?.mosBulkBinding
+        ? [
+            {
+              kind: "clear_mos_bulk_default" as const,
+              instanceId: defaultBoundInstance.id,
+            },
+            ...proposal.edits.map((edit) => {
+              if (edit.kind !== "connect_endpoints") return edit;
+              const target =
+                edit.from.kind === "terminal" && edit.from.pinName === "B"
+                  ? edit.to
+                  : edit.from;
+              return {
+                ...edit,
+                from: target,
+                to: {
+                  kind: "terminal" as const,
+                  instanceId: defaultBoundInstance.id,
+                  pinName: "B",
+                },
+              };
+            }),
+          ]
+        : proposal.edits;
+      const result = transactProposal(proposalFor("connect", edits), {
+        completesWireSession: true,
+      });
+      if (result.ok) {
+        options.completeWire();
+        options.setBulkDrawInstanceId(null);
+        options.setStatus(
+          `Committed route at revision ${result.revision} · Wire remains active · Esc exits`,
+        );
+      }
+    } catch (error) {
       options.setStatus(
-        `Committed route at revision ${result.revision} · Wire remains active · Esc exits`,
+        error instanceof Error ? error.message : "Cannot connect here",
       );
     }
+  };
+
+  const askMember = (
+    choice: WireMemberChoice,
+    accept: (source: WireSource) => void,
+  ): void => {
+    setPendingChoice({
+      choice,
+      document: options.document,
+      revision: options.document.revision,
+      accept,
+    });
+    if (!choice.allowWhole) options.setStatus("Choose one bus member");
+  };
+  const startWire = (candidate: WireSource, description?: string): void => {
+    const selectSource = (source: WireSource) => {
+      options.setWireSource(source, options.document.revision);
+      const endpoint = source.endpoint;
+      options.setStatus(
+        `Wire source: ${description ?? (endpoint.kind === "terminal" ? `${endpoint.instanceId}.${endpoint.pinName}` : endpointKey(endpoint))}`,
+      );
+    };
+    selectSource(candidate);
+    options.setWirePreview(
+      freeWireDraftTarget(candidate.connection.contactPoint),
+    );
+    options.setWireDraftSteps([]);
+    if (candidate.members)
+      askMember(
+        wireMemberChoice(options.document, candidate, true),
+        selectSource,
+      );
+  };
+  const commitWire = (candidate: WireSource): void => {
+    const source = options.readCurrentWireSession().source;
+    if (!source) return;
+    const evaluation = evaluateWireMembers(options.document, source, candidate);
+    if (evaluation.kind === "invalid") {
+      options.setStatus(evaluation.message);
+      return;
+    }
+    if (evaluation.kind === "choose") {
+      askMember(evaluation.choice, (selected) =>
+        commitResolvedWire(
+          evaluation.side === "from" ? selected : source,
+          evaluation.side === "to" ? selected : candidate,
+        ),
+      );
+      return;
+    }
+    setPendingChoice(null);
+    commitResolvedWire(evaluation.from, evaluation.to);
+  };
+  const chooseWireMember = (memberId: string | null): void => {
+    if (
+      !pendingChoice ||
+      pendingChoice.document !== options.document ||
+      pendingChoice.revision !== options.document.revision
+    )
+      return;
+    if (memberId === null && !pendingChoice.choice.allowWhole) return;
+    const source =
+      memberId === null
+        ? pendingChoice.choice.source
+        : selectWireMember(pendingChoice.choice.source, memberId);
+    setPendingChoice(null);
+    pendingChoice.accept(source);
   };
 
   const handleWireEndpoint = (
@@ -335,12 +452,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
     options.setTool("wire");
     const wire = options.readCurrentWireSession();
     if (!wire.source) {
-      options.setWireSource(candidate, options.document.revision);
-      options.setWirePreview(
-        freeWireDraftTarget(candidate.connection.contactPoint),
-      );
-      options.setWireDraftSteps([]);
-      options.setStatus(`Wire source: ${endpointKey(candidate.endpoint)}`);
+      startWire(candidate);
       return;
     }
     if (endpointKey(wire.source.endpoint) === endpointKey(candidate.endpoint)) {
@@ -1001,10 +1113,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       return;
     }
     if (!currentWire.source) {
-      options.setWireSource(anchor, options.document.revision);
-      options.setWirePreview(freeWireDraftTarget(tapPoint));
-      options.setWireDraftSteps([]);
-      options.setStatus(`Wire source: route ${routeId}`);
+      startWire(anchor, `route ${routeId}`);
       return;
     }
     commitWire(anchor);
@@ -1041,7 +1150,11 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
   };
 
   return {
+    memberChoice: pendingChoice?.choice ?? null,
+    chooseWireMember,
+    cancelMemberChoice: () => setPendingChoice(null),
     sourceForTarget,
+    startWire,
     beginRouteStretch,
     commitWire,
     completeRouteStretch,

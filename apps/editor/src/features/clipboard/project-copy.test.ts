@@ -6,7 +6,13 @@ import {
   type CircuitProject,
   type Point,
 } from "@icm/model";
-import { executeProjectTransaction } from "@icm/edit-engine";
+import {
+  executeProjectTransaction,
+  planCreateCellPin,
+  planEnsureNamedRoute,
+  proposeWireIntent,
+  type ProjectStructureEdit,
+} from "@icm/edit-engine";
 import { parseProject } from "@icm/project-protocol";
 import { renderDocumentSvg } from "@icm/render-svg";
 import {
@@ -37,6 +43,102 @@ const selection = (instanceIds: string[] = [], routeIds: string[] = []) => ({
   annotationIds: [],
   draftingIds: [],
 });
+it.each(["IN", "DATA<2>"])(
+  "copies explicit scalar Cell Pin %s with fresh member identity",
+  (name) => {
+    const source = createEmptyProject("scalar-copy", "Scalar copy");
+    const cell = source.documents[0]!;
+    const created = executeProjectTransaction(source, {
+      transactionId: "create-scalar",
+      projectId: source.id,
+      expectedStructureRevision: source.structureRevision,
+      actor: { kind: "human", id: "test" },
+      edits: planCreateCellPin(source, cell.id, {
+        instance: {
+          id: "scalar-pin",
+          symbolId: "port",
+          placement: { position: { x: 0, y: 0 }, rotation: 0, mirror: "none" },
+        },
+        terminal: {
+          id: "scalar-terminal",
+          name,
+          netId: "scalar-net",
+          direction: "input",
+          interfaceInstanceIds: ["scalar-pin"],
+        },
+        connectionEdits: [],
+        signalExpression: name,
+      }),
+    });
+    expect(created.ok, JSON.stringify(created)).toBe(true);
+    if (!created.ok) return;
+    const original = structuredClone(created.project);
+    const clipboard = captureProjectCopy(
+      created.project,
+      created.project.documents[0]!,
+      selection(["scalar-pin"]),
+    )!;
+    const copied = place(createEmptyProject("target", "Target"), clipboard)
+      .documents[0]!;
+    const terminal = copied.netlist!.terminals[0]!;
+    const member = terminal.signal!.members[0]!;
+    expect(terminal.name).toBe(name);
+    expect(terminal.signal!.expression).toBe(name);
+    expect(member.name).toBe(name);
+    expect(member.netId).toBe(terminal.netId);
+    expect(member.id).not.toBe(
+      original.documents[0]!.netlist!.terminals[0]!.signal!.members[0]!.id,
+    );
+    expect(
+      copied.nets.find((net) => net.id === member.netId)?.terminals,
+    ).toContainEqual({
+      instanceId: terminal.interfaceInstanceIds[0],
+      pinName: "P",
+    });
+    expect(created.project).toEqual(original);
+  },
+);
+it("refuses bus copy before remapping any member identities", () => {
+  const source = createEmptyProject("bus-copy", "Bus copy");
+  const document = source.documents[0]!;
+  const created = executeProjectTransaction(source, {
+    transactionId: "create-bus",
+    projectId: source.id,
+    expectedStructureRevision: source.structureRevision,
+    actor: { kind: "human", id: "test" },
+    edits: planCreateCellPin(source, document.id, {
+      instance: {
+        id: "bus-pin",
+        symbolId: "port",
+        placement: { position: { x: 0, y: 0 }, rotation: 0, mirror: "none" },
+      },
+      terminal: {
+        id: "bus-terminal",
+        name: "DATA<3:0>",
+        netId: "bus-net",
+        direction: "input",
+        interfaceInstanceIds: ["bus-pin"],
+      },
+      connectionEdits: [],
+      signalExpression: "DATA<3:0>",
+    }),
+  });
+  expect(created.ok, JSON.stringify(created)).toBe(true);
+  if (!created.ok) return;
+  const before = structuredClone(created.project);
+  const cell = created.project.documents[0]!;
+  const clipboard = captureProjectCopy(
+    created.project,
+    cell,
+    selection(["bus-pin"]),
+  );
+  if (!clipboard)
+    throw new Error("Bus pin copy capture unexpectedly returned nothing");
+  expect(() => prepareProjectCopy(created.project, cell, clipboard)).toThrow(
+    /bus groups.*not supported/u,
+  );
+  expect(created.project).toEqual(before);
+});
 function place(
   project: CircuitProject,
   clipboard: SchematicClipboard,
@@ -51,6 +153,110 @@ function place(
   );
   return applyProjectCopyPlacement(plan);
 }
+it("copies an explicitly indexed scalar Label with its independent claim", () => {
+  let source = createEmptyProject("scalar-label-copy", "Scalar Label copy");
+  const commit = (edits: ProjectStructureEdit[]) => {
+    const result = executeProjectTransaction(source, {
+      transactionId: `edit-${source.structureRevision}`,
+      projectId: source.id,
+      expectedStructureRevision: source.structureRevision,
+      actor: { kind: "human", id: "test" },
+      edits,
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    source = result.project;
+  };
+  const document = source.documents[0]!;
+  const wire = proposeWireIntent(
+    document,
+    createProjectSymbolResolver(source, builtInSymbols),
+    {
+      id: "scalar",
+      from: { kind: "free", point: { x: 0, y: 0 } },
+      to: { kind: "free", point: { x: 100, y: 0 } },
+    },
+  );
+  if (typeof wire === "string") throw new Error(wire);
+  commit([
+    {
+      kind: "transact_document",
+      documentId: document.id,
+      expectedRevision: document.revision,
+      edits: wire.edits,
+    },
+  ]);
+  const wired = source.documents[0]!;
+  const route = wired.routes[0]!;
+  const named = planEnsureNamedRoute(wired, route.id, {
+    name: "DATA<2>",
+    candidateNetId: route.netId,
+    evidenceId: "label-claim",
+    owner: { kind: "net-label", annotationId: "label" },
+  });
+  if (!named.ok) throw new Error(named.message);
+  commit([
+    {
+      kind: "transact_document",
+      documentId: wired.id,
+      expectedRevision: wired.revision,
+      edits: [
+        ...named.edits,
+        {
+          kind: "upsert_schematic_annotation",
+          annotation: {
+            id: "label",
+            kind: "net-label",
+            netId: route.netId,
+            binding: { kind: "net-name", netId: route.netId },
+            anchor: {
+              kind: "route",
+              routeId: route.id,
+              legId: route.legs[0]!.id,
+              t: 0.5,
+              normalOffset: 10,
+              direction: "forward",
+              orientation: "horizontal",
+              fallbackPosition: { x: 50, y: 10 },
+            },
+            alignment: "middle",
+            rotation: 0,
+            locked: false,
+          },
+        },
+      ],
+    },
+  ]);
+  const authored = source.documents[0]!;
+  const copied = place(
+    createEmptyProject("target-label", "Target Label"),
+    captureProjectCopy(source, authored, {
+      ...selection([], [route.id]),
+      annotationIds: ["label"],
+    })!,
+  ).documents[0]!;
+  const claim = copied.connectivityEvidence.find(
+    (item) => item.kind === "name-claim",
+  )!;
+  if (claim.kind !== "name-claim")
+    throw new Error("Expected copied name claim");
+  const original = authored.connectivityEvidence.find(
+    (item) => item.kind === "name-claim",
+  )!;
+  if (original.kind !== "name-claim")
+    throw new Error("Expected original name claim");
+  expect(claim.signal?.members).toEqual([
+    { id: expect.any(String), name: "DATA<2>", netId: claim.netId },
+  ]);
+  expect(claim.signal!.members[0]!.id).not.toBe(
+    original.signal!.members[0]!.id,
+  );
+  expect(claim.netId).not.toBe(original.netId);
+  expect(
+    resolveDocumentLogicalNets(copied).byBaseNetId.get(claim.netId)?.name,
+  ).toBe("DATA<2>");
+  expect(copied.routes[0]!.netId).toBe(claim.netId);
+});
 /** A styled drawing with a branch, a label and a note. */
 function keptStyleSource(
   style: NonNullable<
@@ -766,57 +972,87 @@ describe("one Project copy path", () => {
     ).toContainEqual({ instanceId: instance.id, pinName: pin.name });
   });
 
-  it("preserves copied Port names while allocating distinct Base Nets", () => {
-    const project = createEmptyProject("ports", "Ports");
-    const document = project.documents[0]!;
-    document.instances.push(
-      ...["P1", "P2"].map((id, index) => ({
-        id,
-        symbolId: "port",
+  it.each([false, true])(
+    "preserves copied Port names while allocating distinct Base Nets (explicit signal: %s)",
+    (explicit) => {
+      const project = createEmptyProject("ports", "Ports");
+      const document = project.documents[0]!;
+      document.instances.push(
+        ...["P1", "P2"].map((id, index) => ({
+          id,
+          symbolId: "port",
+          placement: {
+            position: { x: 100 * index, y: 0 },
+            rotation: 0 as const,
+            mirror: "none" as const,
+          },
+        })),
+      );
+      document.nets.push({
+        id: "shared",
+        terminals: document.instances.map((instance) => ({
+          instanceId: instance.id,
+          pinName: "P",
+        })),
+      });
+      document.netlist!.terminals.push(
+        ...["P1", "P2"].map((id) => ({
+          id: `input-${id}`,
+          name: "OLD_INPUT",
+          netId: "shared",
+          direction: "input" as const,
+          interfaceInstanceIds: [id],
+          ...(explicit
+            ? {
+                signal: {
+                  expression: "OLD_INPUT",
+                  members: [
+                    { id: `member-${id}`, name: "OLD_INPUT", netId: "shared" },
+                  ],
+                },
+              }
+            : {}),
+        })),
+      );
+      document.instances.push({
+        id: "outside",
+        symbolId: "resistor",
         placement: {
-          position: { x: 100 * index, y: 0 },
-          rotation: 0 as const,
-          mirror: "none" as const,
+          position: { x: 600, y: 600 },
+          rotation: 0,
+          mirror: "none",
         },
-      })),
-    );
-    document.nets.push({
-      id: "shared",
-      terminals: document.instances.map((instance) => ({
-        instanceId: instance.id,
-        pinName: "P",
-      })),
-    });
-    document.netlist!.terminals.push(
-      ...["P1", "P2"].map((id) => ({
-        id: `input-${id}`,
-        name: "OLD_INPUT",
-        netId: "shared",
-        direction: "input" as const,
-        interfaceInstanceIds: [id],
-      })),
-    );
-    document.instances.push({
-      id: "outside",
-      symbolId: "resistor",
-      placement: { position: { x: 600, y: 600 }, rotation: 0, mirror: "none" },
-    });
-    const copied = place(
-      project,
-      captureProjectCopy(project, document, selection(["P1", "P2"]))!,
-    ).documents[0]!;
-    const terminals = copied.netlist!.terminals.filter((terminal) =>
-      terminal.interfaceInstanceIds.some((id) => id !== "P1" && id !== "P2"),
-    );
-    expect(terminals.map((terminal) => terminal.name)).toEqual([
-      "OLD_INPUT",
-      "OLD_INPUT",
-    ]);
-    expect(new Set(terminals.map((terminal) => terminal.netId)).size).toBe(2);
-    expect(terminals.every((terminal) => terminal.netId !== "shared")).toBe(
-      true,
-    );
-  });
+      });
+      const copied = place(
+        project,
+        captureProjectCopy(project, document, selection(["P1", "P2"]))!,
+      ).documents[0]!;
+      const terminals = copied.netlist!.terminals.filter((terminal) =>
+        terminal.interfaceInstanceIds.some((id) => id !== "P1" && id !== "P2"),
+      );
+      expect(terminals.map((terminal) => terminal.name)).toEqual([
+        "OLD_INPUT",
+        "OLD_INPUT",
+      ]);
+      expect(new Set(terminals.map((terminal) => terminal.netId)).size).toBe(2);
+      expect(terminals.every((terminal) => terminal.netId !== "shared")).toBe(
+        true,
+      );
+      if (explicit) {
+        expect(
+          terminals.every(
+            (terminal) => terminal.signal?.members[0]?.netId === terminal.netId,
+          ),
+        ).toBe(true);
+        expect(
+          terminals.map((terminal) => terminal.signal!.members[0]!.id),
+        ).not.toContain("member-P1");
+        expect(
+          terminals.map((terminal) => terminal.signal!.members[0]!.id),
+        ).not.toContain("member-P2");
+      }
+    },
+  );
 
   it("preserves the authored AVDD supply name when copying its marker", () => {
     const project = createEmptyProject("supplies", "Supplies");

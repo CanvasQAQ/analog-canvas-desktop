@@ -3,6 +3,7 @@ import {
   electricalConnectionGrid,
   SYMBOL_STANDARD_GRID,
   transformPoint,
+  junctionElectricalEndpoints,
 } from "@icm/model";
 import type {
   DerivedPoint,
@@ -256,9 +257,9 @@ export function resolveEndpointConnection(
 export function endpointKey(endpoint: RouteEndpoint): string {
   switch (endpoint.kind) {
     case "terminal":
-      return `terminal:${endpoint.instanceId}:${endpoint.pinName}`;
+      return `terminal:${endpoint.instanceId}:${endpoint.pinName}${endpoint.memberId ? `:member:${endpoint.memberId}` : ""}`;
     case "junction":
-      return `junction:${endpoint.junctionId}`;
+      return `junction:${endpoint.junctionId}${endpoint.memberId ? `:member:${endpoint.memberId}` : ""}`;
   }
 }
 
@@ -334,12 +335,18 @@ export function endpointBelongsToNet(
       return net.terminals.some(
         (terminal) =>
           terminal.instanceId === endpoint.instanceId &&
-          terminal.pinName === endpoint.pinName,
+          terminal.pinName === endpoint.pinName &&
+          terminal.memberId === endpoint.memberId,
       );
     case "junction":
       return document.junctions.some(
         (junction) =>
-          junction.id === endpoint.junctionId && junction.netId === net.id,
+          junction.id === endpoint.junctionId &&
+          junctionElectricalEndpoints(junction).some(
+            (item) =>
+              item.netId === net.id &&
+              endpointKey(item.endpoint) === endpointKey(endpoint),
+          ),
       );
   }
 }
@@ -354,11 +361,9 @@ export function netEndpoints(
       ...terminal,
     })),
     ...document.junctions
-      .filter((junction) => junction.netId === net.id)
-      .map((junction): RouteEndpoint => ({
-        kind: "junction",
-        junctionId: junction.id,
-      })),
+      .flatMap(junctionElectricalEndpoints)
+      .filter((item) => item.netId === net.id)
+      .map((item) => item.endpoint),
   ].sort((left, right) =>
     endpointKey(left).localeCompare(endpointKey(right), "en"),
   );

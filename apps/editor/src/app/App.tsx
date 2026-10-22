@@ -2357,14 +2357,7 @@ function WorkspaceEditor({
         return;
       }
       activateTool("wire");
-      setWireSource(source, document.revision);
-      setWirePreview({
-        kind: "endpoint",
-        point: source.connection.contactPoint,
-        source,
-      });
-      setWireDraftSteps([]);
-      setStatus(`Wire source: ${instanceId}.${pinName}`);
+      startWire(source);
     },
   });
   const {
@@ -2717,7 +2710,11 @@ function WorkspaceEditor({
   );
 
   const {
+    memberChoice,
+    chooseWireMember,
+    cancelMemberChoice,
     sourceForTarget,
+    startWire,
     beginRouteStretch,
     drawSelectedMosBulk,
     fixWirePoint,
@@ -2750,6 +2747,7 @@ function WorkspaceEditor({
       setSelectedEndpoint,
     },
     session: {
+      wireActive: tool === "wire",
       readCurrentWireSession,
       setTool,
       setWireSource,
@@ -3390,8 +3388,7 @@ function WorkspaceEditor({
       ),
       getInteractionKind: () => getCurrentInteractionState().kind,
       cancelInteraction,
-      setWireSource,
-      setWirePreview,
+      memberChoicePending: memberChoice?.allowWhole === false,
       setWireDraftSteps,
       setWireRoutingMode,
       setWireCornerOrder,
@@ -3422,7 +3419,13 @@ function WorkspaceEditor({
       logicalRadiusForPixels,
       paintSnapGuides,
     },
-    commands: { commitWire, fixWirePoint, finishWireAtPoint, setStatus },
+    commands: {
+      startWire,
+      commitWire,
+      fixWirePoint,
+      finishWireAtPoint,
+      setStatus,
+    },
   });
   const {
     compositeSelectionOwnsHit,
@@ -6964,6 +6967,9 @@ function WorkspaceEditor({
             flightlines: displayedFlightlines,
             onFlightlineClick: handleFlightline,
             wireDraftPreview,
+            memberChoice,
+            onWireMemberChoose: chooseWireMember,
+            onWireMemberCancel: cancelMemberChoice,
             wireSnapTarget:
               wireSource && wirePreviewTarget?.kind !== "free"
                 ? wirePreviewTarget?.point

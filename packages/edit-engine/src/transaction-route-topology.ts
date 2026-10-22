@@ -39,6 +39,7 @@ type RouteTopologyEdit = Extract<
       | "attach_endpoint_to_route"
       | "remove_junction"
       | "move_junction"
+      | "set_junction_signal"
       | "cut_connection"
       | "connect_endpoints"
       | "disconnect_endpoint";
@@ -74,6 +75,24 @@ export function applyRouteTopologyEdit(
   let connectivityChanged = false;
 
   switch (edit.kind) {
+    case "set_junction_signal": {
+      const junction = draft.junctions.find(
+        (item) => item.id === edit.junctionId,
+      );
+      if (!junction || junction.members)
+        return rejectAt(
+          "EDIT_PRECONDITION",
+          "Signal width can only be established on an untyped loose junction",
+        );
+      junction.members = structuredClone(edit.members);
+      junction.netId = edit.members[0]!.netId;
+      for (const member of edit.members)
+        if (!draft.nets.some((net) => net.id === member.netId))
+          draft.nets.push({ id: member.netId, terminals: [] });
+      changedObjectIds.add(junction.id);
+      connectivityChanged = true;
+      break;
+    }
     case "add_junction": {
       if (!draft.nets.some((net) => net.id === edit.netId)) {
         if (!edit.createNet) {
@@ -112,6 +131,7 @@ export function applyRouteTopologyEdit(
           id: edit.junctionId,
           netId: edit.netId,
           position: contact?.gridLanding ?? edit.position,
+          ...(edit.members ? { members: edit.members } : {}),
           role: edit.role ?? "branch",
           ...(edit.documentStyle ? { documentStyle: edit.documentStyle } : {}),
           ...(edit.styleOverride ? { styleOverride: edit.styleOverride } : {}),
@@ -429,6 +449,27 @@ export function applyRouteTopologyEdit(
           "EDIT_PRECONDITION",
           `Route contains a locked segment: ${route.id}`,
         );
+      }
+      if (
+        !route.members &&
+        routeEndpoints(route).some((endpoint) => endpoint.memberId)
+      ) {
+        draft.annotations = draft.annotations.filter((annotation) => {
+          const selector =
+            !annotation.locked &&
+            annotation.kind === "net-label" &&
+            annotation.binding?.kind === "net-name" &&
+            annotation.anchor.kind === "route" &&
+            annotation.anchor.routeId === route.id &&
+            !draft.connectivityEvidence.some(
+              (evidence) =>
+                evidence.kind === "name-claim" &&
+                evidence.owner.kind === "net-label" &&
+                evidence.owner.annotationId === annotation.id,
+            );
+          if (selector) changedObjectIds.add(annotation.id);
+          return !selector;
+        });
       }
       const anchoredAnnotation = draft.annotations.find(
         (annotation) =>

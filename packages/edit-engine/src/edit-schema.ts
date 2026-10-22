@@ -9,8 +9,10 @@ import {
   InstanceNetlistBindingSchema,
   InstanceSchema,
   SignalFlowParametersSchema,
+  SignalDeclarationSchema,
   InstanceStyleOverrideSchema,
   JunctionRoleSchema,
+  JunctionSchema,
   JunctionStyleOverrideSchema,
   LayoutConstraintSchema,
   LayoutGroupSchema,
@@ -176,6 +178,7 @@ const UpdateCellTerminalEditSchema = z.strictObject({
   kind: z.literal("update_cell_terminal"),
   terminalId: StableIdSchema,
   name: z.string().min(1).max(128).optional(),
+  signal: SignalDeclarationSchema.optional(),
   direction: z.enum(["input", "output", "inout", "passive"]).optional(),
 });
 const RemoveCellTerminalEditSchema = z.strictObject({
@@ -236,6 +239,7 @@ const AddJunctionEditSchema = z.strictObject({
   kind: z.literal("add_junction"),
   junctionId: StableIdSchema,
   netId: StableIdSchema,
+  members: JunctionSchema.shape.members,
   position: PointSchema,
   role: JunctionRoleSchema.optional(),
   documentStyle: ObjectDocumentStyleSchema.optional(),
@@ -268,6 +272,11 @@ const MoveJunctionEditSchema = z.strictObject({
   kind: z.literal("move_junction"),
   junctionId: StableIdSchema,
   position: PointSchema,
+});
+const SetJunctionSignalEditSchema = z.strictObject({
+  kind: z.literal("set_junction_signal"),
+  junctionId: StableIdSchema,
+  members: JunctionSchema.shape.members.unwrap(),
 });
 /**
  * Removes only the rendered Route geometry.  The Net's electrical membership
@@ -475,6 +484,7 @@ export const SchematicEditSchema = z.discriminatedUnion("kind", [
   AttachEndpointToRouteEditSchema,
   RemoveJunctionEditSchema,
   MoveJunctionEditSchema,
+  SetJunctionSignalEditSchema,
   RemoveRouteGeometryEditSchema,
   CutConnectionEditSchema,
   ConnectEndpointsEditSchema,

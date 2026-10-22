@@ -1,4 +1,8 @@
-import { deriveStableId, routeEnd } from "@icm/model";
+import {
+  deriveStableId,
+  routeEnd,
+  routeElectricalConnections,
+} from "@icm/model";
 import type { Net, Point, RouteEndpoint, SchematicDocument } from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 import type { DocumentSpatialIndex } from "./spatial-index.js";
@@ -314,7 +318,12 @@ function netContacts(
               ),
             ].flatMap((id) => {
               const route = routeLookup.routesById.get(id);
-              return route?.netId === net.id ? [route] : [];
+              return route &&
+                routeElectricalConnections(route).some(
+                  (edge) => edge.netId === net.id,
+                )
+                ? [route]
+                : [];
             })
           : routesForNet;
       const incidents = contactIncidents(
@@ -403,9 +412,13 @@ export function deriveDocumentContactEvidence(
     (() => {
       const grouped = new Map<string, SchematicDocument["routes"][number][]>();
       for (const route of document.routes) {
-        const routes = grouped.get(route.netId) ?? [];
-        routes.push(route);
-        grouped.set(route.netId, routes);
+        for (const netId of new Set(
+          routeElectricalConnections(route).map((edge) => edge.netId),
+        )) {
+          const routes = grouped.get(netId) ?? [];
+          routes.push(route);
+          grouped.set(netId, routes);
+        }
       }
       return grouped;
     })();

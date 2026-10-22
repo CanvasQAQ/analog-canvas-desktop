@@ -4,10 +4,65 @@
  */
 import { objectStyleProfile, resolveEndpointPoint } from "@icm/derived";
 import type { EndpointJoin, SchematicStyleProfile } from "@icm/derived";
-import type { SchematicDocument } from "@icm/model";
+import {
+  routeEnd,
+  type Point,
+  type RouteBranch,
+  type SchematicDocument,
+} from "@icm/model";
 import type { SymbolResolver } from "@icm/symbols";
 
 import { escapeXml, pointList } from "./svg-markup.js";
+
+/** Aggregate ink stays an appearance choice on top of the kept Wire style. */
+export function busStrokeProfile(
+  profile: SchematicStyleProfile,
+  memberCount: number,
+): SchematicStyleProfile {
+  return memberCount > 1
+    ? {
+        ...profile,
+        strokes: { ...profile.strokes, wire: profile.strokes.wire * 1.5 },
+      }
+    : profile;
+}
+
+/** A small slash identifies a scalar takeoff without implying a bus-wide dot. */
+export function busTapMarks(
+  route: RouteBranch,
+  centerline: readonly Point[],
+): Array<{
+  memberId: string;
+  from: Point;
+  to: Point;
+}> {
+  if (route.members || centerline.length < 2) return [];
+  return [route.start, routeEnd(route)].flatMap((endpoint, index) => {
+    if (!endpoint.memberId) return [];
+    const points = index === 0 ? centerline : [...centerline].reverse();
+    const origin = points[0]!;
+    const next = points.find(
+      (point) => point.x !== origin.x || point.y !== origin.y,
+    );
+    if (!next) return [];
+    const length = Math.hypot(next.x - origin.x, next.y - origin.y);
+    const dx = (next.x - origin.x) / length;
+    const dy = (next.y - origin.y) / length;
+    const distance = Math.min(6, length / 2);
+    const half = Math.min(3, length / 4);
+    const center = { x: origin.x + dx * distance, y: origin.y + dy * distance };
+    return [
+      {
+        memberId: endpoint.memberId,
+        from: {
+          x: center.x - (dx - dy) * half,
+          y: center.y - (dy + dx) * half,
+        },
+        to: { x: center.x + (dx - dy) * half, y: center.y + (dy + dx) * half },
+      },
+    ];
+  });
+}
 
 export function renderRouteDirectionArrow(
   centerline: ReadonlyArray<{ x: number; y: number }>,

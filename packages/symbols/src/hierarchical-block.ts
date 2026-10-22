@@ -62,6 +62,14 @@ export function createBlockSymbol(
     ...positional,
     pins: positional.pins.map((pin) => ({
       ...pin,
+      ...(layout.terminals.find((terminal) => terminal.name === pin.name)
+        ?.signalMembers
+        ? {
+            signalMembers: layout.terminals.find(
+              (terminal) => terminal.name === pin.name,
+            )!.signalMembers,
+          }
+        : {}),
       presentation: {
         ...pin.presentation,
         nameContent:
@@ -99,6 +107,14 @@ export function projectCellSymbolTerminals(
     );
     return {
       ...port,
+      ...(terminal.signal && terminal.signal.members.length > 1
+        ? {
+            signalMembers: terminal.signal.members.map(({ id, name }) => ({
+              id,
+              name,
+            })),
+          }
+        : {}),
       nameContent:
         annotation?.formatOverride ??
         (!annotation?.binding ? annotation?.content : undefined) ??
