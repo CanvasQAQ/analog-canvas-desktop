@@ -234,6 +234,12 @@ export function remapNetLabelsAfterSplit(
     ) {
       continue;
     }
+    const binding = annotation.binding;
+    const selected =
+      binding?.kind === "net-name"
+        ? (binding.memberEndpoints ??
+          (binding.memberEndpoint ? [binding.memberEndpoint] : undefined))
+        : undefined;
     const closest = splitRouteIds
       .flatMap((routeId) => {
         const route = draft.routes.find(
@@ -243,6 +249,19 @@ export function remapNetLabelsAfterSplit(
           ? resolveRouteEditPath(draft, resolver, route)
           : null;
         if (!route || !polyline) return [];
+        // A scalar fan-out can split the route into ordinary Junction-only
+        // branches and a member-bearing stem. Keep selectors on a segment
+        // that can still represent every selected member.
+        if (selected) {
+          const edges = routeElectricalConnections(route);
+          if (
+            edges.length !== selected.length ||
+            edges.some(
+              (edge) => !edge.endpoints.some((endpoint) => endpoint.memberId),
+            )
+          )
+            return [];
+        }
         const lengths = polyline.points.slice(0, -1).map((from, index) => {
           const to = polyline.points[index + 1]!;
           return Math.hypot(to.x - from.x, to.y - from.y);
@@ -307,7 +326,6 @@ export function remapNetLabelsAfterSplit(
         1,
       ),
     };
-    const binding = annotation.binding;
     if (
       binding?.kind === "net-name" &&
       (binding.memberEndpoint || binding.memberEndpoints)
@@ -319,7 +337,7 @@ export function remapNetLabelsAfterSplit(
         return (
           edge.endpoints.find(
             (candidate) => endpointKey(candidate) === endpointKey(endpoint),
-          ) ?? edge.endpoints[0]
+          ) ?? edge.endpoints.find((candidate) => candidate.memberId)!
         );
       });
       if (binding.memberEndpoints) binding.memberEndpoints = remapped;

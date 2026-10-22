@@ -9,6 +9,77 @@ import { buildSvgScene, renderDocumentSvg } from "./render.js";
 
 const resolver = new InMemorySymbolResolver([]);
 
+it.each([false, true])(
+  "keeps stacked member No Connect names inside formal export bounds (marks only: %s)",
+  (marksOnly) => {
+    const document = createEmptyDocument("unused-bus", "Unused bus");
+    const members = Array.from({ length: 16 }, (_, index) => ({
+      id: `member-${index}`,
+      name: `WWWWWWWW<${index}>`,
+    }));
+    const block = createBlockSymbol({
+      id: "unused-block",
+      name: "Unused",
+      terminals: [
+        {
+          id: "data",
+          name: "DATA<15:0>",
+          direction: "input",
+          signalMembers: members,
+        },
+      ],
+    });
+    const symbols = new InMemorySymbolResolver([block]);
+    document.instances.push({
+      id: "X1",
+      symbolId: block.id,
+      placement: {
+        position: { x: 100, y: 100 },
+        rotation: 90,
+        mirror: "horizontal",
+      },
+    });
+    document.noConnects = members.map((member) => ({
+      id: `nc-${member.id}`,
+      endpoint: {
+        kind: "terminal",
+        instanceId: "X1",
+        pinName: "DATA<15:0>",
+        memberId: member.id,
+      },
+    }));
+    const before = structuredClone(document);
+    const scene = buildSvgScene(document, symbols, {
+      margin: 0,
+      ...(marksOnly
+        ? { objectIds: new Set(document.noConnects.map((mark) => mark.id)) }
+        : {}),
+    });
+    const labels = [
+      ...scene.formalBody.matchAll(
+        /<text[^>]*data-role="no-connect-member"[^>]*>/gu,
+      ),
+    ];
+    expect(labels).toHaveLength(16);
+    for (const [label] of labels) {
+      const x = Number(label.match(/ x="([^"]+)"/u)![1]);
+      const y = Number(label.match(/ y="([^"]+)"/u)![1]);
+      const size = Number(label.match(/font-size="([^"]+)"/u)![1]);
+      expect(scene.viewBox.x).toBeLessThanOrEqual(x);
+      expect(scene.viewBox.y).toBeLessThanOrEqual(y - size);
+      // Eight wide W glyphs alone must fit before the index and NC suffix.
+      expect(scene.viewBox.x + scene.viewBox.width).toBeGreaterThan(
+        x + 8 * size,
+      );
+      expect(scene.viewBox.y + scene.viewBox.height).toBeGreaterThanOrEqual(y);
+    }
+    expect(renderDocumentSvg(document, symbols)).not.toMatch(
+      /editor-overlay|data-layer="selection"/u,
+    );
+    expect(document).toEqual(before);
+  },
+);
+
 function busDrawing() {
   const document = createEmptyDocument("bus-drawing", "Bus drawing");
   const members = Array.from({ length: 4 }, (_, index) => ({

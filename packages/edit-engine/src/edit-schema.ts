@@ -353,6 +353,7 @@ const DisconnectEndpointEditSchema = z.strictObject({
     kind: z.literal("terminal"),
     instanceId: StableIdSchema,
     pinName: z.string().min(1),
+    memberId: StableIdSchema.optional(),
   }),
 });
 /** Assigns a reviewed non-graphical terminal directly to an existing Net. */

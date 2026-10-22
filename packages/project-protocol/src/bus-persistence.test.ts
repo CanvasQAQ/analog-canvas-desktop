@@ -139,7 +139,7 @@ it("requires a new file envelope for explicit member connectivity", () => {
   );
 });
 
-it("writes ordered bundles in schema 76 and refuses them under a schema 75 envelope", () => {
+it("writes ordered bundles in the current schema and refuses them under a schema 75 envelope", () => {
   const project = busProject();
   const terminal = project.documents[0]!.netlist!.terminals[0]!;
   terminal.name = "CLK,RESET,DATA<1:0>";
@@ -149,7 +149,7 @@ it("writes ordered bundles in schema 76 and refuses them under a schema 75 envel
   });
   const saved = serializeProject(project);
   const source = JSON.parse(saved);
-  expect(source.schemaVersion).toBe(76);
+  expect(source.schemaVersion).toBe(CURRENT_PROJECT_FILE_VERSION);
   const reopened = parseProject(saved);
   expect(reopened.documents[0]!.netlist!.terminals[0]!.signal!.members).toEqual(
     terminal.signal!.members,

@@ -16,6 +16,7 @@ import {
 
 import {
   evaluateWireMembers,
+  signalEndpointMembers,
   prepareNamedWireSource,
   planNamedWireEdits,
   selectWireMember,
@@ -63,6 +64,7 @@ import {
   freeWireDraftTarget,
   type WireDraftTarget,
   type WireLabelDraft,
+  type WireRepeat,
 } from "../../interaction/interaction-state";
 import {
   startCanvasDragSession,
@@ -109,6 +111,7 @@ export interface CurrentWireSession {
   steps: readonly WireDraftStep[];
   routingMode: WireRoutingMode;
   cornerOrder: WireCornerOrder;
+  repeat?: WireRepeat;
   label?: WireLabelDraft;
   labelEditing?: WireLabelDraft;
 }
@@ -145,7 +148,8 @@ export interface UseWireInteractionOptions {
     setWireSource: (source: WireSource | null, revision: number | null) => void;
     setWirePreview: (target: WireDraftTarget | null) => void;
     setWireDraftSteps: (steps: WireDraftStep[]) => void;
-    completeWire: () => void;
+    completeWire: (revision?: number) => void;
+    setWireRepeat: (repeat: WireRepeat | null) => void;
     editWireLabel: (draft: WireLabelDraft | null) => void;
     acceptWireLabel: (draft: WireLabelDraft, source: WireSource) => void;
     clearTransientCanvasState: () => void;
@@ -246,6 +250,76 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
     ...capabilities.session,
     ...capabilities.transaction,
     ...capabilities.drag,
+  };
+  const repeat = options.readCurrentWireSession().repeat;
+  useEffect(() => {
+    const wire = options.readCurrentWireSession();
+    const current = wire.repeat;
+    if (!current || wire.source || current.index >= current.members.length)
+      return;
+    if (current.revision !== options.document.revision) {
+      options.cancelInteraction();
+      options.setStatus("Continuous taps cancelled because the source changed");
+      return;
+    }
+    const endpoint = current.source.endpoint;
+    const connection = resolveEndpointConnection(
+      options.document,
+      options.resolver,
+      endpoint,
+    );
+    const members = signalEndpointMembers(
+      options.document,
+      options.resolver,
+      endpoint,
+    );
+    if (!connection || !members) {
+      options.cancelInteraction();
+      options.setStatus("Continuous tap source is no longer available");
+      return;
+    }
+    const source: WireSource = {
+      endpoint,
+      connection,
+      members,
+      netId: members[0]!.netId,
+      preludeEdits: [],
+    };
+    options.setWireSource(
+      selectWireMember(source, current.members[current.index]!.id),
+      options.document.revision,
+    );
+    options.setWirePreview(freeWireDraftTarget(connection.contactPoint));
+  }, [repeat, options.document]);
+  const beginContinuousTaps = (
+    order: "ascending" | "descending" | "fanout",
+    memberId?: string,
+  ) => {
+    if (
+      !pendingChoice?.choice.allowWhole ||
+      pendingChoice.document !== options.document
+    )
+      return;
+    const source = pendingChoice.choice.source;
+    const members = pendingChoice.choice.options.filter(
+      (member) => !memberId || member.id === memberId,
+    );
+    if (!members.length) return;
+    if (order !== "fanout")
+      members.sort(
+        (a, b) =>
+          a.label.localeCompare(b.label, undefined, { numeric: true }) *
+          (order === "descending" ? -1 : 1),
+      );
+    options.setWireRepeat({
+      source,
+      members,
+      index: 0,
+      fanout: order === "fanout",
+      revision: options.document.revision,
+    });
+    pendingChoice.accept(selectWireMember(source, members[0]!.id));
+    setPendingChoice(null);
   };
   const transactProposal = (
     proposal: RoutingOperationPlan,
@@ -431,7 +505,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
         completesWireSession: true,
       });
       if (result.ok) {
-        options.completeWire();
+        options.completeWire(result.revision);
         options.setBulkDrawInstanceId(null);
         options.setStatus(
           `Committed route at revision ${result.revision} · Wire remains active · Esc exits`,
@@ -458,6 +532,7 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
       options.setStatus(`Choose ${choice.expectedWidth ?? 1} bus member(s)`);
   };
   const startWire = (candidate: WireSource, description?: string): void => {
+    options.setWireRepeat(null);
     const selectSource = (source: WireSource) => {
       options.setWireSource(source, options.document.revision);
       const endpoint = source.endpoint;
@@ -1299,6 +1374,8 @@ export function useWireInteraction(capabilities: UseWireInteractionOptions) {
     commitWireLabelEditing,
     cancelWireLabelEditing,
     memberChoice: pendingChoice?.choice ?? null,
+    beginContinuousTaps,
+    wireRepeat: repeat,
     chooseWireMember,
     previewWireExpression,
     chooseWireExpression,

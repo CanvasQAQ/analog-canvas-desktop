@@ -15,7 +15,11 @@ import {
   createProjectSymbolResolver,
   builtInSymbols,
 } from "@icm/symbols";
-import { resolveEndpointConnection } from "@icm/derived";
+import {
+  buildProjectConnectivityIndex,
+  resolveEndpointConnection,
+  traceHierarchyNet,
+} from "@icm/derived";
 import {
   analyzeDesignNetlist,
   createDesignNetlistExport,
@@ -372,6 +376,75 @@ it("preserves physical hierarchy channels after connected reorder, rename and re
   ).toBe("INPUT<0:3>");
 });
 
+it.each([false, true])(
+  "traces one bus member through concrete reversed callers after migration=%s without editing",
+  (migrated) => {
+    const { project } = busDcFixture(migrated);
+    const before = serializeProject(project);
+    const top = project.documents.find((cell) => cell.id === "top")!;
+    const child = project.documents.find((cell) => cell.id === "child")!;
+    const selected = top.netlist!.terminals[0]!.signal!.members.find(
+      (member) => member.name === "DATA<7>",
+    )!;
+    const index = buildProjectConnectivityIndex(
+      project,
+      createProjectSymbolResolver(project, builtInSymbols),
+    );
+    const trace = traceHierarchyNet(index, top.id, selected.netId)!;
+    expect(trace.primary.routes).toEqual(["trunk-identity", "trunk-reverse"]);
+    expect(trace.highlights).toHaveLength(3);
+    const prefix = migrated ? "INPUT" : "IN";
+    for (const [instanceId, bit] of [
+      ["identity", 3],
+      ["reverse", 0],
+    ] as const) {
+      const member = child.netlist!.terminals[0]!.signal!.members.find(
+        (item) => item.name === `${prefix}<${bit}>`,
+      )!;
+      const occurrence = [
+        { parentDocumentId: top.id, instanceId, childDocumentId: child.id },
+      ];
+      expect(trace.highlights).toContainEqual(
+        expect.objectContaining({
+          documentId: child.id,
+          netId: member.netId,
+          hierarchyPath: occurrence,
+        }),
+      );
+      expect(trace.hops).toContainEqual(
+        expect.objectContaining({
+          direction: "down",
+          frame: expect.objectContaining({
+            instanceId,
+            parentMemberId: member.id,
+            parentMemberName: member.name,
+            childMemberId: member.id,
+            childMemberName: member.name,
+          }),
+        }),
+      );
+      expect(
+        index.documents.get(top.id)!.logicalNetByBaseNetId.get(selected.netId)!
+          .logicalEndpoints,
+      ).toContainEqual({
+        kind: "terminal",
+        instanceId,
+        pinName: child.netlist!.terminals[0]!.name,
+        memberId: member.id,
+      });
+      const upward = traceHierarchyNet(
+        index,
+        child.id,
+        member.netId,
+        undefined,
+        occurrence,
+      )!;
+      expect(upward.highlights).toEqual(trace.highlights);
+    }
+    expect(serializeProject(project)).toBe(before);
+  },
+);
+
 function copiedBusDcFixture() {
   let source = busDcFixture(true).project;
   const originalTop = source.documents.find((cell) => cell.id === "top")!;
@@ -679,6 +752,46 @@ it("exports mixed bundles, ordered and nested slices through hierarchy after can
     project.documents.find((document) => document.id === "top")!.netlist!
       .terminals[0]!.name,
   ).toBe("CLK,RESET,DATA<1:0>");
+});
+
+it("traces a selected mixed-bundle member through nested slices without highlighting other members", () => {
+  const { project } = slicedBusDcFixture();
+  const before = serializeProject(project);
+  const top = project.documents.find((cell) => cell.id === "top")!;
+  const child = project.documents.find((cell) => cell.id === "child")!;
+  const index = buildProjectConnectivityIndex(
+    project,
+    createProjectSymbolResolver(project, builtInSymbols),
+  );
+  for (const [name, instances, childName] of [
+    ["DATA<0>", ["nested", "range"], "IN<0>"],
+    ["CLK", ["reorder"], "IN<0>"],
+    ["RESET", ["reorder"], "IN<1>"],
+  ] as const) {
+    const member = top.netlist!.terminals[0]!.signal!.members.find(
+      (item) => item.name === name,
+    )!;
+    const childMember = child.netlist!.terminals[0]!.signal!.members.find(
+      (item) => item.name === childName,
+    )!;
+    const trace = traceHierarchyNet(index, top.id, member.netId)!;
+    expect(
+      trace.highlights
+        .filter((item) => item.documentId === child.id)
+        .map((item) => ({
+          netId: item.netId,
+          instanceId: item.hierarchyPath.at(-1)!.instanceId,
+        })),
+    ).toEqual(
+      instances.map((instanceId) => ({ netId: childMember.netId, instanceId })),
+    );
+    expect(
+      trace.hops
+        .filter((hop) => hop.direction === "down")
+        .map((hop) => hop.direction === "down" && hop.frame.childMemberName),
+    ).toEqual(instances.map(() => childName));
+  }
+  expect(serializeProject(project)).toBe(before);
 });
 
 // Native ngspice is optional in unit-test hosts. Local Windows acceptance may

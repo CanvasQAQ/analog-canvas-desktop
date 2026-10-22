@@ -201,7 +201,8 @@ export function removeNoConnectForEndpoint(
   draft.noConnects = draft.noConnects.filter((noConnect) => {
     const matches =
       noConnect.endpoint.instanceId === endpoint.instanceId &&
-      noConnect.endpoint.pinName === endpoint.pinName;
+      noConnect.endpoint.pinName === endpoint.pinName &&
+      noConnect.endpoint.memberId === endpoint.memberId;
     if (matches) changedObjectIds.add(noConnect.id);
     return !matches;
   });
@@ -657,9 +658,21 @@ export function pruneUnreachableLocalNet(
     return;
   }
   if (
-    draft.routes.some((route) => route.netId === netId) ||
-    draft.junctions.some((junction) => junction.netId === netId) ||
-    draft.netlist?.terminals.some((terminal) => terminal.netId === netId) ||
+    draft.routes.some(
+      (route) =>
+        route.netId === netId ||
+        route.members?.some((member) => member.netId === netId),
+    ) ||
+    draft.junctions.some(
+      (junction) =>
+        junction.netId === netId ||
+        junction.members?.some((member) => member.netId === netId),
+    ) ||
+    draft.netlist?.terminals.some(
+      (terminal) =>
+        terminal.netId === netId ||
+        terminal.signal?.members.some((member) => member.netId === netId),
+    ) ||
     draft.annotations.some(
       (annotation) =>
         annotation.netId === netId ||

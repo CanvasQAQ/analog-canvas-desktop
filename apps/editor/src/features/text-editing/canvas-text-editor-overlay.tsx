@@ -31,6 +31,7 @@ export interface CanvasTextEditorOverlayProps {
   disabled: boolean;
   onUpdate(change: TextEditingUpdate): void;
   onCommit(): void;
+  secondaryAction?: { label: string; onClick(): void } | undefined;
   onCancel(): void;
   onEscape?(): void;
   onDelete(): void;
@@ -199,6 +200,7 @@ export function CanvasTextEditorOverlay({
   disabled,
   onUpdate,
   onCommit,
+  secondaryAction,
   onCancel,
   onEscape,
   onDelete,
@@ -326,7 +328,9 @@ export function CanvasTextEditorOverlay({
     pixelsPerUnit,
     measuredLayoutHeight === null
       ? null
-      : measuredLayoutHeight + (signalPreview ? 48 : 0),
+      : measuredLayoutHeight +
+          (signalPreview ? 48 : 0) +
+          (secondaryAction ? 40 : 0),
     obscured,
   );
   const inlineFrame = resolveInlineTextEditorFrame(
@@ -450,6 +454,15 @@ export function CanvasTextEditorOverlay({
             : {})}
           onLayoutHeightChange={handleLayoutHeightChange}
         />
+        {secondaryAction ? (
+          <button
+            type="button"
+            onClick={secondaryAction.onClick}
+            disabled={Boolean(signalPreview?.error)}
+          >
+            {secondaryAction.label}
+          </button>
+        ) : null}
         {signalPreview ? (
           <div
             className="signal-expression-preview"

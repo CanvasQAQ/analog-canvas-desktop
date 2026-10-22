@@ -16,6 +16,7 @@ import { renderRichTextDocument } from "@icm/render-svg";
 
 import { CanvasTextEditorOverlay } from "../features/text-editing/canvas-text-editor-overlay";
 import type { WireMemberChoice } from "@icm/edit-engine";
+import type { WireRepeat } from "../interaction/interaction-state";
 import type { WireDraftPreview } from "../features/wiring/wire-draft-preview";
 import { serializePolylinePoints } from "./canvas-geometry";
 
@@ -44,6 +45,7 @@ export interface EditorWiringOverlayProps {
     }>,
   ) => void;
   onNetLabelSubmit: () => void;
+  onExpandNetLabels?: (() => void) | undefined;
   onNetLabelEscape: () => void;
   flightlines: readonly Flightline[];
   onFlightlineClick: (
@@ -52,6 +54,13 @@ export interface EditorWiringOverlayProps {
   ) => void;
   wireDraftPreview: WireDraftPreview;
   memberChoice?: WireMemberChoice | null | undefined;
+  wireRepeat?: WireRepeat | undefined;
+  onContinuousTaps?:
+    | ((
+        order: "ascending" | "descending" | "fanout",
+        memberId?: string,
+      ) => void)
+    | undefined;
   onWireMemberChoose?: ((memberId: string | null) => void) | undefined;
   onWireExpressionPreview?:
     ((expression: string) => { text: string; valid: boolean }) | undefined;
@@ -69,6 +78,7 @@ type NetLabelEditorOverlayProps = Pick<
   | "netLabelPlacement"
   | "onNetLabelTextChange"
   | "onNetLabelSubmit"
+  | "onExpandNetLabels"
   | "onNetLabelEscape"
   | "viewBox"
 >;
@@ -82,6 +92,7 @@ export function NetLabelEditorOverlay({
   netLabelPlacement,
   onNetLabelTextChange,
   onNetLabelSubmit,
+  onExpandNetLabels,
   onNetLabelEscape,
   viewBox,
 }: NetLabelEditorOverlayProps) {
@@ -110,6 +121,14 @@ export function NetLabelEditorOverlay({
         disabled={false}
         onUpdate={onNetLabelTextChange}
         onCommit={onNetLabelSubmit}
+        secondaryAction={
+          onExpandNetLabels
+            ? {
+                label: "Expand onto selected branches",
+                onClick: onExpandNetLabels,
+              }
+            : undefined
+        }
         onCancel={onNetLabelEscape}
         onEscape={onNetLabelEscape}
         onDelete={onNetLabelEscape}
@@ -259,6 +278,8 @@ export function EditorWiringOverlay({
 /** Above canvas hit targets, like the existing inline Label editor. */
 export function WireMemberChoiceOverlay({
   memberChoice,
+  wireRepeat,
+  onContinuousTaps,
   onWireMemberChoose,
   onWireExpressionPreview,
   onWireExpressionChoose,
@@ -267,6 +288,8 @@ export function WireMemberChoiceOverlay({
 }: Pick<
   EditorWiringOverlayProps,
   | "memberChoice"
+  | "wireRepeat"
+  | "onContinuousTaps"
   | "onWireMemberChoose"
   | "onWireMemberCancel"
   | "viewBox"
@@ -289,11 +312,12 @@ export function WireMemberChoiceOverlay({
     observer.observe(svg);
     return () => observer.disconnect();
   }, [memberChoice, viewBox]);
-  if (!memberChoice) return null;
+  if (!memberChoice && !wireRepeat) return null;
   const preview = expression.trim()
     ? onWireExpressionPreview?.(expression)
     : null;
-  const point = memberChoice.source.connection.contactPoint;
+  const point = (memberChoice?.source ?? wireRepeat!.source).connection
+    .contactPoint;
   const widthPixels = Math.min(240, viewBox.width / unitsPerPixel - 16);
   const width = widthPixels * unitsPerPixel;
   const x = Math.max(
@@ -302,7 +326,7 @@ export function WireMemberChoiceOverlay({
   );
   const y = Math.max(
     viewBox.y + 8,
-    Math.min(point.y + 12, viewBox.y + viewBox.height - 196 * unitsPerPixel),
+    Math.min(point.y + 12, viewBox.y + viewBox.height - 280 * unitsPerPixel),
   );
   return (
     <foreignObject
@@ -310,7 +334,7 @@ export function WireMemberChoiceOverlay({
       x={x}
       y={y}
       width={width}
-      height={188 * unitsPerPixel}
+      height={(memberChoice ? 272 : 56) * unitsPerPixel}
       data-canvas-overlay="wire-member-choice"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
@@ -327,60 +351,106 @@ export function WireMemberChoiceOverlay({
         role="group"
         aria-label="Bus member choice"
       >
-        <label>
-          Connect {memberChoice.options.length}-member bus
-          <select
-            aria-label="Bus connection"
-            autoFocus={!memberChoice.allowWhole}
-            value={memberChoice.allowWhole ? "whole" : ""}
-            onChange={(event) => {
-              if (event.target.value === "whole") onWireMemberChoose?.(null);
-              else if (event.target.value.startsWith("member:"))
-                onWireMemberChoose?.(event.target.value.slice(7));
-            }}
-          >
-            <option value="" disabled>
-              Choose connection…
-            </option>
-            {memberChoice.allowWhole ? (
-              <option value="whole">
-                Whole bus · {memberChoice.options.length} members
-              </option>
-            ) : null}
-            {memberChoice.options.map((option) => (
-              <option key={option.id} value={`member:${option.id}`}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (preview?.valid) onWireExpressionChoose?.(expression);
-          }}
-        >
-          <input
-            aria-label="Bus member expression"
-            value={expression}
-            placeholder="<7:4> or CLK,DATA<3,0>"
-            onChange={(event) => setExpression(event.target.value)}
-          />
-          {preview ? (
-            <div
-              aria-label="Bus selection preview"
-              role={preview.valid ? "status" : "alert"}
+        {wireRepeat && !memberChoice ? (
+          <div role="status" aria-label="Continuous taps">
+            {wireRepeat.index >= wireRepeat.members.length
+              ? "All members completed · Choose a new source"
+              : `${wireRepeat.fanout ? "Fanout" : "Next tap"}: ${wireRepeat.members[wireRepeat.index]!.label}`}
+            <div>Esc ends continuous taps</div>
+          </div>
+        ) : null}
+        {memberChoice ? (
+          <>
+            <label>
+              Connect {memberChoice.options.length}-member bus
+              <select
+                aria-label="Bus connection"
+                autoFocus={!memberChoice.allowWhole}
+                value={memberChoice.allowWhole ? "whole" : ""}
+                onChange={(event) => {
+                  if (event.target.value.startsWith("fanout:"))
+                    onContinuousTaps?.("fanout", event.target.value.slice(7));
+                  else if (event.target.value === "whole")
+                    onWireMemberChoose?.(null);
+                  else if (event.target.value.startsWith("member:"))
+                    onWireMemberChoose?.(event.target.value.slice(7));
+                }}
+              >
+                <option value="" disabled>
+                  Choose connection…
+                </option>
+                {memberChoice.allowWhole ? (
+                  <option value="whole">
+                    Whole bus · {memberChoice.options.length} members
+                  </option>
+                ) : null}
+                {memberChoice.options.map((option) => (
+                  <option key={option.id} value={`member:${option.id}`}>
+                    {option.label}
+                  </option>
+                ))}
+                {memberChoice.allowWhole ? (
+                  <optgroup label="Repeat one member">
+                    {memberChoice.options.map((option) => (
+                      <option key={option.id} value={`fanout:${option.id}`}>
+                        Fanout {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </label>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (preview?.valid) onWireExpressionChoose?.(expression);
+              }}
             >
-              {preview.text}
-            </div>
-          ) : null}
-          <button type="submit" disabled={!preview?.valid}>
-            Use selection
-          </button>
-        </form>
-        <button type="button" onClick={onWireMemberCancel}>
-          {memberChoice.allowWhole ? "Hide" : "Cancel · Esc"}
-        </button>
+              <input
+                aria-label="Bus member expression"
+                value={expression}
+                placeholder="<7:4> or CLK,DATA<3,0>"
+                onChange={(event) => setExpression(event.target.value)}
+              />
+              {preview ? (
+                <div
+                  aria-label="Bus selection preview"
+                  role={preview.valid ? "status" : "alert"}
+                >
+                  {preview.text}
+                </div>
+              ) : null}
+              <button type="submit" disabled={!preview?.valid}>
+                Use selection
+              </button>
+            </form>
+            {memberChoice.allowWhole ? (
+              <div aria-label="Continuous tap order">
+                <button
+                  type="button"
+                  onClick={() => onContinuousTaps?.("ascending")}
+                >
+                  Tap ascending
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onContinuousTaps?.("descending")}
+                >
+                  Tap descending
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onContinuousTaps?.("fanout")}
+                >
+                  Fanout first member
+                </button>
+              </div>
+            ) : null}
+            <button type="button" onClick={onWireMemberCancel}>
+              {memberChoice.allowWhole ? "Hide" : "Cancel · Esc"}
+            </button>
+          </>
+        ) : null}
       </div>
     </foreignObject>
   );

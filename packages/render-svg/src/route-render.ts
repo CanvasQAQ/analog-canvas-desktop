@@ -2,7 +2,12 @@
  * Route paint beside the conductor ink: direction arrows, the miter bridges
  * that join strokes at pins and Junctions, and No Connect marks.
  */
-import { objectStyleProfile, resolveEndpointPoint } from "@icm/derived";
+import {
+  measureLabelText,
+  objectStyleProfile,
+  resolveEndpointPoint,
+  richTextMetrics,
+} from "@icm/derived";
 import type { EndpointJoin, SchematicStyleProfile } from "@icm/derived";
 import {
   routeEnd,
@@ -185,12 +190,12 @@ export function renderRouteDirectionArrow(
  * than offset along a lead: the declaration applies to that exact terminal or
  * port origin.
  */
-export function renderNoConnectMarkers(
+export function noConnectMarkerLayouts(
   document: SchematicDocument,
   resolver: SymbolResolver,
   profile: SchematicStyleProfile,
   objectIds?: ReadonlySet<string>,
-): string {
+) {
   return [...document.noConnects]
     .filter((item) => !objectIds || objectIds.has(item.id))
     .sort((left, right) => left.id.localeCompare(right.id, "en"))
@@ -203,11 +208,81 @@ export function renderNoConnectMarkers(
       if (!point) return [];
       const markProfile = objectStyleProfile(profile, noConnect);
       const halfExtent = Math.max(markProfile.strokes.normal * 3, 4);
-      const strokeWidth = markProfile.strokes.normal;
+      const memberId = noConnect.endpoint.memberId;
+      const instance =
+        memberId &&
+        document.instances.find(
+          (item) => item.id === noConnect.endpoint.instanceId,
+        );
+      const name = instance
+        ? resolveInstanceSymbol(resolver, instance)
+            ?.definition.pins.find(
+              (pin) => pin.name === noConnect.endpoint.pinName,
+            )
+            ?.signalMembers?.find((member) => member.id === memberId)?.name
+        : undefined;
+      const siblings = document.noConnects.filter(
+        (item) =>
+          item.endpoint.instanceId === noConnect.endpoint.instanceId &&
+          item.endpoint.pinName === noConnect.endpoint.pinName &&
+          item.endpoint.memberId,
+      );
+      const index = siblings.findIndex((item) => item.id === noConnect.id);
+      const fontSize = markProfile.typography.netFontSize;
+      const text = name ? `${name} NC` : undefined;
+      const x = point.x + halfExtent + 3;
+      const y = point.y - halfExtent - 3 - index * fontSize;
+      const measured = text
+        ? measureLabelText(
+            { runs: [{ kind: "text", value: text }] },
+            { ...richTextMetrics(markProfile, "label"), fontSize },
+          )
+        : undefined;
+      const left = Math.min(0, measured?.lines[0]?.ink?.left ?? 0);
+      const right = Math.max(
+        measured?.width ?? 0,
+        measured?.lines[0]?.ink?.right ?? 0,
+      );
       return [
-        `<path data-object-id="${escapeXml(noConnect.id)}" data-role="no-connect" d="M ${point.x - halfExtent} ${point.y - halfExtent} L ${point.x + halfExtent} ${point.y + halfExtent} M ${point.x + halfExtent} ${point.y - halfExtent} L ${point.x - halfExtent} ${point.y + halfExtent}" fill="none" stroke="${markProfile.foreground}" stroke-width="${strokeWidth}" stroke-linecap="${markProfile.lineCap}"/>`,
+        {
+          id: noConnect.id,
+          point,
+          halfExtent,
+          profile: markProfile,
+          label: text
+            ? {
+                text,
+                x,
+                y,
+                fontSize,
+                bounds: {
+                  x: x + left,
+                  y: y - fontSize,
+                  width: right - left,
+                  height: fontSize * 1.3,
+                },
+              }
+            : undefined,
+        },
       ];
-    })
+    });
+}
+
+export function renderNoConnectMarkers(
+  document: SchematicDocument,
+  resolver: SymbolResolver,
+  profile: SchematicStyleProfile,
+  objectIds?: ReadonlySet<string>,
+): string {
+  return noConnectMarkerLayouts(document, resolver, profile, objectIds)
+    .flatMap(({ id, point, halfExtent, profile: markProfile, label }) => [
+      `<path data-object-id="${escapeXml(id)}" data-role="no-connect" d="M ${point.x - halfExtent} ${point.y - halfExtent} L ${point.x + halfExtent} ${point.y + halfExtent} M ${point.x + halfExtent} ${point.y - halfExtent} L ${point.x - halfExtent} ${point.y + halfExtent}" fill="none" stroke="${markProfile.foreground}" stroke-width="${markProfile.strokes.normal}" stroke-linecap="${markProfile.lineCap}"/>`,
+      ...(label
+        ? [
+            `<text data-object-id="${escapeXml(id)}" data-role="no-connect-member" x="${label.x}" y="${label.y}" fill="${markProfile.foreground}" font-size="${label.fontSize}">${escapeXml(label.text)}</text>`,
+          ]
+        : []),
+    ])
     .join("");
 }
 

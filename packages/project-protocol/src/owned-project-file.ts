@@ -18,8 +18,33 @@ import {
   materializeSourceConnectivity,
   type SourceConnectivity,
 } from "./source-connectivity.js";
-export const CURRENT_PROJECT_FILE_VERSION = 76;
+export const CURRENT_PROJECT_FILE_VERSION = 77;
 type Value = Record<string, any>;
+
+/** Member-specific No Connect declarations are explicit from schema 77. */
+export function rejectMemberNoConnect(raw: Value): void {
+  if (!Array.isArray(raw.documents)) return;
+  raw.documents.forEach((document: Value, index: number) => {
+    if (!Array.isArray(document?.noConnects)) return;
+    document.noConnects.forEach((mark: Value, markIndex: number) => {
+      if (mark?.endpoint && Object.hasOwn(mark.endpoint, "memberId"))
+        throw new ProjectFormatError([
+          {
+            code: "INVALID_PROJECT",
+            path: [
+              "documents",
+              index,
+              "noConnects",
+              markIndex,
+              "endpoint",
+              "memberId",
+            ],
+            message: "Member No Connect requires Project schema 77",
+          },
+        ]);
+    });
+  });
+}
 
 /** Schema 75 understood ranges, but not ordered expressions or slice selectors. */
 export function rejectOrderedSignals(raw: Value): void {

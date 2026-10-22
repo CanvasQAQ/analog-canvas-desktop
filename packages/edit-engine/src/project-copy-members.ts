@@ -225,4 +225,7 @@ export function remapImportedMembers(
       endpoint(item, copied.memberEndpoints![endpointIndex]!),
     );
   });
+  source.noConnects.forEach((item, index) =>
+    endpoint(item.endpoint, target.noConnects[index]!.endpoint),
+  );
 }

@@ -228,7 +228,6 @@ export function proposeWireCommit(
           newNetId: `net-ui-${suffixOrIds}`,
         }
       : suffixOrIds;
-  const edits: SchematicEdit[] = [...from.preludeEdits, ...to.preludeEdits];
   const presentation =
     from.routePresentation === "bulk-dashed" ||
     to.routePresentation === "bulk-dashed"
@@ -240,6 +239,21 @@ export function proposeWireCommit(
   // Only an identity hint; the completed endpoint graph derives membership.
   const netId =
     from.members?.[0]?.netId ?? from.netId ?? to.netId ?? ids.newNetId;
+  // A selected, previously unconnected caller member carries a fresh Net
+  // hint. Its new scalar anchor must create that same Net before the selector
+  // is written; otherwise routing keeps the anchor's unrelated provisional ID.
+  const edits: SchematicEdit[] = [from, to].flatMap((source) =>
+    source.preludeEdits.map((edit) =>
+      !source.members &&
+      isFreeWireAnchor(source) &&
+      source.endpoint.kind === "junction" &&
+      edit.kind === "add_junction" &&
+      edit.junctionId === source.endpoint.junctionId &&
+      edit.netId !== netId
+        ? { ...edit, netId, createNet: true }
+        : edit,
+    ),
+  );
   const routeId = ids.routeId;
   const routed = compileWireDraft(
     from,

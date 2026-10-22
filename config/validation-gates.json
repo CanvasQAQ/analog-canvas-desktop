@@ -37,6 +37,7 @@
       "apps/editor/e2e/circuit-authoring.spec.ts",
       "apps/editor/e2e/copy-paste.spec.ts",
       "apps/editor/e2e/agent-bus-reuse.spec.ts",
+      "apps/editor/e2e/agent-bus-productivity.spec.ts",
       "apps/editor/e2e/drawing-style.spec.ts",
       "apps/editor/e2e/editor-shell.spec.ts",
       "apps/editor/e2e/label-editing.spec.ts",
@@ -157,6 +158,7 @@
       "apps/editor/src/features/hierarchy/**",
       "apps/editor/e2e/hierarchy.spec.ts",
       "apps/editor/e2e/bus-lifecycle.spec.ts",
+      "apps/editor/e2e/bus-productivity.spec.ts",
       "packages/model/src/cell-interface-projection*",
       "packages/model/src/circuit-component*",
       "packages/model/src/component-interface*",
@@ -292,6 +294,7 @@
       "apps/editor/src/agent/**",
       "apps/editor/e2e/web-agent-session.spec.ts",
       "apps/editor/e2e/agent-bus-reuse.spec.ts",
+      "apps/editor/e2e/agent-bus-productivity.spec.ts",
       "apps/editor/e2e/agent-simulation.spec.ts",
       "apps/editor/e2e/mcp-native-simulation.spec.ts",
       "apps/editor/e2e/simulation-e2e-fixtures.ts",
@@ -501,12 +504,14 @@
         "pnpm",
         "test:e2e:local",
         "apps/editor/e2e/hierarchy.spec.ts",
-        "apps/editor/e2e/bus-lifecycle.spec.ts"
+        "apps/editor/e2e/bus-lifecycle.spec.ts",
+        "apps/editor/e2e/bus-productivity.spec.ts"
       ],
       "ci": {
         "e2eArgs": [
           "apps/editor/e2e/hierarchy.spec.ts",
-          "apps/editor/e2e/bus-lifecycle.spec.ts"
+          "apps/editor/e2e/bus-lifecycle.spec.ts",
+          "apps/editor/e2e/bus-productivity.spec.ts"
         ]
       }
     },
@@ -569,6 +574,7 @@
         "test:e2e:local",
         "apps/editor/e2e/web-agent-session.spec.ts",
         "apps/editor/e2e/agent-bus-reuse.spec.ts",
+        "apps/editor/e2e/agent-bus-productivity.spec.ts",
         "apps/editor/e2e/agent-simulation.spec.ts",
         "apps/editor/e2e/mcp-native-simulation.spec.ts"
       ],
@@ -576,6 +582,7 @@
         "e2eArgs": [
           "apps/editor/e2e/web-agent-session.spec.ts",
           "apps/editor/e2e/agent-bus-reuse.spec.ts",
+          "apps/editor/e2e/agent-bus-productivity.spec.ts",
           "apps/editor/e2e/agent-simulation.spec.ts",
           "apps/editor/e2e/mcp-native-simulation.spec.ts"
         ]
@@ -628,6 +635,7 @@
         "apps/editor/e2e/circuit-authoring.spec.ts",
         "apps/editor/e2e/copy-paste.spec.ts",
         "apps/editor/e2e/agent-bus-reuse.spec.ts",
+        "apps/editor/e2e/agent-bus-productivity.spec.ts",
         "apps/editor/e2e/drawing-style.spec.ts",
         "apps/editor/e2e/editor-shell.spec.ts",
         "apps/editor/e2e/label-editing.spec.ts",
@@ -643,6 +651,7 @@
           "apps/editor/e2e/circuit-authoring.spec.ts",
           "apps/editor/e2e/copy-paste.spec.ts",
           "apps/editor/e2e/agent-bus-reuse.spec.ts",
+          "apps/editor/e2e/agent-bus-productivity.spec.ts",
           "apps/editor/e2e/drawing-style.spec.ts",
           "apps/editor/e2e/editor-shell.spec.ts",
           "apps/editor/e2e/label-editing.spec.ts",

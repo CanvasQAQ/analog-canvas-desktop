@@ -602,10 +602,9 @@ export function proposePaste(
         noConnect: {
           ...structuredClone(noConnect),
           id: noConnectIds.get(noConnect.id)!,
-          endpoint: {
-            ...noConnect.endpoint,
-            instanceId: instanceIds.get(noConnect.endpoint.instanceId)!,
-          },
+          endpoint: members.endpoint(
+            noConnect.endpoint,
+          ) as typeof noConnect.endpoint,
         },
       };
     }),

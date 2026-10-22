@@ -1104,10 +1104,12 @@ export function diagnoseVisualQuality(
     }
   }
   const noConnectKeys = new Set(
-    document.noConnects.map(
-      (noConnect) =>
-        `${noConnect.endpoint.instanceId}\0${noConnect.endpoint.pinName}`,
-    ),
+    document.noConnects
+      .filter((noConnect) => !noConnect.endpoint.memberId)
+      .map(
+        (noConnect) =>
+          `${noConnect.endpoint.instanceId}\0${noConnect.endpoint.pinName}`,
+      ),
   );
   for (const instance of document.instances) {
     if (!instance.placement) continue;

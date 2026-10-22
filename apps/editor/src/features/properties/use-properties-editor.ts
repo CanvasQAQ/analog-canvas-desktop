@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   createRoutingOperationPlan,
+  planExpandedNetLabels,
   gateRoutingOperationPlan,
   type SchematicEdit,
 } from "@icm/edit-engine";
@@ -907,6 +908,28 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
     setNetLabelPlacement(ready);
   };
 
+  const expandNetLabelSelection = (): void => {
+    if (!netLabelPlacement) return;
+    try {
+      const expression = flattenRichText(netLabelPlacement.content);
+      const edits = planExpandedNetLabels(
+        options.document,
+        options.resolver,
+        expression,
+        options.selectedRouteIds ?? [],
+      );
+      if (transactNamedNet(edits)) {
+        setNetLabelPlacement(null);
+        options.setStatus(
+          `Expanded ${expression} onto selected branches in selection order`,
+        );
+      }
+    } catch (error) {
+      options.setStatus(
+        error instanceof Error ? error.message : "Cannot expand Labels",
+      );
+    }
+  };
   const updateNetLabelPlacementText = (
     change: Partial<
       Pick<
@@ -1381,6 +1404,7 @@ export function usePropertiesEditor(options: UsePropertiesEditorOptions) {
     commitElectricalMarkerName,
     commitNetLabelScope,
     commitNetLabelEditing,
+    expandNetLabelSelection,
     commitPendingNetLabelDraft,
     commitTextEditing,
     escapeTextEditing: () => {

@@ -811,6 +811,10 @@ const TraceInterfaceSchema = z.strictObject({
   childDocumentId: StableIdSchema,
   childTerminalName: z.string(),
   childNetId: StableIdSchema,
+  parentMemberId: StableIdSchema.optional(),
+  parentMemberName: z.string().optional(),
+  childMemberId: StableIdSchema.optional(),
+  childMemberName: z.string().optional(),
 });
 const AgentNetTraceSchema = z.strictObject({
   highlights: z.array(

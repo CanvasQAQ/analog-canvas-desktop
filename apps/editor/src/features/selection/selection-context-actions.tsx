@@ -1,3 +1,7 @@
+import {
+  SignalMemberInspector,
+  type SignalMemberInspection,
+} from "./signal-member-inspector";
 import { lazy, Suspense } from "react";
 import { resolveEndpointPoint, type MosBulkResolution } from "@icm/derived";
 import type { WireSource } from "@icm/edit-engine";
@@ -170,6 +174,7 @@ export function RouteActionsSection({
   onApply,
   onToggleHighlight,
   onDeleteWire,
+  signalMembers,
 }: {
   active: boolean;
   document: SchematicDocument;
@@ -184,6 +189,7 @@ export function RouteActionsSection({
   onApply: (value: RoutePropertyCodeValue) => { ok: boolean; message?: string };
   onToggleHighlight: () => void;
   onDeleteWire: () => void;
+  signalMembers?: SignalMemberInspection | undefined;
 }) {
   if (!active || !route) return null;
   if (bulkOwnerLabel) {
@@ -214,6 +220,7 @@ export function RouteActionsSection({
   }
   return (
     <section className="context-actions" aria-label="Route actions">
+      {signalMembers ? <SignalMemberInspector {...signalMembers} /> : null}
       <Suspense fallback={<p role="status">Loading properties…</p>}>
         <RoutePropertyCodeEditor
           {...(resolver ? { resolver } : {})}
@@ -258,6 +265,7 @@ export function EndpointActionsSection({
   onToggleNoConnect,
   onDeleteJunction,
   junctionColor,
+  signalMembers,
 }: {
   item?: WireSource | null;
   color?: string;
@@ -268,6 +276,7 @@ export function EndpointActionsSection({
   onDeleteConnection: () => void;
   onToggleNoConnect: () => void;
   onDeleteJunction: () => void;
+  signalMembers?: SignalMemberInspection | undefined;
   junctionColor?: {
     color: string;
     onApply(color: string): { ok: boolean; message?: string };
@@ -298,6 +307,7 @@ export function EndpointActionsSection({
     return (
       <section className="context-actions" aria-label="Junction actions">
         <h2>Junction</h2>
+        {signalMembers ? <SignalMemberInspector {...signalMembers} /> : null}
         {junctionProperties ??
           (item && (
             <ItemPropertySummary
@@ -324,6 +334,7 @@ export function EndpointActionsSection({
   return (
     <section className="context-actions" aria-label="Endpoint actions">
       <h2>Endpoint</h2>
+      {signalMembers ? <SignalMemberInspector {...signalMembers} /> : null}
       {junctionProperties ??
         (item && (
           <ItemPropertySummary
@@ -350,7 +361,10 @@ export function EndpointActionsSection({
       <button
         type="button"
         onClick={onToggleNoConnect}
-        disabled={!noConnect && endpointNetId !== null}
+        disabled={
+          Boolean(signalMembers && !item?.endpoint.memberId) ||
+          (!noConnect && endpointNetId !== null)
+        }
         title={noConnect ? "Clear No Connect" : "Mark No Connect"}
       >
         {noConnect ? "Clear NoConn" : "Mark NoConn"}

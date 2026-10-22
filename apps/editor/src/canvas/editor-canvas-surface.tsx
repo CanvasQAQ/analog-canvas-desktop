@@ -409,6 +409,8 @@ export function EditorCanvasSurface({
           ) : null}
           <WireMemberChoiceOverlay
             memberChoice={wiring.memberChoice}
+            wireRepeat={wiring.wireRepeat}
+            onContinuousTaps={wiring.onContinuousTaps}
             onWireMemberChoose={wiring.onWireMemberChoose}
             onWireExpressionPreview={wiring.onWireExpressionPreview}
             onWireExpressionChoose={wiring.onWireExpressionChoose}
@@ -419,6 +421,7 @@ export function EditorCanvasSurface({
             netLabelPlacement={wiring.netLabelPlacement}
             onNetLabelTextChange={wiring.onNetLabelTextChange}
             onNetLabelSubmit={wiring.onNetLabelSubmit}
+            onExpandNetLabels={wiring.onExpandNetLabels}
             onNetLabelEscape={wiring.onNetLabelEscape}
             viewBox={wiring.viewBox}
           />

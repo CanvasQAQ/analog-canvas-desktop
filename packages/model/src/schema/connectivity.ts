@@ -123,6 +123,7 @@ const NoConnectEndpointSchema = z.strictObject({
   kind: z.literal("terminal"),
   instanceId: StableIdSchema,
   pinName: z.string().min(1),
+  memberId: StableIdSchema.optional(),
 });
 export const NoConnectSchema = z.strictObject({
   id: StableIdSchema,

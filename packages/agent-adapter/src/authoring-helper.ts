@@ -806,6 +806,8 @@ export function compileActions(
       case "add-text":
       case "arrange-instances":
       case "disconnect-pin":
+      case "expand-net-labels":
+      case "set-no-connect":
         transactions.push({
           form: "command",
           command: action,

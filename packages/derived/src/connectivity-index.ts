@@ -79,6 +79,10 @@ export interface HierarchyEdge {
   childDocumentId: string;
   childTerminalName: string;
   childNetId: string;
+  parentMemberId?: string;
+  parentMemberName?: string;
+  childMemberId?: string;
+  childMemberName?: string;
 }
 
 export interface HierarchyConnectivityIndex {
@@ -118,7 +122,13 @@ export interface ProjectConnectivityIndex {
 const terminalEndpoint = (
   instanceId: string,
   pinName: string,
-): EndpointRef => ({ kind: "terminal", instanceId, pinName });
+  memberId?: string,
+): EndpointRef => ({
+  kind: "terminal",
+  instanceId,
+  pinName,
+  ...(memberId ? { memberId } : {}),
+});
 
 interface CachedDocumentIndex {
   revision: number;
@@ -288,7 +298,11 @@ function buildNetRecord(
 ): NetConnectivityRecord {
   const logicalEndpoints: EndpointRef[] = [
     ...net.terminals.map((terminal) =>
-      terminalEndpoint(terminal.instanceId, terminal.pinName),
+      terminalEndpoint(
+        terminal.instanceId,
+        terminal.pinName,
+        terminal.memberId,
+      ),
     ),
   ].sort((a, b) => endpointKey(a).localeCompare(endpointKey(b), "en"));
 
@@ -442,6 +456,39 @@ function buildHierarchyIndex(
         const childTerminals = (child.netlist?.terminals ?? []).filter(
           (terminal) => foldNetName(terminal.name) === foldNetName(pin.name),
         );
+        if (pin.signalMembers?.length) {
+          for (const parentMember of pin.signalMembers) {
+            const matches = childTerminals.flatMap((terminal) =>
+              (terminal.signal?.members ?? []).flatMap((member) =>
+                member.id === parentMember.id ? [{ terminal, member }] : [],
+              ),
+            );
+            // Use the captured formal identity, never a member's position or
+            // spelling. Missing/ambiguous mappings cannot create trace edges.
+            if (matches.length !== 1) continue;
+            const { terminal, member } = matches[0]!;
+            if (!childIndex.logicalNetByBaseNetId.has(member.netId)) continue;
+            edges.push({
+              parentDocumentId: parent.id,
+              instanceId: instance.id,
+              parentPinName: pin.name,
+              parentMemberId: parentMember.id,
+              parentMemberName: parentMember.name,
+              childDocumentId: childId,
+              childTerminalName: terminal.name,
+              childMemberId: member.id,
+              childMemberName: member.name,
+              childNetId: member.netId,
+            });
+          }
+          continue;
+        }
+        if (
+          childTerminals.some(
+            (terminal) => (terminal.signal?.members.length ?? 0) > 1,
+          )
+        )
+          continue;
         const childLogicalNets = childTerminals.map((terminal) =>
           childIndex.logicalNetByBaseNetId.get(terminal.netId),
         );
@@ -471,7 +518,8 @@ function buildHierarchyIndex(
     (a, b) =>
       a.parentDocumentId.localeCompare(b.parentDocumentId, "en") ||
       a.instanceId.localeCompare(b.instanceId, "en") ||
-      a.parentPinName.localeCompare(b.parentPinName, "en"),
+      a.parentPinName.localeCompare(b.parentPinName, "en") ||
+      (a.parentMemberId ?? "").localeCompare(b.parentMemberId ?? "", "en"),
   );
   calls.sort(
     (a, b) =>

@@ -10,6 +10,7 @@ import {
   InstanceNetlistDataSchema,
   SignalFlowParametersSchema,
   ComponentDefinitionSchema,
+  NoConnectSchema,
 } from "@icm/model";
 
 /** Small server-planned conveniences; results still commit as existing edits. */
@@ -178,9 +179,19 @@ const BatchItemSchema = z.discriminatedUnion("kind", [
       kind: z.literal("disconnect-pin"),
       instanceId: StableIdSchema,
       pinName: z.string().min(1).max(128),
+      memberId: StableIdSchema.optional(),
     })
     .describe(
-      "Free one pin from its Net, as its menu does: Delete connection where wires end on it, Disconnect endpoint where none does.",
+      "Free one pin from its Net, as its menu does. For a bus, memberId is required and detaches only that lane while preserving other connections.",
+    ),
+  z
+    .strictObject({
+      kind: z.literal("set-no-connect"),
+      endpoints: z.array(NoConnectSchema.shape.endpoint).min(1).max(256),
+      marked: z.boolean(),
+    })
+    .describe(
+      "Mark or clear an explicit set of unused scalar pins or bus members atomically. Connected members require explicit disconnection first.",
     ),
   z
     .strictObject({
@@ -270,6 +281,15 @@ const BatchItemSchema = z.discriminatedUnion("kind", [
       })
       .optional(),
   }),
+  z
+    .strictObject({
+      kind: z.literal("expand-net-labels"),
+      expression: z.string().min(1).max(256),
+      routeIds: z.array(StableIdSchema).min(1).max(256),
+    })
+    .describe(
+      "Expand a signal expression onto distinct existing scalar branches in explicit routeIds order, with one atomic Label edit.",
+    ),
   z.strictObject({
     kind: z.literal("set-net-label"),
     memberMap: z

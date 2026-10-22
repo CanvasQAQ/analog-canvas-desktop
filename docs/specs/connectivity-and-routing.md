@@ -79,7 +79,21 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
   SVG, PNG and PDF share this geometry and exclude editing controls.
 - Unknown members, unequal widths and malformed expressions refuse atomically.
   Fixed scalar sources cannot acquire vector or bundle width from a Label.
-  Member NoConnect authoring is refused without changing the circuit.
+  No Connect accepts one explicit member or an explicit member set. Each mark
+  excludes only that member from missing-connection ERC; connected members need
+  explicit disconnection first. Mark, clear and disconnection are atomic and
+  follow stable identities through interface rename/reorder and undo.
+- Continuous taps opt in to ascending/descending order or intentional fanout.
+  Successful branch transactions advance the shown member; invalid/cancelled
+  drafts do not. Exhaustion stops without wrapping. The session belongs to
+  Wire and uses its existing Label focus, routing controls and Escape behavior.
+- Selecting scalar branches and invoking L can expand an expression into Labels
+  in selection order. Equal counts and distinct scalar Nets are required; all
+  Labels use normal naming/anchoring rules and commit together in one undo.
+- Member inspection and hierarchy traces are read-only. They show full member
+  names, concrete caller occurrences and parent/child mapping, using stable
+  member identity after rename/reorder. Existing Issues locators identify the
+  member whose connection is missing; formal exports exclude inspection overlays.
 - Editing a bus source Pin or Label, or a connected scalar Pin, previews the affected interface and member
   mapping. Matching names retain stable identity; other renames and removed
   members require an explicit target or disconnect. Reordering follows identity,
@@ -169,8 +183,10 @@ Primary owners: `packages/model`, `packages/edit-engine`, `packages/derived`
 - Copy (`C` or copy/paste, any tab, Agent and workspace) takes the selected
   internal subgraph; boundary Routes and external membership stay (copied
   boundary pins open). Selected Pins, markers and labels rejoin only by
-  `name + scope`; names owned by unselected objects, Bulk overrides and No
-  Connects never travel; a whole Cell takes its names, No Connects and testbench.
+  `name + scope`; names owned by unselected objects, Bulk overrides and scalar
+  No Connects stay. Member No Connects travel with their selected caller and
+  use the same owner-scoped member mapping; a whole Cell takes its names,
+  No Connects and testbench.
   Bus members follow their stored identities and ordered mappings. New local
   contacts receive fresh identities; callers of a reused Cell retain its formal
   identities. Imported Cells, captured caller artwork, selector bindings and

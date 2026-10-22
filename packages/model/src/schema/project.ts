@@ -318,46 +318,62 @@ export const CircuitProjectSchema = z
     );
     const childrenByDocument = new Map<string, string[]>();
     for (const [documentIndex, document] of project.documents.entries()) {
-      for (const [netIndex, net] of document.nets.entries()) {
-        for (const [terminalIndex, terminal] of net.terminals.entries()) {
-          const instance = document.instances.find(
-            (item) => item.id === terminal.instanceId,
-          );
-          const binding = instance?.netlist?.binding;
-          const declaration =
-            binding?.kind === "subcircuit"
-              ? documentById
-                  .get(binding.childDocumentId)
-                  ?.netlist?.terminals.find(
-                    (item) =>
-                      foldNetName(item.name) === foldNetName(terminal.pinName),
-                  )
-              : document.netlist?.terminals.find(
+      const memberReferences = [
+        ...document.nets.flatMap((net, netIndex) =>
+          net.terminals.map((terminal, terminalIndex) => ({
+            terminal,
+            path: [
+              "documents",
+              documentIndex,
+              "nets",
+              netIndex,
+              "terminals",
+              terminalIndex,
+            ],
+          })),
+        ),
+        ...document.noConnects.map((item, noConnectIndex) => ({
+          terminal: item.endpoint,
+          path: [
+            "documents",
+            documentIndex,
+            "noConnects",
+            noConnectIndex,
+            "endpoint",
+          ],
+        })),
+      ];
+      for (const { terminal, path } of memberReferences) {
+        const instance = document.instances.find(
+          (item) => item.id === terminal.instanceId,
+        );
+        const binding = instance?.netlist?.binding;
+        const declaration =
+          binding?.kind === "subcircuit"
+            ? documentById
+                .get(binding.childDocumentId)
+                ?.netlist?.terminals.find(
                   (item) =>
-                    item.interfaceInstanceIds.includes(terminal.instanceId) &&
-                    terminal.pinName === "P",
-                );
-          const members = declaration?.signal?.members;
-          const vector = members && members.length > 1;
-          if (
-            vector
-              ? !members.some((member) => member.id === terminal.memberId)
-              : terminal.memberId !== undefined
-          ) {
-            context.addIssue({
-              code: "custom",
-              message:
-                "Terminal endpoint must select an existing scalar member of its declared interface",
-              path: [
-                "documents",
-                documentIndex,
-                "nets",
-                netIndex,
-                "terminals",
-                terminalIndex,
-              ],
-            });
-          }
+                    foldNetName(item.name) === foldNetName(terminal.pinName),
+                )
+            : document.netlist?.terminals.find(
+                (item) =>
+                  item.interfaceInstanceIds.includes(terminal.instanceId) &&
+                  terminal.pinName === "P",
+              );
+        const members = declaration?.signal?.members;
+        const vector = members && members.length > 1;
+        if (
+          vector
+            ? !members.some((member) => member.id === terminal.memberId)
+            : terminal.memberId !== undefined
+        ) {
+          context.addIssue({
+            code: "custom",
+            message:
+              "Terminal endpoint must select an existing scalar member of its declared interface",
+            path,
+          });
         }
       }
       for (const [terminalIndex, terminal] of (
